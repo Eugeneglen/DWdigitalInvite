@@ -120,7 +120,7 @@ function HomeContent() {
   // Show login modal when ?view= param requires auth but user isn't authenticated
   // Also show when ?view= doesn't match the user's current role (e.g. admin visiting ?view=couple)
   const needsAuthForView = (wantsCMSView && !isAdmin) || (wantsCoupleView && !isCouple);
-  const autoShowLogin = needsAuthForView && dismissedForView !== viewParam && status !== 'loading';
+  const autoShowLogin = needsAuthForView && dismissedForView !== viewParam;
   const showLoginModal = loginModalOpen || autoShowLogin;
 
   const handleLoginModalChange = (open: boolean) => {
