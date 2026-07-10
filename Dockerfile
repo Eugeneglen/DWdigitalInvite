@@ -25,6 +25,11 @@ COPY . .
 # what next build is doing (and whether it errors out).
 RUN npm run build
 
+# Seed the database with the initial admin and couple accounts.
+# This runs after the build so the Prisma client and app dependencies
+# are already available.
+RUN npx prisma db seed
+
 ENV NODE_ENV=production
 EXPOSE 3000
 
