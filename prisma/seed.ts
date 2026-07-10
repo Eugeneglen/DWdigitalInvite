@@ -7,7 +7,7 @@ async function seed() {
   console.log('🌱 Seeding database...');
 
   // 1. Create Dreamweavers Super Admin
-  const adminPassword = await bcrypt.hash('Admin@2024', 12);
+  const adminPassword = await bcrypt.hash('Admin@123', 12);
   const admin = await db.user.upsert({
     where: { email: 'admin@dreamweavers.sg' },
     update: { role: 'SUPER_ADMIN' },
@@ -22,7 +22,7 @@ async function seed() {
   console.log(`✅ Admin user: ${admin.email} (${admin.role})`);
 
   // 2. Create a sample couple user
-  const couplePassword = await bcrypt.hash('Couple@2024', 12);
+  const couplePassword = await bcrypt.hash('Couple@123', 12);
   const couple = await db.user.upsert({
     where: { email: 'eleanor@wedding.com' },
     update: { role: 'COUPLE' },
@@ -154,8 +154,8 @@ async function seed() {
 
   console.log('\n🎉 Seed complete!');
   console.log('---');
-  console.log('Admin login: admin@dreamweavers.sg / Admin@2024');
-  console.log('Couple login: eleanor@wedding.com / Couple@2024');
+  console.log('Admin login: admin@dreamweavers.sg / Admin@123');
+  console.log('Couple login: eleanor@wedding.com / Couple@123');
 }
 
 seed()
