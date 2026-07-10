@@ -11,6 +11,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
+    "db:seed": "node prisma/seed.ts",
     "verify-standalone": "if [ -d .next/standalone ]; then echo .next/standalone exists; ls -la .next/standalone | head -20; else echo .next/standalone MISSING!; exit 1; fi"
   },
   "dependencies": {

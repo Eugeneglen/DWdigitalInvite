@@ -40,5 +40,8 @@ ENV PORT=3000
 
 EXPOSE 3000
 
-# Start the app
-CMD ["node", "server.js"]
+# Create startup script that seeds database before starting app
+RUN echo '#!/bin/sh\necho "Seeding database..."\nnpx prisma db push --skip-generate\nnode prisma/seed.ts\necho "Starting application..."\nnode server.js' > /app/startup.sh
+RUN chmod +x /app/startup.sh
+
+CMD ["/app/startup.sh"]
