@@ -31,10 +31,6 @@ ENV DATABASE_URL=${DATABASE_URL}
 # what next build is doing (and whether it errors out).
 RUN npm run build
 
-# Seed the database using Railway's DATABASE_URL so the user table is
-# populated for login to work.
-RUN npx prisma db seed
-
 ENV NODE_ENV=production
 EXPOSE 3000
 
