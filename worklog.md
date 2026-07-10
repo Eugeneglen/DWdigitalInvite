@@ -1914,3 +1914,20 @@ Stage Summary:
 - Full CMS page (24 dynamic imports) exceeds sandbox memory when compiled concurrently
 - Committed auth/tenant/build compatibility fixes to cms-2
 - Root cause of instability: 3.9GB sandbox RAM with no swap, Turbopack compilation spikes
+
+---
+Task ID: workflow-rules
+Agent: Main (user-directed)
+Task: Establish Z.ai + GitHub + Railway development workflow
+
+Work Log:
+- User provided the official development workflow to follow from this point forward
+- Saved workflow rules to worklog for all future sessions
+
+Stage Summary:
+- All development happens in Z.ai (this environment)
+- All commits go to GitHub CRM-2 branch ONLY
+- Railway auto-deploys from CRM-2 — never edit code on Railway directly
+- Validation happens on Railway after each deployment
+- If issues found: fix in Z.ai → commit to CRM-2 → Railway auto-redeploys → re-validate
+- GitHub CRM-2 is the single source of truth
