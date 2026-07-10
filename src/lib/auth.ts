@@ -14,7 +14,9 @@ export const getServerSession = () => _getServerSession(authOptions);
 export interface JWTPayload {
   userId: string;
   email: string;
+  name?: string;
   role: string;
+  tenantId?: string;
   tenantRole?: string;
   iat?: number;
   exp?: number;
