@@ -7,8 +7,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY bun.lock ./
 
-# Install dependencies
-RUN npm ci
+# Install dependencies with Bun
+RUN bun install --frozen-lockfile
 
 # Copy Prisma schema and generate client
 COPY prisma ./prisma
@@ -17,8 +17,8 @@ RUN npx prisma generate
 # Copy entire project
 COPY . .
 
-# Build Next.js with standalone output
-RUN npm run build
+# Build Next.js with standalone output using Bun
+RUN bun run build
 
 # Verify standalone output was created
 RUN if [ ! -d ".next/standalone" ]; then echo "ERROR: .next/standalone not created!"; exit 1; fi
