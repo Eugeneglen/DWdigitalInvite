@@ -3,12 +3,15 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
+# Install Bun (not included in node:22-alpine by default)
+RUN npm install -g bun
+
 # Copy package files
 COPY package*.json ./
 COPY bun.lock ./
 
-# Install dependencies
-RUN npm ci
+# Install dependencies with Bun
+RUN bun install --frozen-lockfile
 
 # Copy Prisma schema and generate client
 COPY prisma ./prisma
@@ -17,8 +20,8 @@ RUN npx prisma generate
 # Copy entire project
 COPY . .
 
-# Build Next.js with standalone output
-RUN npm run build
+# Build Next.js with standalone output - OUTPUT DIRECTLY (no log redirection)
+RUN bun run build
 
 # Verify standalone output was created
 RUN if [ ! -d ".next/standalone" ]; then echo "ERROR: .next/standalone not created!"; exit 1; fi
