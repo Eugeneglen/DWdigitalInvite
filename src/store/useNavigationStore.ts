@@ -39,16 +39,18 @@ const SECTION_TO_FEATURE: Partial<Record<Section, string>> = {
   moments: 'moments',
 };
 
-/** Filter global nav tabs by wedding feature flags */
+/** Filter global nav tabs by wedding feature flags.
+ *  When featureFlags is empty (no wedding data loaded yet), show all tabs. */
 export function filterTabsByFeatures(
   tabs: NavTab[],
   featureFlags: Record<string, boolean>,
 ): NavTab[] {
+  const hasFlags = Object.keys(featureFlags).length > 0;
   return tabs.filter((tab) => {
     if (tab.section === 'home') return true; // always shown
     const featureKey = SECTION_TO_FEATURE[tab.section];
     if (!featureKey) return true; // unknown section → show
-    return featureFlags[featureKey] === true;
+    return !hasFlags || featureFlags[featureKey] === true;
   });
 }
 
