@@ -287,16 +287,16 @@ export default function CoupleDetails() {
         </CardContent>
       </Card>
 
-      {/* Save Button */}
-      <div className="flex justify-end pt-2">
+      {/* Sticky Save Bar — bottom right (always visible — only way to save wedding details) */}
+      <div className="sticky bottom-0 flex justify-end gap-2 py-4 bg-white/95 backdrop-blur-sm border-t border-charcoal-ink/5">
         <Button
           onClick={handleSave}
           disabled={saving}
-          className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 rounded px-6 py-2.5 text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300 disabled:opacity-50"
+          className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 rounded px-6 py-2.5 text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300 disabled:opacity-50 shrink-0 min-w-fit"
         >
           {saving ? (
             <>
-              <Loader2 className="size-4 animate-spin mr-2" />
+              <Loader2 className="size-4 mr-2 animate-spin" />
               Saving…
             </>
           ) : (

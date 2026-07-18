@@ -2,14 +2,19 @@
 
 import dynamic from 'next/dynamic';
 import { Lock } from 'lucide-react';
-import { useCoupleCMSStore } from '@/store/useCoupleCMSStore';
+import { useCoupleCMSStore, type CoupleCMSPage } from '@/store/useCoupleCMSStore';
 import { isPageEnabled, extractFeatureFlags, PAGE_TO_FEATURE } from '@/lib/feature-lock';
 import { FEATURE_LABELS } from '@/lib/constants';
 
 // ── Dedicated Couple CMS pages ──────────────────────────────────────────────
+// Using dynamic imports with ssr:false for code-splitting. Components are
+// kept mounted (display:none) via the ALL_PAGES array below, so navigating
+// between pages does NOT unmount/remount them — preventing thumbnail
+// disappearance and state loss.
 const CoupleOverview = dynamic(() => import('./couple/CoupleOverview'), { ssr: false });
 const CoupleDetails = dynamic(() => import('./couple/CoupleDetails'), { ssr: false });
 const CoupleHome = dynamic(() => import('./couple/CoupleHome'), { ssr: false });
+const CoupleDesign = dynamic(() => import('./couple/CoupleDesign'), { ssr: false });
 const CoupleSchedule = dynamic(() => import('./couple/CoupleSchedule'), { ssr: false });
 const CoupleRSVPs = dynamic(() => import('./couple/CoupleRSVPs'), { ssr: false });
 const CoupleGettingThere = dynamic(() => import('./couple/CoupleGettingThere'), { ssr: false });
@@ -22,6 +27,27 @@ const CoupleAnalytics = dynamic(() => import('./couple/CoupleAnalytics'), { ssr:
 const CoupleAuditLog = dynamic(() => import('./couple/CoupleAuditLog'), { ssr: false });
 const CoupleSharing = dynamic(() => import('./couple/CoupleSharing'), { ssr: false });
 const CoupleFeatures = dynamic(() => import('./couple/CoupleFeatures'), { ssr: false });
+
+// Ordered list of all couple CMS pages and their components.
+// Ordered to match the sidebar navigation order.
+const ALL_PAGES: Array<{ key: CoupleCMSPage; component: React.ComponentType }> = [
+  { key: 'overview', component: CoupleOverview },
+  { key: 'details', component: CoupleDetails },
+  { key: 'home', component: CoupleHome },
+  { key: 'design', component: CoupleDesign },
+  { key: 'schedule', component: CoupleSchedule },
+  { key: 'rsvps', component: CoupleRSVPs },
+  { key: 'getting-there', component: CoupleGettingThere },
+  { key: 'story', component: CoupleStory },
+  { key: 'wishes', component: CoupleWishes },
+  { key: 'faqs', component: CoupleFAQs },
+  { key: 'moments', component: CoupleMoments },
+  { key: 'guests', component: CoupleGuests },
+  { key: 'analytics', component: CoupleAnalytics },
+  { key: 'audit', component: CoupleAuditLog },
+  { key: 'sharing', component: CoupleSharing },
+  { key: 'features', component: CoupleFeatures },
+];
 
 /** Locked screen shown when a couple tries to access a disabled feature */
 function LockedFeaturePage({ featureKey }: { featureKey: string }) {
@@ -42,6 +68,15 @@ function LockedFeaturePage({ featureKey }: { featureKey: string }) {
   );
 }
 
+/**
+ * Keeps all ENABLED couple CMS pages mounted but only shows the active one
+ * (via display:none). This avoids unmounting/remounting on every navigation,
+ * which previously destroyed fetched images (thumbnails disappeared) and
+ * reset form state. Same pattern as the GuestSite PageRenderer.
+ *
+ * Locked pages (features not in the couple's plan) are NOT mounted at all —
+ * they show a LockedFeaturePage placeholder instead.
+ */
 export default function CoupleCMSPageRouter() {
   const { currentPage, weddingData } = useCoupleCMSStore();
   const featureFlags = extractFeatureFlags(weddingData as Record<string, unknown> | null);
@@ -50,42 +85,25 @@ export default function CoupleCMSPageRouter() {
   const pageEnabled = isPageEnabled(currentPage, featureFlags);
   const featureKey = PAGE_TO_FEATURE[currentPage];
 
+  // If the current page is locked, show the locked screen (don't render any page)
   if (!pageEnabled && featureKey) {
     return <LockedFeaturePage featureKey={featureKey} />;
   }
 
-  switch (currentPage) {
-    case 'overview':
-      return <CoupleOverview />;
-    case 'details':
-      return <CoupleDetails />;
-    case 'home':
-      return <CoupleHome />;
-    case 'schedule':
-      return <CoupleSchedule />;
-    case 'rsvps':
-      return <CoupleRSVPs />;
-    case 'getting-there':
-      return <CoupleGettingThere />;
-    case 'story':
-      return <CoupleStory />;
-    case 'wishes':
-      return <CoupleWishes />;
-    case 'faqs':
-      return <CoupleFAQs />;
-    case 'moments':
-      return <CoupleMoments />;
-    case 'guests':
-      return <CoupleGuests />;
-    case 'analytics':
-      return <CoupleAnalytics />;
-    case 'audit':
-      return <CoupleAuditLog />;
-    case 'sharing':
-      return <CoupleSharing />;
-    case 'features':
-      return <CoupleFeatures />;
-    default:
-      return <CoupleOverview />;
-  }
+  return (
+    <>
+      {ALL_PAGES.map(({ key, component: Component }) => {
+        // Skip mounting locked pages entirely (saves resources)
+        if (!isPageEnabled(key, featureFlags)) return null;
+        return (
+          <div
+            key={key}
+            style={{ display: key === currentPage ? 'block' : 'none' }}
+          >
+            <Component />
+          </div>
+        );
+      })}
+    </>
+  );
 }

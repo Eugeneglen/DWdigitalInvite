@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Loader2, Plus, Pencil, Trash2, Clock, MapPin, CalendarRange } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, Clock, MapPin, CalendarRange, Save } from 'lucide-react';
 import MirrorImageGallery from './MirrorImageGallery';
 import MirrorImageUpload from './MirrorImageUpload';
 import { toast } from '@/hooks/use-toast';
@@ -89,13 +89,19 @@ export default function CoupleSchedule() {
   const [contentFields, setContentFields] = useState<Record<string, string>>({});
   const [originalFields, setOriginalFields] = useState<Record<string, string>>({});
   const [editedFields, setEditedFields] = useState<Record<string, boolean>>({});
-  const [savingContent, setSavingContent] = useState(false);
 
   // Venue content state (getting-there section)
   const [venueFields, setVenueFields] = useState<Record<string, string>>({});
   const [venueOriginals, setVenueOriginals] = useState<Record<string, string>>({});
   const [venueEdited, setVenueEdited] = useState<Record<string, boolean>>({});
-  const [savingVenue, setSavingVenue] = useState(false);
+
+  // Unified saving state — one Save button for all text fields (schedule + venue)
+  const [savingAll, setSavingAll] = useState(false);
+
+  // Total pending text changes across all sections (for the Save button count)
+  const totalPendingChanges =
+    Object.values(editedFields).filter(Boolean).length +
+    Object.values(venueEdited).filter(Boolean).length;
 
   const CONTENT_KEYS = [
     { key: 'title', label: 'Section Title', placeholder: 'e.g. The Day', type: 'input' as const },
@@ -126,7 +132,7 @@ export default function CoupleSchedule() {
       const res = await fetch('/api/cms/content?XTransformPort=3000');
       if (!res.ok) throw new Error('Failed to load content');
       const data = await res.json();
-      const allItems = data.items ?? [];
+      const allItems = data.content ?? [];
 
       // Schedule section fields
       const scheduleItems = allItems.filter((i: { section: string }) => i.section === 'schedule');
@@ -248,51 +254,31 @@ export default function CoupleSchedule() {
     }));
   };
 
-  const handleSaveVenue = async () => {
-    try {
-      setSavingVenue(true);
-      const items = Object.keys(venueEdited)
-        .filter((k) => venueEdited[k])
-        .map((fieldKey) => ({
-          section: 'getting-there' as const,
-          fieldKey,
-          fieldValue: venueFields[fieldKey],
-        }));
-      if (items.length === 0) {
-        toast({ title: 'Info', description: 'No changes to save' });
-        return;
-      }
-      const res = await fetch('/api/cms/content?XTransformPort=3000', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items }),
-      });
-      if (!res.ok) throw new Error('Failed to save venue content');
-      invalidateWeddingCache();
-      toast({ title: 'Success', description: 'Venue content saved' });
-      setVenueOriginals({ ...venueFields });
-      setVenueEdited({});
-    } catch {
-      toast({ title: 'Error', description: 'Failed to save venue content', variant: 'destructive' });
-    } finally {
-      setSavingVenue(false);
-    }
-  };
+  // Unified save — one button saves ALL text field changes (schedule + venue)
+  const handleSaveAll = async () => {
+    const items: Array<{ section: string; fieldKey: string; fieldValue: string }> = [];
 
-  const handleSaveContent = async () => {
+    // Schedule section fields
+    Object.keys(editedFields)
+      .filter((k) => editedFields[k])
+      .forEach((fieldKey) => {
+        items.push({ section: 'schedule', fieldKey, fieldValue: contentFields[fieldKey] });
+      });
+
+    // Getting-there section venue fields
+    Object.keys(venueEdited)
+      .filter((k) => venueEdited[k])
+      .forEach((fieldKey) => {
+        items.push({ section: 'getting-there', fieldKey, fieldValue: venueFields[fieldKey] });
+      });
+
+    if (items.length === 0) {
+      toast({ title: 'Info', description: 'No changes to save' });
+      return;
+    }
+
     try {
-      setSavingContent(true);
-      const items = Object.keys(editedFields)
-        .filter((k) => editedFields[k])
-        .map((fieldKey) => ({
-          section: 'schedule' as const,
-          fieldKey,
-          fieldValue: contentFields[fieldKey],
-        }));
-      if (items.length === 0) {
-        toast({ title: 'Info', description: 'No changes to save' });
-        return;
-      }
+      setSavingAll(true);
       const res = await fetch('/api/cms/content?XTransformPort=3000', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -300,13 +286,15 @@ export default function CoupleSchedule() {
       });
       if (!res.ok) throw new Error('Failed to save content');
       invalidateWeddingCache();
-      toast({ title: 'Success', description: 'Content saved successfully' });
+      toast({ title: 'Success', description: `${items.length} change${items.length > 1 ? 's' : ''} saved` });
       setOriginalFields({ ...contentFields });
       setEditedFields({});
+      setVenueOriginals({ ...venueFields });
+      setVenueEdited({});
     } catch {
-      toast({ title: 'Error', description: 'Failed to save content', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Failed to save changes', variant: 'destructive' });
     } finally {
-      setSavingContent(false);
+      setSavingAll(false);
     }
   };
 
@@ -357,15 +345,6 @@ export default function CoupleSchedule() {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {Object.values(editedFields).some(Boolean) && (
-            <Button
-              onClick={handleSaveContent}
-              disabled={savingContent}
-              className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 rounded px-4 py-2 text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300"
-            >
-              {savingContent ? 'Saving…' : 'Save Content'}
-            </Button>
-          )}
           <Button
             onClick={openAddDialog}
             className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 rounded px-4 py-2 text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300"
@@ -384,14 +363,7 @@ export default function CoupleSchedule() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-charcoal-ink">Wedding Venue</h3>
             {Object.values(venueEdited).some(Boolean) && (
-              <Button
-                onClick={handleSaveVenue}
-                disabled={savingVenue}
-                size="sm"
-                className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 rounded px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.08em] transition-colors duration-300"
-              >
-                {savingVenue ? 'Saving…' : 'Save'}
-              </Button>
+              <span className="text-[11px] text-cinematic-gold font-medium uppercase tracking-[0.08em]">Edited</span>
             )}
           </div>
           <div className="space-y-4">
@@ -674,7 +646,7 @@ export default function CoupleSchedule() {
             <Button
               onClick={handleSave}
               disabled={saving}
-              className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 rounded px-6 py-2.5 text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300 disabled:opacity-50"
+              className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 rounded px-6 py-2.5 text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300 disabled:opacity-50 shrink-0 min-w-fit"
             >
               {saving ? (
                 <>
@@ -690,6 +662,29 @@ export default function CoupleSchedule() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Sticky Save Bar — bottom right */}
+      {true && (
+        <div className="sticky bottom-0 flex justify-end gap-2 py-4 bg-white/95 backdrop-blur-sm border-t border-charcoal-ink/5">
+          <Button
+            onClick={handleSaveAll}
+            disabled={savingAll}
+            className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 rounded px-6 py-2.5 text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300 disabled:opacity-50 shrink-0 min-w-fit"
+          >
+            {savingAll ? (
+              <>
+                <Loader2 className="size-4 mr-2 animate-spin" />
+                Saving…
+              </>
+            ) : (
+              <>
+                <Save className="size-4 mr-2" />
+                Save Changes ({totalPendingChanges})
+              </>
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

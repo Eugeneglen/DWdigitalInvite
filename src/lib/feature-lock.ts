@@ -12,6 +12,7 @@ export const PAGE_TO_FEATURE: Partial<Record<CoupleCMSPage, string>> = {
   wishes: 'wishes',
   faqs: 'qa',
   moments: 'moments',
+  design: 'templates',
 };
 
 /**

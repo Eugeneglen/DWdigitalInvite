@@ -110,9 +110,45 @@ export function generateThemeOverrideStyle(
   };
 
   // ── text-charcoal-ink ──
+  // Override text colour to the theme text colour (e.g. light on dark themes).
   rule('.text-charcoal-ink', 'color', tr, tg, tb);
   for (const a of [20, 25, 30, 35, 40, 50, 60, 70, 75, 80]) {
     rule(`.text-charcoal-ink\\/${a}`, 'color', tr, tg, tb, a / 100);
+  }
+
+  // ── White-card protection ──
+  // Elements inside white-background containers (cards, modals, etc.) must
+  // keep dark text for readability, regardless of the page theme colour.
+  // We override the theme text colour back to dark (#1A1A1A) for any
+  // .text-charcoal-ink element that is a descendant of .bg-white or
+  // .bg-paper-cream — including alpha variants like bg-white/50 (common
+  // on Story tidbit cards, glass panels, etc.). Uses !important + higher
+  // specificity to win over the theme override above.
+  // Note: alpha variants use rgba() (not rgb() with slash alpha, which is
+  // invalid in the comma-separated form).
+  const DARK_R = 26, DARK_G = 26, DARK_B = 26;
+  // Solid containers
+  lines.push(`${SCOPE} .bg-white .text-charcoal-ink { color: rgb(${DARK_R}, ${DARK_G}, ${DARK_B}) !important; }`);
+  lines.push(`${SCOPE} .bg-paper-cream .text-charcoal-ink { color: rgb(${DARK_R}, ${DARK_G}, ${DARK_B}) !important; }`);
+  // Alpha-variant containers (bg-white/20, bg-white/50, bg-paper-cream/40, etc.)
+  // These are semi-transparent white overlays — still light enough that dark
+  // text is more readable than the theme text colour on dark themes.
+  for (const a of [5, 10, 20, 25, 30, 40, 50, 60, 70, 75, 80, 90, 95]) {
+    lines.push(`${SCOPE} .bg-white\\/${a} .text-charcoal-ink { color: rgb(${DARK_R}, ${DARK_G}, ${DARK_B}) !important; }`);
+    lines.push(`${SCOPE} .bg-paper-cream\\/${a} .text-charcoal-ink { color: rgb(${DARK_R}, ${DARK_G}, ${DARK_B}) !important; }`);
+  }
+  // Alpha-variant text inside solid containers
+  for (const a of [20, 25, 30, 35, 40, 50, 60, 70, 75, 80]) {
+    lines.push(`${SCOPE} .bg-white .text-charcoal-ink\\/${a} { color: rgba(${DARK_R}, ${DARK_G}, ${DARK_B}, ${a / 100}) !important; }`);
+    lines.push(`${SCOPE} .bg-paper-cream .text-charcoal-ink\\/${a} { color: rgba(${DARK_R}, ${DARK_G}, ${DARK_B}, ${a / 100}) !important; }`);
+  }
+  // Alpha-variant text inside alpha-variant containers (e.g. text-charcoal-ink/80
+  // inside bg-white/50 — common on Story tidbit cards)
+  for (const ca of [5, 10, 20, 25, 30, 40, 50, 60, 70, 75, 80, 90, 95]) {
+    for (const ta of [20, 25, 30, 35, 40, 50, 60, 70, 75, 80]) {
+      lines.push(`${SCOPE} .bg-white\\/${ca} .text-charcoal-ink\\/${ta} { color: rgba(${DARK_R}, ${DARK_G}, ${DARK_B}, ${ta / 100}) !important; }`);
+      lines.push(`${SCOPE} .bg-paper-cream\\/${ca} .text-charcoal-ink\\/${ta} { color: rgba(${DARK_R}, ${DARK_G}, ${DARK_B}, ${ta / 100}) !important; }`);
+    }
   }
 
   // ── border-charcoal-ink ──

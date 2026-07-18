@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Loader2, Plus, Pencil, Trash2, BookOpen, Calendar, Lightbulb, Plane } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, BookOpen, Calendar, Lightbulb, Plane, Save } from 'lucide-react';
 import MirrorImageGallery from './MirrorImageGallery';
 import MirrorImageUpload from './MirrorImageUpload';
 import { toast } from '@/hooks/use-toast';
@@ -121,7 +121,7 @@ export default function CoupleStory() {
       const res = await fetch('/api/cms/content?XTransformPort=3000');
       if (!res.ok) throw new Error('Failed to load content');
       const data = await res.json();
-      const items = (data.items ?? []).filter((i: { section: string }) => i.section === 'story');
+      const items = (data.content ?? []).filter((i: { section: string }) => i.section === 'story');
       const fields: Record<string, string> = {};
       items.forEach((item: { fieldKey: string; fieldValue: string }) => {
         fields[item.fieldKey] = item.fieldValue;
@@ -437,6 +437,12 @@ export default function CoupleStory() {
 
   const hasContentChanges = Object.values(editedFields).some(Boolean) || tidbitsEdited || destinationsEdited;
 
+  // Count pending text changes for the Save button badge
+  const pendingContentCount =
+    Object.values(editedFields).filter(Boolean).length +
+    (tidbitsEdited ? 1 : 0) +
+    (destinationsEdited ? 1 : 0);
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -448,15 +454,6 @@ export default function CoupleStory() {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {hasContentChanges && (
-            <Button
-              onClick={handleSaveContent}
-              disabled={savingContent}
-              className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 rounded px-4 py-2 text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300"
-            >
-              {savingContent ? 'Saving…' : 'Save Content'}
-            </Button>
-          )}
           <Button
             onClick={openAddDialog}
             className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 rounded px-4 py-2 text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300"
@@ -881,7 +878,7 @@ export default function CoupleStory() {
                 <Button
                   onClick={handleSave}
                   disabled={saving}
-                  className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 rounded px-6 py-2.5 text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300 disabled:opacity-50"
+                  className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 rounded px-6 py-2.5 text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300 disabled:opacity-50 shrink-0 min-w-fit"
                 >
                   {saving ? (
                     <>
@@ -993,6 +990,29 @@ export default function CoupleStory() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Sticky Save Bar — bottom right */}
+      {true && (
+        <div className="sticky bottom-0 flex justify-end gap-2 py-4 bg-white/95 backdrop-blur-sm border-t border-charcoal-ink/5">
+          <Button
+            onClick={handleSaveContent}
+            disabled={savingContent}
+            className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 rounded px-6 py-2.5 text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300 disabled:opacity-50 shrink-0 min-w-fit"
+          >
+            {savingContent ? (
+              <>
+                <Loader2 className="size-4 mr-2 animate-spin" />
+                Saving…
+              </>
+            ) : (
+              <>
+                <Save className="size-4 mr-2" />
+                Save Changes ({pendingContentCount})
+              </>
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

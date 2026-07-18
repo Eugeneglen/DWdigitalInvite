@@ -196,28 +196,9 @@ export default function CoupleHome() {
 
       {/* Hero Content Fields */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <Label className="text-xs font-medium text-charcoal-ink/50 uppercase tracking-wider">
-            Hero Content
-          </Label>
-          <Button
-            onClick={handleSave}
-            disabled={saving || !hasChanges || loading}
-            className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 rounded px-4 py-2 text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300 shrink-0 disabled:opacity-50"
-          >
-            {saving ? (
-              <>
-                <Loader2 className="size-4 animate-spin mr-1.5" />
-                Saving…
-              </>
-            ) : (
-              <>
-                <Save className="size-4 mr-1.5" />
-                Save{hasChanges ? ` (${Object.keys(editedFields).length})` : ''}
-              </>
-            )}
-          </Button>
-        </div>
+        <Label className="text-xs font-medium text-charcoal-ink/50 uppercase tracking-wider">
+          Hero Content
+        </Label>
 
         <Card className="border-charcoal-ink/5 shadow-none">
           <CardContent className="p-4 space-y-4">
@@ -380,6 +361,29 @@ export default function CoupleHome() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Save Bar — bottom right */}
+      {true && (
+        <div className="sticky bottom-0 flex justify-end gap-2 py-4 bg-white/95 backdrop-blur-sm border-t border-charcoal-ink/5">
+          <Button
+            onClick={handleSave}
+            disabled={saving}
+            className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 rounded px-6 py-2.5 text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300 disabled:opacity-50 shrink-0 min-w-fit"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="size-4 mr-2 animate-spin" />
+                Saving…
+              </>
+            ) : (
+              <>
+                <Save className="size-4 mr-2" />
+                Save Changes ({Object.keys(editedFields).length})
+              </>
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

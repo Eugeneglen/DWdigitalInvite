@@ -51,8 +51,39 @@ function WishesPageInner() {
   const [name, setName] = useState(autoName);
   const [relationship, setRelationship] = useState('');
   const [message, setMessage] = useState('');
+  const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
+  const [imageFileName, setImageFileName] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+
+  // Convert a selected File to a base64 data URL (same pattern as the
+  // couple CMS InlineImageUpload / SectionImageUpload components).
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate type + size (10MB limit, matching the displayed hint)
+    if (!file.type.startsWith('image/')) {
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImageDataUrl(reader.result as string);
+      setImageFileName(file.name);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const clearImage = () => {
+    setImageDataUrl(null);
+    setImageFileName('');
+  };
 
   // Build the CMS wish cards from data.wishes
   const cmsWishCards = (data?.wishes ?? []).map((w, i) => ({
@@ -90,6 +121,7 @@ function WishesPageInner() {
           relationship: relationship.trim() || undefined,
           message: message.trim(),
           weddingId,
+          imageUrl: imageDataUrl || undefined,
         }),
       });
       if (!res.ok) {
@@ -116,6 +148,7 @@ function WishesPageInner() {
         setName('');
         setRelationship('');
         setMessage('');
+        clearImage();
       }, 3000);
     }, 1500);
   };
@@ -266,15 +299,41 @@ function WishesPageInner() {
                 className="input-line resize-none"
               />
 
-              {/* Upload area */}
-              <div className="border-2 border-dashed border-charcoal-ink/15 rounded bg-paper-cream/40 py-8 text-center select-none">
-                <span className="material-symbols-outlined text-charcoal-ink/30 text-[32px] mb-2 block">cloud_upload</span>
-                <p className="text-[14px] text-charcoal-ink/40">
-                  Attach a photo or memento
-                </p>
-                <p className="text-[12px] text-charcoal-ink/25 mt-1">
-                  JPG, PNG up to 10MB
-                </p>
+              {/* Upload area — functional file input with preview */}
+              <div className="border-2 border-dashed border-charcoal-ink/15 rounded bg-paper-cream/40 text-center select-none">
+                {imageDataUrl ? (
+                  <div className="relative p-4">
+                    <img
+                      src={imageDataUrl}
+                      alt={imageFileName || 'Selected photo'}
+                      className="max-h-64 mx-auto rounded"
+                    />
+                    <p className="text-[12px] text-charcoal-ink/40 mt-2 truncate">{imageFileName}</p>
+                    <button
+                      type="button"
+                      onClick={clearImage}
+                      className="mt-2 text-[12px] text-charcoal-ink/50 hover:text-red-600 transition-colors uppercase tracking-[0.1em]"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <label className="block py-8 px-4 cursor-pointer hover:bg-paper-cream/60 transition-colors">
+                    <span className="material-symbols-outlined text-charcoal-ink/30 text-[32px] mb-2 block">cloud_upload</span>
+                    <p className="text-[14px] text-charcoal-ink/40">
+                      Attach a photo or memento
+                    </p>
+                    <p className="text-[12px] text-charcoal-ink/25 mt-1">
+                      JPG, PNG up to 10MB
+                    </p>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handleFileSelect}
+                      className="sr-only"
+                    />
+                  </label>
+                )}
               </div>
 
               {/* Submit button */}

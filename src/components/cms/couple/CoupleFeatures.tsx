@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Loader2, Timer, CalendarClock, Mail, BookOpen, Image, Heart, MapPin, HelpCircle, Sparkles, Video, Music2, Save } from 'lucide-react';
+import { Loader2, Timer, CalendarClock, Mail, BookOpen, Image, Heart, MapPin, HelpCircle, Sparkles, Video, Music2, Save, Palette } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -81,6 +81,12 @@ const FEATURE_REGISTRY: Record<string, FeatureConfig> = {
     displayName: 'Wedding Video',
     description: 'Embed a wedding video on your page',
     icon: Video,
+  },
+  templates: {
+    featureKey: 'templates',
+    displayName: 'Theme Templates',
+    description: 'Browse and apply 6 curated design themes (Diamond feature)',
+    icon: Palette,
   },
   music: {
     featureKey: 'music',

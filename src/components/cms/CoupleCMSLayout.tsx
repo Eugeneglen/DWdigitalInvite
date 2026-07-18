@@ -22,6 +22,7 @@ import {
   MapPin,
   Camera,
   LayoutDashboard,
+  Palette,
   MoreHorizontal,
   Lock,
 } from 'lucide-react';
@@ -38,6 +39,7 @@ const NAV_ITEMS: { key: CoupleCMSPage; label: string; icon: React.ElementType }[
   { key: 'overview', label: 'Overview', icon: Home },
   { key: 'details', label: 'Your Details', icon: Heart },
   { key: 'home', label: 'Home', icon: LayoutDashboard },
+  { key: 'design', label: 'Design', icon: Palette },
   { key: 'schedule', label: 'Schedule', icon: Calendar },
   { key: 'rsvps', label: 'RSVPs', icon: Mail },
   { key: 'getting-there', label: 'Getting There', icon: MapPin },
@@ -157,7 +159,7 @@ export default function CoupleCMSLayout({ children }: { children: React.ReactNod
   const moreNavItems = NAV_ITEMS.slice(VISIBLE_NAV_COUNT);
 
   return (
-    <div className="flex min-h-screen bg-paper-cream">
+    <div className="flex h-screen overflow-hidden bg-paper-cream">
       {/* Left Sidebar */}
       <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-champagne-silk bg-paper-cream md:flex">
         {/* Logo area */}

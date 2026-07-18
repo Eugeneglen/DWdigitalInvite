@@ -14,6 +14,9 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  Copy,
+  Check,
+  KeyRound,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -66,7 +69,10 @@ interface Wedding {
   brideName: string | null;
   groomName: string | null;
   weddingDate: string;
+  weddingTime: string | null;
+  venue: string | null;
   venueAddress: string | null;
+  googleMapsUrl: string | null;
   status: string;
   plan: string;
   jobNumber: string | null;
@@ -89,9 +95,25 @@ interface WeddingForm {
   brideName: string;
   groomName: string;
   weddingDate: string;
+  weddingTime: string;
+  venue: string;
   venueAddress: string;
+  googleMapsUrl: string;
   plan: string;
+  status: string;
+  jobNumber: string;
+  coupleEmail: string;
+  couplePhone: string;
   sections: string[];
+  consultantId: string;
+  coordinatorId: string;
+}
+
+interface StaffUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
 }
 
 const OPTIONAL_SECTIONS = [
@@ -99,6 +121,7 @@ const OPTIONAL_SECTIONS = [
   { key: 'wishes', label: 'Wishes' },
   { key: 'qa', label: 'Q&A' },
   { key: 'moments', label: 'Moments' },
+  { key: 'templates', label: 'Theme Templates' },
 ];
 
 const EMPTY_FORM: WeddingForm = {
@@ -106,9 +129,18 @@ const EMPTY_FORM: WeddingForm = {
   brideName: '',
   groomName: '',
   weddingDate: '',
+  weddingTime: '',
+  venue: '',
   venueAddress: '',
+  googleMapsUrl: '',
   plan: 'GOLD',
+  status: 'DRAFT',
+  jobNumber: '',
+  coupleEmail: '',
+  couplePhone: '',
   sections: [],
+  consultantId: '',
+  coordinatorId: '',
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -215,6 +247,54 @@ export default function MasterWeddings() {
   const [form, setForm] = useState<WeddingForm>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
 
+  // Staff users for consultant/coordinator assignment
+  const [staff, setStaff] = useState<StaffUser[]>([]);
+  const consultants = staff.filter((s) => s.role === 'ADMIN_1');
+  const coordinators = staff.filter((s) => s.role === 'ADMIN_2');
+
+  // Fetch staff users (consultants ADMIN_1 + coordinators ADMIN_2)
+  const fetchStaff = useCallback(async () => {
+    try {
+      const res = await fetch('/api/master/users?XTransformPort=3000');
+      if (res.ok) {
+        const data = await res.json();
+        const all: StaffUser[] = data.users ?? [];
+        setStaff(all.filter((u) => u.role === 'ADMIN_1' || u.role === 'ADMIN_2'));
+      }
+    } catch {
+      // silently fail — dropdowns will just be empty
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStaff();
+  }, [fetchStaff]);
+
+  // Credentials dialog state — lets admin retrieve registration details
+  // (couple CMS URL, guest URL, login ID, password, job number) for any
+  // wedding, even after the creation wizard has closed.
+  const [credWedding, setCredWedding] = useState<Wedding | null>(null);
+  const [defaultPassword, setDefaultPassword] = useState('Couple@123');
+  const [copied, setCopied] = useState<string | null>(null);
+
+  // Fetch the platform default couple password from system settings
+  useEffect(() => {
+    fetch('/api/master/settings?XTransformPort=3000')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        const val = data?.settings?.default_couple_password;
+        if (val) setDefaultPassword(val);
+      })
+      .catch(() => { /* keep default */ });
+  }, []);
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(label);
+    toast({ title: 'Copied', description: label });
+    setTimeout(() => setCopied(null), 2000);
+  };
+
   // ── Fetch weddings ─────────────────────────────────────────────────────
 
   const fetchWeddings = useCallback(async () => {
@@ -267,9 +347,18 @@ export default function MasterWeddings() {
       brideName: w.brideName ?? '',
       groomName: w.groomName ?? '',
       weddingDate: w.weddingDate ? w.weddingDate.slice(0, 10) : '',
+      weddingTime: w.weddingTime ?? '',
+      venue: w.venue ?? '',
       venueAddress: w.venueAddress ?? '',
+      googleMapsUrl: w.googleMapsUrl ?? '',
       plan: w.plan,
+      status: w.status,
+      jobNumber: w.jobNumber ?? '',
+      coupleEmail: w.coupleEmail ?? '',
+      couplePhone: w.couplePhone ?? '',
       sections: enabledSections,
+      consultantId: w.consultantId ?? '',
+      coordinatorId: w.coordinatorId ?? '',
     });
     setDialogOpen(true);
   }
@@ -282,16 +371,34 @@ export default function MasterWeddings() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.coupleName.trim()) {
-      toast({ title: 'Validation Error', description: 'Couple name is required.', variant: 'destructive' });
+
+    // ── Required field validation ──
+    // All fields mandatory except: googleMapsUrl, weddingTime
+    const errors: string[] = [];
+    if (!form.coupleName.trim()) errors.push('Couple name is required');
+    if (!form.brideName.trim()) errors.push('Bride name is required');
+    if (!form.groomName.trim()) errors.push('Groom name is required');
+    if (!form.weddingDate) errors.push('Wedding date is required');
+    if (!form.venue.trim()) errors.push('Venue name is required');
+    if (!form.venueAddress.trim()) errors.push('Venue address is required');
+    if (!form.plan) errors.push('Plan is required');
+    if (!form.status) errors.push('Status is required');
+    if (!form.jobNumber.trim()) errors.push('Job number is required');
+    if (!form.coupleEmail.trim()) errors.push('Couple email is required');
+    if (!form.couplePhone.trim()) errors.push('Couple phone is required');
+
+    if (errors.length > 0) {
+      toast({
+        title: 'Validation Error',
+        description: errors[0] + (errors.length > 1 ? ` (+${errors.length - 1} more)` : ''),
+        variant: 'destructive',
+      });
       return;
     }
-    if (!form.weddingDate) {
-      toast({ title: 'Validation Error', description: 'Wedding date is required.', variant: 'destructive' });
-      return;
-    }
-    if (!form.venueAddress.trim()) {
-      toast({ title: 'Validation Error', description: 'Venue address is required.', variant: 'destructive' });
+
+    // Email format validation
+    if (form.coupleEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.coupleEmail.trim())) {
+      toast({ title: 'Validation Error', description: 'Couple email is not a valid email address.', variant: 'destructive' });
       return;
     }
 
@@ -300,12 +407,21 @@ export default function MasterWeddings() {
 
       const payload: Record<string, unknown> = {
         coupleName: form.coupleName.trim(),
-        brideName: form.brideName.trim() || null,
-        groomName: form.groomName.trim() || null,
+        brideName: form.brideName.trim(),
+        groomName: form.groomName.trim(),
         weddingDate: new Date(form.weddingDate).toISOString(),
+        weddingTime: form.weddingTime.trim() || null,
+        venue: form.venue.trim(),
         venueAddress: form.venueAddress.trim(),
+        googleMapsUrl: form.googleMapsUrl.trim() || null,
         plan: form.plan,
+        status: form.status,
+        jobNumber: form.jobNumber.trim(),
+        coupleEmail: form.coupleEmail.trim(),
+        couplePhone: form.couplePhone.trim(),
         sections: form.sections,
+        consultantId: form.consultantId || null,
+        coordinatorId: form.coordinatorId || null,
       };
 
       if (editingId) {
@@ -571,6 +687,15 @@ export default function MasterWeddings() {
                             <Pencil className="h-4 w-4" />
                             Edit
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCredWedding(w);
+                            }}
+                          >
+                            <KeyRound className="h-4 w-4" />
+                            Credentials
+                          </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onClick={(e) => {
@@ -697,16 +822,42 @@ export default function MasterWeddings() {
               </div>
             </div>
 
-            {/* Wedding Date */}
+            {/* Wedding Date & Time — side by side */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="weddingDate">
+                  Wedding Date <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="weddingDate"
+                  type="date"
+                  value={form.weddingDate}
+                  onChange={(e) => setField('weddingDate', e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="weddingTime">Wedding Time</Label>
+                <Input
+                  id="weddingTime"
+                  type="time"
+                  value={form.weddingTime}
+                  onChange={(e) => setField('weddingTime', e.target.value)}
+                  placeholder="Optional"
+                />
+              </div>
+            </div>
+
+            {/* Venue Name */}
             <div className="space-y-2">
-              <Label htmlFor="weddingDate">
-                Wedding Date <span className="text-red-500">*</span>
+              <Label htmlFor="venue">
+                Venue Name <span className="text-red-500">*</span>
               </Label>
               <Input
-                id="weddingDate"
-                type="date"
-                value={form.weddingDate}
-                onChange={(e) => setField('weddingDate', e.target.value)}
+                id="venue"
+                placeholder="e.g. The Fullerton Hotel"
+                value={form.venue}
+                onChange={(e) => setField('venue', e.target.value)}
                 required
               />
             </div>
@@ -725,22 +876,152 @@ export default function MasterWeddings() {
               />
             </div>
 
-            {/* Plan */}
+            {/* Google Maps URL (optional) */}
             <div className="space-y-2">
-              <Label>Plan</Label>
-              <Select
-                value={form.plan}
-                onValueChange={(v) => setField('plan', v)}
-              >
-                <SelectTrigger className="w-full border-slate-200">
-                  <SelectValue placeholder="Select a plan" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="GOLD">Gold</SelectItem>
-                  <SelectItem value="PLATINUM">Platinum</SelectItem>
-                  <SelectItem value="DIAMOND">Diamond</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="googleMapsUrl">Google Maps URL</Label>
+              <Input
+                id="googleMapsUrl"
+                placeholder="https://maps.google.com/?q=..."
+                value={form.googleMapsUrl}
+                onChange={(e) => setField('googleMapsUrl', e.target.value)}
+              />
+            </div>
+
+            {/* Job Number */}
+            <div className="space-y-2">
+              <Label htmlFor="jobNumber">
+                Job Number <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="jobNumber"
+                placeholder="e.g. DW-TDS-2026-000001"
+                value={form.jobNumber}
+                onChange={(e) => setField('jobNumber', e.target.value)}
+                required
+              />
+            </div>
+
+            {/* Couple Email & Phone — side by side */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="coupleEmail">
+                  Couple Email <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="coupleEmail"
+                  type="email"
+                  placeholder="couple@example.com"
+                  value={form.coupleEmail}
+                  onChange={(e) => setField('coupleEmail', e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="couplePhone">
+                  Couple Phone <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="couplePhone"
+                  placeholder="+65 9123 4567"
+                  value={form.couplePhone}
+                  onChange={(e) => setField('couplePhone', e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Plan & Status — side by side */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>
+                  Plan <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={form.plan}
+                  onValueChange={(v) => setField('plan', v)}
+                >
+                  <SelectTrigger className="w-full border-slate-200">
+                    <SelectValue placeholder="Select a plan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="GOLD">Gold</SelectItem>
+                    <SelectItem value="PLATINUM">Platinum</SelectItem>
+                    <SelectItem value="DIAMOND">Diamond</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>
+                  Status <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={form.status}
+                  onValueChange={(v) => setField('status', v)}
+                >
+                  <SelectTrigger className="w-full border-slate-200">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DRAFT">Draft</SelectItem>
+                    <SelectItem value="ACTIVE">Active</SelectItem>
+                    <SelectItem value="SUSPENDED">Suspended</SelectItem>
+                    <SelectItem value="ARCHIVED">Archived</SelectItem>
+                    <SelectItem value="COMPLETED">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Consultant & Coordinator — side by side */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Consultant</Label>
+                <Select
+                  value={form.consultantId || 'none'}
+                  onValueChange={(v) => setField('consultantId', v === 'none' ? '' : v)}
+                >
+                  <SelectTrigger className="w-full border-slate-200">
+                    <SelectValue placeholder="Select consultant" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— None —</SelectItem>
+                    {consultants.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {consultants.length === 0 && (
+                  <p className="text-xs text-amber-600">
+                    No ADMIN_1 users. Add staff in the Team page.
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Coordinator</Label>
+                <Select
+                  value={form.coordinatorId || 'none'}
+                  onValueChange={(v) => setField('coordinatorId', v === 'none' ? '' : v)}
+                >
+                  <SelectTrigger className="w-full border-slate-200">
+                    <SelectValue placeholder="Select coordinator" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— None —</SelectItem>
+                    {coordinators.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {coordinators.length === 0 && (
+                  <p className="text-xs text-amber-600">
+                    No ADMIN_2 users. Add staff in the Team page.
+                  </p>
+                )}
+              </div>
             </div>
 
             <Separator />
@@ -811,6 +1092,116 @@ export default function MasterWeddings() {
         onOpenChange={setWizardOpen}
         onCreated={fetchWeddings}
       />
+
+      {/* Credentials Dialog — retrieve registration details anytime */}
+      <Dialog open={!!credWedding} onOpenChange={(open) => { if (!open) setCredWedding(null); }}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-charcoal-ink">
+              <div className="flex items-center justify-center h-8 w-8 rounded-full bg-cinematic-gold/10">
+                <KeyRound className="size-5 text-cinematic-gold" />
+              </div>
+              Wedding Registration Details
+            </DialogTitle>
+            <DialogDescription>
+              {credWedding?.coupleName} — copy these details to share with the couple.
+            </DialogDescription>
+          </DialogHeader>
+          {credWedding && (() => {
+            const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+            const coupleCmsUrl = `${baseUrl}/?view=couple`;
+            const guestUrl = `${baseUrl}/${credWedding.slug}`;
+            const loginId = credWedding.coupleEmail ?? '(not set)';
+            const jobNum = credWedding.jobNumber ?? '—';
+            const expiry = credWedding.accessExpiryDate
+              ? new Date(credWedding.accessExpiryDate).toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' })
+              : '—';
+            const allDetails = `DreamWeavers Digital Invitation\n\nCouple: ${credWedding.coupleName}\nJob Number: ${jobNum}\n\nCouple CMS URL: ${coupleCmsUrl}\nGuest URL: ${guestUrl}\n\nLogin ID: ${loginId}\nPassword: ${defaultPassword}\n\nPlease log in to personalise your wedding invitation.`;
+            return (
+              <div className="space-y-4 py-2">
+                <div className="bg-paper-cream rounded-lg p-4 space-y-3">
+                  <div>
+                    <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Couple</Label>
+                    <p className="text-sm font-medium text-charcoal-ink mt-1">{credWedding.coupleName}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Job Number</Label>
+                    <p className="text-sm font-medium text-charcoal-ink mt-1">{jobNum}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Couple CMS URL</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <code className="flex-1 text-sm bg-white border border-charcoal-ink/10 rounded px-2 py-1.5 truncate">
+                        {coupleCmsUrl}
+                      </code>
+                      <Button size="sm" variant="outline" onClick={() => copyToClipboard(coupleCmsUrl, 'Couple CMS URL')}>
+                        {copied === 'Couple CMS URL' ? <Check className="size-3" /> : <Copy className="size-3" />}
+                      </Button>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Guest Invitation URL</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <code className="flex-1 text-sm bg-white border border-charcoal-ink/10 rounded px-2 py-1.5 truncate">
+                        {guestUrl}
+                      </code>
+                      <Button size="sm" variant="outline" onClick={() => copyToClipboard(guestUrl, 'Guest URL')}>
+                        {copied === 'Guest URL' ? <Check className="size-3" /> : <Copy className="size-3" />}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Login ID</Label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <code className="flex-1 text-sm bg-white border border-charcoal-ink/10 rounded px-2 py-1.5 truncate">
+                          {loginId}
+                        </code>
+                        <Button size="sm" variant="outline" onClick={() => copyToClipboard(loginId, 'Login ID')}>
+                          {copied === 'Login ID' ? <Check className="size-3" /> : <Copy className="size-3" />}
+                        </Button>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Password</Label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <code className="flex-1 text-sm bg-white border border-charcoal-ink/10 rounded px-2 py-1.5 truncate">
+                          {defaultPassword}
+                        </code>
+                        <Button size="sm" variant="outline" onClick={() => copyToClipboard(defaultPassword, 'Password')}>
+                          {copied === 'Password' ? <Check className="size-3" /> : <Copy className="size-3" />}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Access Expires</Label>
+                    <p className="text-sm font-medium text-charcoal-ink mt-1">{expiry}</p>
+                  </div>
+                </div>
+                <div className="bg-cinematic-gold/5 border border-cinematic-gold/20 rounded-lg p-3 flex items-center gap-2">
+                  <p className="text-xs text-charcoal-ink/60">
+                    Password shown is the platform default. If the couple has changed it, this field won't reflect their current password.
+                  </p>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    onClick={() => copyToClipboard(allDetails, 'All Details')}
+                    variant="outline"
+                    className="text-xs"
+                  >
+                    <Copy className="size-3 mr-1" />
+                    Copy All Details
+                  </Button>
+                  <Button onClick={() => setCredWedding(null)} className="bg-charcoal-ink text-paper-cream hover:bg-charcoal-ink/90 text-xs">
+                    Done
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

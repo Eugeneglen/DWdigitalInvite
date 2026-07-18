@@ -56,12 +56,13 @@ const ALL_FEATURES: FeatureInfo[] = [
   { key: 'gallery', label: 'Photo Gallery', description: 'Additional gallery' },
   { key: 'music', label: 'Background Music', description: 'Music player' },
   { key: 'video', label: 'Wedding Video', description: 'Embedded video' },
+  { key: 'templates', label: 'Theme Templates', description: '6 curated design themes' },
 ];
 
 const PACKAGE_DESCRIPTIONS: Record<string, string> = {
   GOLD: 'Home, Schedule, RSVP, Getting There, Countdown',
   PLATINUM: 'Gold + Story, Wishes, Q&A',
-  DIAMOND: 'Platinum + Moments, Music, Video',
+  DIAMOND: 'Platinum + Moments, Music, Video, Theme Templates',
 };
 
 interface WeddingCreationWizardProps {

@@ -7,6 +7,7 @@ const wishSchema = z.object({
   relationship: z.string().optional(),
   message: z.string().min(1, 'Message is required'),
   weddingId: z.string().optional(),
+  imageUrl: z.string().optional(),
 });
 
 export async function POST(request: Request) {
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { name, relationship, message, weddingId } = parsed.data;
+    const { name, relationship, message, weddingId, imageUrl } = parsed.data;
 
     // Validate weddingId if provided
     if (weddingId) {
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
         relationship: relationship || null,
         message,
         weddingId: weddingId || null,
+        imageUrl: imageUrl || null,
       },
     });
 

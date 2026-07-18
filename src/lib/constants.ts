@@ -25,6 +25,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   countdown: 'Countdown',
   music: 'Background Music',
   video: 'Wedding Video',
+  templates: 'Theme Templates',
   qa: 'Q&A',
 };
 

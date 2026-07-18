@@ -286,10 +286,18 @@ export async function PATCH(req: NextRequest) {
     if (updates.plan) updateData.plan = updates.plan;
     if (updates.heroImageUrl !== undefined) updateData.heroImageUrl = updates.heroImageUrl;
     if (updates.bannerUrl !== undefined) updateData.bannerUrl = updates.bannerUrl;
+    // Consultant & coordinator assignment (null clears the field)
+    if (updates.consultantId !== undefined) updateData.consultantId = updates.consultantId || null;
+    if (updates.coordinatorId !== undefined) updateData.coordinatorId = updates.coordinatorId || null;
+    // Registration details
+    if (updates.coupleEmail !== undefined) updateData.coupleEmail = updates.coupleEmail || null;
+    if (updates.couplePhone !== undefined) updateData.couplePhone = updates.couplePhone || null;
+    if (updates.jobNumber !== undefined) updateData.jobNumber = updates.jobNumber || null;
+    if (updates.accountStatus !== undefined) updateData.accountStatus = updates.accountStatus;
 
     // Handle section toggles
     if (Array.isArray(updates.sections)) {
-      const optionalFeatureKeys = ['story', 'wishes', 'qa', 'moments'];
+      const optionalFeatureKeys = ['story', 'wishes', 'qa', 'moments', 'templates'];
       for (const key of optionalFeatureKeys) {
         await db.weddingFeature.upsert({
           where: { weddingId_featureKey: { weddingId: id, featureKey: key } },

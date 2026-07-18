@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type CoupleCMSPage = 'overview' | 'details' | 'content' | 'home' | 'schedule' | 'story' | 'moments' | 'rsvps' | 'getting-there' | 'wishes' | 'faqs' | 'features' | 'guests' | 'analytics' | 'audit' | 'sharing';
+export type CoupleCMSPage = 'overview' | 'details' | 'content' | 'home' | 'design' | 'schedule' | 'story' | 'moments' | 'rsvps' | 'getting-there' | 'wishes' | 'faqs' | 'features' | 'guests' | 'analytics' | 'audit' | 'sharing';
 
 interface CoupleCMSState {
   currentPage: CoupleCMSPage;

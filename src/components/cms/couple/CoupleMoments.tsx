@@ -143,30 +143,11 @@ export default function CoupleMoments() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-semibold text-charcoal-ink">Moments</h2>
-          <p className="text-sm text-charcoal-ink/50 mt-1">
-            Upload and manage your moments gallery.
-          </p>
-        </div>
-        <Button
-          onClick={handleSave}
-          disabled={saving || !hasChanges}
-          className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 rounded px-4 py-2 text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300 shrink-0 disabled:opacity-50"
-        >
-          {saving ? (
-            <>
-              <Loader2 className="size-4 animate-spin mr-1.5" />
-              Saving…
-            </>
-          ) : (
-            <>
-              <Save className="size-4 mr-1.5" />
-              Save{hasChanges ? ` (${Object.keys(editedFields).length})` : ''}
-            </>
-          )}
-        </Button>
+      <div>
+        <h2 className="text-xl font-semibold text-charcoal-ink">Moments</h2>
+        <p className="text-sm text-charcoal-ink/50 mt-1">
+          Upload and manage your moments gallery.
+        </p>
       </div>
 
       <Separator className="bg-champagne-silk" />
@@ -207,6 +188,29 @@ export default function CoupleMoments() {
 
       {/* Section Image Upload */}
       <MirrorImageGallery category="moments" label="Moments Gallery" maxImages={20} aspectClass="aspect-[3/4]" helperText="3:4 portrait crop mirrors the guest-site masonry gallery" />
+
+      {/* Save Bar — bottom right */}
+      {true && (
+        <div className="sticky bottom-0 flex justify-end gap-2 py-4 bg-white/95 backdrop-blur-sm border-t border-charcoal-ink/5">
+          <Button
+            onClick={handleSave}
+            disabled={saving}
+            className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 rounded px-6 py-2.5 text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300 disabled:opacity-50 shrink-0 min-w-fit"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="size-4 mr-2 animate-spin" />
+                Saving…
+              </>
+            ) : (
+              <>
+                <Save className="size-4 mr-2" />
+                Save Changes ({Object.keys(editedFields).length})
+              </>
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
