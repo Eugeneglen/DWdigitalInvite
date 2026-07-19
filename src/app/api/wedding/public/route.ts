@@ -1,16 +1,26 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getServerSession } from '@/lib/auth';
 
 // GET /api/wedding/public?slug=eleanor-james
-// Returns all wedding data needed by guest-facing pages
+// Returns all wedding data needed by guest-facing pages.
+// Admins (SUPER_ADMIN, ADMIN_1, ADMIN_2) can preview non-ACTIVE weddings.
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const slug = searchParams.get('slug');
 
+    // Check if the requester is an admin (for previewing DRAFT/SUSPENDED weddings)
+    const session = await getServerSession();
+    const role = session?.user?.role;
+    const isAdmin = role === 'SUPER_ADMIN' || role === 'ADMIN_1' || role === 'ADMIN_2';
+
     // When no slug is provided (platform home page), fall back to the
     // first active wedding so the landing page renders a real invitation.
-    const where = slug ? { slug, status: 'ACTIVE' as const } : { status: 'ACTIVE' as const };
+    // Admins can see any wedding by slug; guests only see ACTIVE.
+    const where = slug
+      ? (isAdmin ? { slug } : { slug, status: 'ACTIVE' as const })
+      : { status: 'ACTIVE' as const };
 
     const wedding = await db.weddingAccount.findFirst({
       where,

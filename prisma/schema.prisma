@@ -66,6 +66,12 @@ model WeddingAccount {
   accessExpiryDate DateTime? // Auto-calculated: weddingDate + couple_access_expiry_days
   accountStatus    String   @default("ONBOARDING") // ONBOARDING | ACTIVE | COMPLETED | EXPIRED | SUSPENDED
 
+  // Theme tracking — true when the couple has manually customized their
+  // colors/fonts via the pickers or Diamond Design page. When false, the
+  // admin's "Apply Default to All Couples" action will overwrite their
+  // theme with the global default template. When true, they're protected.
+  themeCustomized  Boolean  @default(false)
+
   ownerId   String?
   owner     User?    @relation(fields: [ownerId], references: [id])
   consultant  User?  @relation("ConsultantWeddings", fields: [consultantId], references: [id])

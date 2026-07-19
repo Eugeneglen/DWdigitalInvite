@@ -590,7 +590,7 @@ export default function MasterWeddings() {
                   <TableRow
                     key={w.id}
                     className="border-slate-100 cursor-pointer"
-                    onClick={() => selectWedding(w.id)}
+                    onClick={() => window.open(`/${w.slug}`, '_blank')}
                   >
                     {/* Couple Name */}
                     <TableCell>
@@ -672,7 +672,7 @@ export default function MasterWeddings() {
                           <DropdownMenuItem
                             onClick={(e) => {
                               e.stopPropagation();
-                              selectWedding(w.id);
+                              window.open(`/${w.slug}`, '_blank');
                             }}
                           >
                             <Eye className="h-4 w-4" />
