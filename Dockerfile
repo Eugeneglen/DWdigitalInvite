@@ -10,8 +10,10 @@ RUN bun install --frozen-lockfile
 
 COPY . .
 
-# Patch Prisma provider for Railway Postgres (local dev uses sqlite)
-RUN sed -i 's/provider = "sqlite"/provider = "postgresql"/' prisma/schema.prisma
+# NOTE: Database is SQLite at runtime (DATABASE_URL=file:./prisma/dev.db).
+# Do NOT patch the Prisma provider to postgresql here — doing so causes a
+# schema mismatch between the generated client and the actual SQLite database.
+# RUN sed -i 's/provider = "sqlite"/provider = "postgresql"/' prisma/schema.prisma
 
 # Generate Prisma client (binaryTargets set in schema for cross-arch engines)
 RUN bunx prisma generate
