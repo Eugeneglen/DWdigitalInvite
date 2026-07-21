@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import SectionBanner from '../SectionBanner';
-import { usePublicWedding } from '@/hooks/usePublicWedding';
+import { usePublicWedding } from '@/hooks/usePublicWedding'
+import { useWeddingSlug } from '@/hooks/useWeddingSlug';;
 
 export default function QAPage() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
-  const { data, getField } = usePublicWedding();
+  const { data, getField } = usePublicWedding(useWeddingSlug());
 
   const sectionTitle = getField('qa', 'title', 'Frequently Asked');
   const sectionSubtitle = getField('qa', 'subtitle', 'Everything you need to know for our celebration.');

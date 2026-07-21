@@ -2,14 +2,15 @@
 
 import { useState } from 'react';
 import SectionBanner from '../SectionBanner';
-import { usePublicWedding } from '@/hooks/usePublicWedding';
+import { usePublicWedding } from '@/hooks/usePublicWedding'
+import { useWeddingSlug } from '@/hooks/useWeddingSlug';;
 
 const FALLBACK_VENUE = 'The Singapore EDITION';
 const FALLBACK_ADDRESS = '38 Cuscaden Road, Singapore 249731';
 
 export default function GettingTherePage() {
   const [tab, setTab] = useState<'car' | 'transit'>('transit');
-  const { data, getField } = usePublicWedding();
+  const { data, getField } = usePublicWedding(useWeddingSlug());
 
   const venueName = data?.wedding.venue || FALLBACK_VENUE;
   const venueAddress = data?.wedding.venueAddress || FALLBACK_ADDRESS;

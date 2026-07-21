@@ -46,12 +46,19 @@ const DEFAULT_FOOTER: FooterContent = {
 };
 
 // ── Module-level cache so multiple components share one fetch ───────────
+// Cache expires after 60 seconds so settings changes (e.g., nav tabs,
+// footer text) eventually propagate without requiring a full page reload.
 
 let cachedPromise: Promise<SiteSettings> | null = null;
 let cachedData: SiteSettings | null = null;
+let cachedAt: number = 0;
+const CACHE_TTL_MS = 60_000; // 60 seconds
 
 async function fetchSiteSettings(): Promise<SiteSettings> {
-  if (cachedData) return cachedData;
+  // Check if cached data is still fresh
+  if (cachedData && Date.now() - cachedAt < CACHE_TTL_MS) return cachedData;
+  // Cache expired — clear it
+  cachedData = null;
   if (cachedPromise) return cachedPromise;
 
   cachedPromise = fetch('/api/site-settings?XTransformPort=3000')
@@ -61,6 +68,7 @@ async function fetchSiteSettings(): Promise<SiteSettings> {
     })
     .then((data: SiteSettings) => {
       cachedData = data;
+      cachedAt = Date.now();
       cachedPromise = null;
       return data;
     })

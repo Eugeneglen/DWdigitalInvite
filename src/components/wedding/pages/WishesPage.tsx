@@ -3,7 +3,8 @@
 import { useState, Suspense, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import SectionBanner from '../SectionBanner';
-import { usePublicWedding } from '@/hooks/usePublicWedding';
+import { usePublicWedding } from '@/hooks/usePublicWedding'
+import { useWeddingSlug } from '@/hooks/useWeddingSlug';;
 import { useLiveWeddingData, type LiveWish } from '@/hooks/useLiveWeddingData';
 
 export default function WishesPage() {
@@ -15,7 +16,7 @@ export default function WishesPage() {
 }
 
 function WishesPageInner() {
-  const { data, getField } = usePublicWedding();
+  const { data, getField } = usePublicWedding(useWeddingSlug());
   const weddingId = data?.wedding?.id;
   const { liveWishes, addWish } = useLiveWeddingData({ weddingId });
 

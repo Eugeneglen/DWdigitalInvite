@@ -2,7 +2,8 @@
 
 import { useCallback } from 'react';
 import { useNavigationStore } from '@/store/useNavigationStore';
-import { usePublicWedding } from '@/hooks/usePublicWedding';
+import { usePublicWedding } from '@/hooks/usePublicWedding'
+import { useWeddingSlug } from '@/hooks/useWeddingSlug';;
 
 const CEREMONY_IMG =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuAsLNSEjy771owdkkDbKTl1nE5oEzBQFVHob_HKiQb9eJb1X7I79-CxGjCPeKwCSHhwswJRqSrt3ox_aktMQUGlyzg6Eoo5R0aH6CYxxKj5f3uZCWdaDfZEIqmxwZd5DgdvCUWZfIdnNvixcYvcspOOFnGM2ThX9BPZz-ftetacA-b6CkxEEp9BdSatnTG55-e8tZz1jlG1euZgtw17iI67tcMGtR2azzCg8GvNH-xQPfUJlAXxGC3jU9Q7dbVZPK-xnHwtTl5eRNknueI';
@@ -109,7 +110,7 @@ function getCalendarDateStr(dateStr: string | null | undefined): string {
 }
 
 export default function SchedulePage() {
-  const { data, getField } = usePublicWedding();
+  const { data, getField } = usePublicWedding(useWeddingSlug());
   const { setSection } = useNavigationStore();
 
   const bannerUrl = data?.wedding.bannerUrl || FALLBACK_BANNER_BG;

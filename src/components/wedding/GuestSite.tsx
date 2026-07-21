@@ -6,6 +6,7 @@ import { useNavigationStore } from '@/store/useNavigationStore';
 import { useCoupleCMSStore } from '@/store/useCoupleCMSStore';
 import { useAuthModalStore } from '@/store/useAuthModalStore';
 import { usePublicWedding } from '@/hooks/usePublicWedding';
+import { WeddingSlugProvider } from '@/hooks/useWeddingSlug';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { getAutoTextColor, getAutoBorderColor, generateThemeOverrideStyle } from '@/lib/contrast';
 import { filterTabsByFeatures } from '@/store/useNavigationStore';
@@ -190,6 +191,7 @@ export default function GuestSite({ slug, topOffset, showEditorButton = false }:
       {/* Dynamic theme overrides — must be first child for cascade order */}
       <style dangerouslySetInnerHTML={{ __html: themeOverrideCSS }} />
       <GoldDust />
+      <WeddingSlugProvider slug={slug}>
       <Header topOffset={topOffset} headerTextColor={headerTextColor} />
       <MobileDrawer />
 
@@ -232,6 +234,7 @@ export default function GuestSite({ slug, topOffset, showEditorButton = false }:
         variant={loginVariant}
         onOpenChange={(open) => { if (!open) closeModal(); }}
       />
+      </WeddingSlugProvider>
     </div>
   );
 }

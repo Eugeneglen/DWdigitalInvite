@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigationStore } from '@/store/useNavigationStore';
-import { usePublicWedding } from '@/hooks/usePublicWedding';
+import { usePublicWedding } from '@/hooks/usePublicWedding'
+import { useWeddingSlug } from '@/hooks/useWeddingSlug';;
 import { useLiveWeddingData } from '@/hooks/useLiveWeddingData';
 import { useImageAutoContrast } from '@/hooks/useImageAutoContrast';
 
@@ -65,7 +66,7 @@ function parseWeddingTimestamp(dateStr: string | null | undefined): number {
 }
 
 export default function HomePage() {
-  const { data, getField } = usePublicWedding();
+  const { data, getField } = usePublicWedding(useWeddingSlug());
 
   const bannerUrl = data?.wedding.bannerUrl || FALLBACK_BANNER_BG;
   const heroImgUrl = data?.wedding.heroImageUrl || FALLBACK_HERO_IMG;

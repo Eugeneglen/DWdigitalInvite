@@ -3,7 +3,6 @@ import { getServerSession } from 'next-auth';
 import { authOptions, hashPassword } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { z } from 'zod/v4';
-import { DEFAULT_TEMPLATES } from '@/lib/wedding-templates';
 
 const createWeddingSchema = z.object({
   coupleName: z.string().min(2, 'Couple name is required'),
@@ -200,62 +199,6 @@ export async function POST(req: NextRequest) {
       })),
     });
 
-    // Auto-apply the global default template's colors + fonts to the new
-    // wedding's WeddingContent (section `global`). The couple's
-    // `themeCustomized` flag stays false (default) because the admin applied
-    // the default, not the couple. If the couple later edits colors/fonts via
-    // the pickers or applies a template in the Design page, the cms/content
-    // PUT handler will flip `themeCustomized` to true and protect them from
-    // future "Apply Default to All Couples" sweeps.
-    try {
-      const templateSettings = await db.systemSetting.findMany({
-        where: {
-          OR: [
-            { key: { startsWith: 'template_' } },
-            { key: 'default_template' },
-          ],
-        },
-      });
-      const templateSettingsMap: Record<string, string> = {};
-      for (const s of templateSettings) templateSettingsMap[s.key] = s.value;
-
-      const defaultTemplateId = templateSettingsMap['default_template'] || 'classic-elegance';
-      let defaultTemplate = DEFAULT_TEMPLATES.find((t) => t.id === defaultTemplateId) ?? DEFAULT_TEMPLATES[0];
-      const storedTemplate = templateSettingsMap[`template_${defaultTemplateId}`];
-      if (storedTemplate) {
-        try {
-          defaultTemplate = { ...defaultTemplate, ...JSON.parse(storedTemplate) };
-        } catch { /* ignore malformed JSON, fall back to hardcoded default */ }
-      }
-
-      const globalItems = [
-        { section: 'global', fieldKey: 'backgroundColor', fieldValue: defaultTemplate.colors.bg, fieldType: 'TEXT' },
-        { section: 'global', fieldKey: 'textColor', fieldValue: defaultTemplate.colors.text, fieldType: 'TEXT' },
-        { section: 'global', fieldKey: 'accentColor', fieldValue: defaultTemplate.colors.accent, fieldType: 'TEXT' },
-        { section: 'global', fieldKey: 'secondaryColor', fieldValue: defaultTemplate.colors.secondary, fieldType: 'TEXT' },
-        { section: 'global', fieldKey: 'mutedColor', fieldValue: defaultTemplate.colors.muted, fieldType: 'TEXT' },
-        { section: 'global', fieldKey: 'fontFamily', fieldValue: defaultTemplate.fonts.heading, fieldType: 'TEXT' },
-        { section: 'global', fieldKey: 'bodyFont', fieldValue: defaultTemplate.fonts.body, fieldType: 'TEXT' },
-        { section: 'hero', fieldKey: 'fontFamily', fieldValue: defaultTemplate.fonts.heading, fieldType: 'TEXT' },
-      ];
-
-      for (const item of globalItems) {
-        await db.weddingContent.upsert({
-          where: {
-            weddingId_section_fieldKey: {
-              weddingId: wedding.id,
-              section: item.section,
-              fieldKey: item.fieldKey,
-            },
-          },
-          update: { fieldValue: item.fieldValue, fieldType: item.fieldType },
-          create: { weddingId: wedding.id, ...item },
-        });
-      }
-    } catch (templateError) {
-      console.error('Auto-apply default template failed (non-blocking):', templateError);
-    }
-
     // Audit log
     await db.auditLog.create({
       data: {
@@ -351,6 +294,7 @@ export async function PATCH(req: NextRequest) {
     if (updates.couplePhone !== undefined) updateData.couplePhone = updates.couplePhone || null;
     if (updates.jobNumber !== undefined) updateData.jobNumber = updates.jobNumber || null;
     if (updates.accountStatus !== undefined) updateData.accountStatus = updates.accountStatus;
+    if (updates.internalNotes !== undefined) updateData.internalNotes = updates.internalNotes || null;
 
     // Handle section toggles
     if (Array.isArray(updates.sections)) {

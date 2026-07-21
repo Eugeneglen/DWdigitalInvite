@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  Palette, Star, Eye, Pencil, Save, RotateCcw, Loader2, RefreshCw,
+  Palette, Star, Eye, Pencil, Save, RotateCcw,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
@@ -612,10 +612,6 @@ export default function MasterTemplates() {
   const [previewTemplate, setPreviewTemplate] = useState<WeddingTemplate | null>(null);
   const [expandedTemplate, setExpandedTemplate] = useState<WeddingTemplate | null>(null);
 
-  // "Apply Default to All Couples" bulk action state
-  const [confirmApplyDefault, setConfirmApplyDefault] = useState(false);
-  const [applyingDefault, setApplyingDefault] = useState(false);
-
   // Load persisted templates from SystemSetting
   const fetchTemplates = useCallback(async () => {
     try {
@@ -720,37 +716,6 @@ export default function MasterTemplates() {
     }
   };
 
-  // Bulk-apply the global default template to every wedding whose
-  // `themeCustomized` flag is still false. Couples who have customized their
-  // theme are protected server-side.
-  const handleApplyDefault = async () => {
-    setApplyingDefault(true);
-    try {
-      const res = await fetch('/api/master/templates/apply-default?XTransformPort=3000', {
-        method: 'POST',
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data?.error || `Request failed (${res.status})`);
-      }
-      toast({
-        title: 'Default Theme Applied',
-        description: `Updated ${data.updatedCount} ${
-          data.updatedCount === 1 ? 'couple' : 'couples'
-        } to ${data.templateName}.`,
-      });
-      setConfirmApplyDefault(false);
-    } catch (err) {
-      toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'Failed to apply default theme',
-        variant: 'destructive',
-      });
-    } finally {
-      setApplyingDefault(false);
-    }
-  };
-
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-slate-400">
@@ -774,30 +739,6 @@ export default function MasterTemplates() {
           <Palette className="h-4 w-4" />
           <span>{templates.filter((t) => t.isActive).length} of {templates.length} active</span>
         </div>
-      </div>
-
-      {/* Bulk action: Apply default template to all non-customized couples */}
-      <div className="flex items-center justify-between flex-wrap gap-3 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
-            <RefreshCw className="h-4 w-4" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-slate-800">Apply Default to All Couples</p>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Overwrite the theme colors and fonts for every couple who hasn&apos;t customized their own.
-              Couples with a customized theme are protected.
-            </p>
-          </div>
-        </div>
-        <Button
-          onClick={() => setConfirmApplyDefault(true)}
-          disabled={applyingDefault || loading}
-          className="bg-charcoal-ink text-paper-cream hover:opacity-90 transition-opacity"
-        >
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Apply Default to All Couples
-        </Button>
       </div>
 
       {/* Templates Grid */}
@@ -945,50 +886,6 @@ export default function MasterTemplates() {
           onOpenChange={(open) => { if (!open) setExpandedTemplate(null); }}
         />
       )}
-
-      {/* Apply Default to All Couples — confirmation dialog */}
-      <Dialog open={confirmApplyDefault} onOpenChange={(open) => { if (!applyingDefault) setConfirmApplyDefault(open); }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-slate-900">Apply Default to All Couples?</DialogTitle>
-            <DialogDescription className="text-slate-500">
-              This will update the theme colors and fonts for all couples who haven&apos;t
-              customized their own theme. Continue?
-            </DialogDescription>
-          </DialogHeader>
-          <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5 text-xs text-amber-800">
-            Couples who have applied their own template or edited colors via the
-            Design page will be skipped (their <span className="font-mono">themeCustomized</span> flag is true).
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setConfirmApplyDefault(false)}
-              disabled={applyingDefault}
-              className="border-slate-200"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleApplyDefault}
-              disabled={applyingDefault}
-              className="bg-charcoal-ink text-paper-cream hover:opacity-90 transition-opacity"
-            >
-              {applyingDefault ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Applying…
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Apply to All
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

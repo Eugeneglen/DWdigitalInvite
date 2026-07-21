@@ -84,29 +84,6 @@ export async function PUT(req: NextRequest) {
       results.push(upserted);
     }
 
-    // If any of the upserted items touched the couple's theme (section `global`
-    // with one of the color/font field keys), flip `themeCustomized = true` on
-    // the wedding account so future "Apply Default to All Couples" sweeps
-    // skip this couple and preserve their hand-picked theme.
-    const THEME_GLOBAL_KEYS = new Set([
-      'backgroundColor',
-      'textColor',
-      'accentColor',
-      'secondaryColor',
-      'mutedColor',
-      'fontFamily',
-      'bodyFont',
-    ]);
-    const touchedTheme = items.some(
-      (i) => i.section === 'global' && THEME_GLOBAL_KEYS.has(i.fieldKey),
-    );
-    if (touchedTheme) {
-      await db.weddingAccount.update({
-        where: { id: weddingId },
-        data: { themeCustomized: true },
-      });
-    }
-
     await db.auditLog.create({
       data: {
         userId: session.user.id,

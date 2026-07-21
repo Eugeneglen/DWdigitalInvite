@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Music2, Volume2, VolumeX, Play, Pause } from 'lucide-react';
-import { usePublicWedding } from '@/hooks/usePublicWedding';
+import { usePublicWedding } from '@/hooks/usePublicWedding'
+import { useWeddingSlug } from '@/hooks/useWeddingSlug';;
 
 interface MusicConfig {
   url?: string;
@@ -13,7 +14,7 @@ interface MusicConfig {
 }
 
 export default function MusicPlayer() {
-  const { data } = usePublicWedding();
+  const { data } = usePublicWedding(useWeddingSlug());
   const [expanded, setExpanded] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);

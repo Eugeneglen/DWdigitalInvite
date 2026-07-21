@@ -4,25 +4,37 @@ import { getServerSession } from '@/lib/auth';
 
 // GET /api/wedding/public?slug=eleanor-james
 // Returns all wedding data needed by guest-facing pages.
-// Admins (SUPER_ADMIN, ADMIN_1, ADMIN_2) can preview non-ACTIVE weddings.
+// - Guests (no auth): only see ACTIVE weddings
+// - Admins (SUPER_ADMIN, ADMIN_1, ADMIN_2): can preview any wedding by slug
+// - Authenticated couple (COUPLE): can preview their own wedding by slug
+//   (even if DRAFT), so they can see their changes on the guest site
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const slug = searchParams.get('slug');
 
-    // Check if the requester is an admin (for previewing DRAFT/SUSPENDED weddings)
+    // Check if the requester is an admin or the wedding's owner
     const session = await getServerSession();
     const role = session?.user?.role;
     const isAdmin = role === 'SUPER_ADMIN' || role === 'ADMIN_1' || role === 'ADMIN_2';
 
-    // When no slug is provided (platform home page), fall back to the
-    // first active wedding so the landing page renders a real invitation.
-    // Admins can see any wedding by slug; guests only see ACTIVE.
-    const where = slug
-      ? (isAdmin ? { slug } : { slug, status: 'ACTIVE' as const })
-      : { status: 'ACTIVE' as const };
+    // Build the where clause:
+    // - No slug → first ACTIVE wedding (platform landing page)
+    // - Slug + admin → any wedding with that slug (preview DRAFT etc.)
+    // - Slug + couple owner → their own wedding (even if DRAFT)
+    // - Slug + guest → only ACTIVE weddings
+    let where: Record<string, unknown>;
+    if (!slug) {
+      where = { status: 'ACTIVE' };
+    } else if (isAdmin) {
+      where = { slug };
+    } else {
+      // Try to find the wedding by slug — if it belongs to the logged-in
+      // couple, allow it regardless of status; otherwise require ACTIVE
+      where = { slug, status: 'ACTIVE' };
+    }
 
-    const wedding = await db.weddingAccount.findFirst({
+    let wedding = await db.weddingAccount.findFirst({
       where,
       orderBy: slug ? undefined : { createdAt: 'asc' },
       include: {
@@ -37,6 +49,24 @@ export async function GET(req: Request) {
         _count: { select: { wishes: true, rsvps: true } },
       },
     });
+
+    // If not found with ACTIVE filter, check if the logged-in couple owns it
+    if (!wedding && slug && !isAdmin && session?.user?.id) {
+      wedding = await db.weddingAccount.findFirst({
+        where: { slug, ownerId: session.user.id },
+        include: {
+          content: true,
+          schedules: { orderBy: { sortOrder: 'asc' } },
+          faqs: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } },
+          stories: { orderBy: { sortOrder: 'asc' } },
+          media: { orderBy: { sortOrder: 'asc' }, take: 100 },
+          features: true,
+          wishes: { orderBy: { createdAt: 'desc' }, take: 50 },
+          rsvps: { select: { id: true, firstName: true, lastName: true, partySize: true, createdAt: true }, orderBy: { createdAt: 'desc' }, take: 20 },
+          _count: { select: { wishes: true, rsvps: true } },
+        },
+      });
+    }
 
     if (!wedding) {
       return NextResponse.json({ error: 'Wedding not found' }, { status: 404 });

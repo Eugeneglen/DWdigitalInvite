@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useCMSStore } from '@/store/useCMSStore';
 import { Heart, CheckCircle, Mail, Users, MessageSquareHeart, Phone } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -165,12 +166,18 @@ export default function MasterDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { currentPage } = useCMSStore();
 
   useEffect(() => {
+    // Refetch whenever the dashboard becomes the active page (not just on mount).
+    // This ensures counts/lists are fresh after navigating away and back.
+    if (currentPage !== 'dashboard') return;
     async function fetchDashboard() {
       try {
         setLoading(true);
-        const res = await fetch('/api/master/dashboard?XTransformPort=3000');
+        const res = await fetch('/api/master/dashboard?XTransformPort=3000', {
+          headers: { 'Cache-Control': 'no-store' },
+        });
         if (!res.ok) throw new Error(`Failed to load dashboard (${res.status})`);
         const json = await res.json();
         setData(json);
@@ -181,7 +188,7 @@ export default function MasterDashboard() {
       }
     }
     fetchDashboard();
-  }, []);
+  }, [currentPage]);
 
   if (error) {
     return (

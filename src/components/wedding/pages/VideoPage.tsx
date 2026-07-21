@@ -2,7 +2,8 @@
 
 import { useMemo } from 'react';
 import SectionBanner from '../SectionBanner';
-import { usePublicWedding } from '@/hooks/usePublicWedding';
+import { usePublicWedding } from '@/hooks/usePublicWedding'
+import { useWeddingSlug } from '@/hooks/useWeddingSlug';;
 
 interface VideoConfig {
   url?: string;
@@ -51,7 +52,7 @@ function isDirectVideo(raw: string): boolean {
 }
 
 export default function VideoPage() {
-  const { data, getField } = usePublicWedding();
+  const { data, getField } = usePublicWedding(useWeddingSlug());
   const config: VideoConfig = (data?.featureConfigs?.['video'] as VideoConfig) ?? {};
 
   const videoUrl = config.url?.trim();

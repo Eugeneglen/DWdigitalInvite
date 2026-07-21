@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import SectionBanner from '../SectionBanner';
-import { usePublicWedding } from '@/hooks/usePublicWedding';
+import { usePublicWedding } from '@/hooks/usePublicWedding'
+import { useWeddingSlug } from '@/hooks/useWeddingSlug';;
 
 const FALLBACK_PHOTOS = [
   {
@@ -62,7 +63,7 @@ function useReveal() {
 
 export default function MomentsPage() {
   const { ref, visible } = useReveal();
-  const { data, getField } = usePublicWedding();
+  const { data, getField } = usePublicWedding(useWeddingSlug());
 
   const sectionTitle = getField('moments', 'title', 'Moments');
   const subtitle = getField('moments', 'subtitle', FALLBACK_SUBTITLE);

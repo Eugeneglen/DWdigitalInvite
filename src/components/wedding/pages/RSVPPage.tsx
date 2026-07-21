@@ -2,7 +2,8 @@
 
 import { useState, Suspense, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { usePublicWedding } from '@/hooks/usePublicWedding';
+import { usePublicWedding } from '@/hooks/usePublicWedding'
+import { useWeddingSlug } from '@/hooks/useWeddingSlug';;
 
 // Steps: 0=Name, 1=Party Size, 2=Guest Details, 3=Attendance
 
@@ -33,7 +34,7 @@ export default function RSVPPage() {
 
 function RSVPPageInner() {
   const searchParams = useSearchParams();
-  const { data, getField } = usePublicWedding();
+  const { data, getField } = usePublicWedding(useWeddingSlug());
 
   // CMS content with fallbacks
   const coupleName = data?.wedding.coupleName || 'Eleanor & James';

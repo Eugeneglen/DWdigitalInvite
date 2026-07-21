@@ -35,6 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -78,6 +79,7 @@ interface Wedding {
   jobNumber: string | null;
   coupleEmail: string | null;
   couplePhone: string | null;
+  internalNotes: string | null;
   consultantId: string | null;
   coordinatorId: string | null;
   accountStatus: string;
@@ -104,6 +106,7 @@ interface WeddingForm {
   jobNumber: string;
   coupleEmail: string;
   couplePhone: string;
+  internalNotes: string;
   sections: string[];
   consultantId: string;
   coordinatorId: string;
@@ -138,6 +141,7 @@ const EMPTY_FORM: WeddingForm = {
   jobNumber: '',
   coupleEmail: '',
   couplePhone: '',
+  internalNotes: '',
   sections: [],
   consultantId: '',
   coordinatorId: '',
@@ -356,6 +360,7 @@ export default function MasterWeddings() {
       jobNumber: w.jobNumber ?? '',
       coupleEmail: w.coupleEmail ?? '',
       couplePhone: w.couplePhone ?? '',
+      internalNotes: w.internalNotes ?? '',
       sections: enabledSections,
       consultantId: w.consultantId ?? '',
       coordinatorId: w.coordinatorId ?? '',
@@ -419,6 +424,7 @@ export default function MasterWeddings() {
         jobNumber: form.jobNumber.trim(),
         coupleEmail: form.coupleEmail.trim(),
         couplePhone: form.couplePhone.trim(),
+        internalNotes: form.internalNotes.trim() || null,
         sections: form.sections,
         consultantId: form.consultantId || null,
         coordinatorId: form.coordinatorId || null,
@@ -590,7 +596,7 @@ export default function MasterWeddings() {
                   <TableRow
                     key={w.id}
                     className="border-slate-100 cursor-pointer"
-                    onClick={() => window.open(`/${w.slug}`, '_blank')}
+                    onClick={() => selectWedding(w.id)}
                   >
                     {/* Couple Name */}
                     <TableCell>
@@ -672,7 +678,7 @@ export default function MasterWeddings() {
                           <DropdownMenuItem
                             onClick={(e) => {
                               e.stopPropagation();
-                              window.open(`/${w.slug}`, '_blank');
+                              selectWedding(w.id);
                             }}
                           >
                             <Eye className="h-4 w-4" />
@@ -928,6 +934,19 @@ export default function MasterWeddings() {
                   required
                 />
               </div>
+            </div>
+
+            {/* Internal Notes (admin only) */}
+            <div className="space-y-2">
+              <Label htmlFor="internalNotes">Internal Notes (admin only)</Label>
+              <Textarea
+                id="internalNotes"
+                placeholder="Notes visible to DreamWeavers staff only..."
+                value={form.internalNotes}
+                onChange={(e) => setField('internalNotes', e.target.value)}
+                rows={3}
+                className="border-slate-200 resize-none"
+              />
             </div>
 
             {/* Plan & Status — side by side */}

@@ -1,6 +1,7 @@
 'use client';
 
-import { usePublicWedding } from '@/hooks/usePublicWedding';
+import { usePublicWedding } from '@/hooks/usePublicWedding'
+import { useWeddingSlug } from '@/hooks/useWeddingSlug';;
 import { useImageAutoContrast } from '@/hooks/useImageAutoContrast';
 
 const FALLBACK_BG =
@@ -14,7 +15,7 @@ interface SectionBannerProps {
 }
 
 export default function SectionBanner({ title, subtitle, bannerUrl: bannerUrlProp }: SectionBannerProps) {
-  const { data } = usePublicWedding();
+  const { data } = usePublicWedding(useWeddingSlug());
   const bannerUrl = bannerUrlProp ?? data?.wedding.bannerUrl ?? FALLBACK_BG;
 
   // Auto-contrast: sample the banner image pixels to pick readable text colour.
