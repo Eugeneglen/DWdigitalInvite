@@ -4,6 +4,9 @@ import { authOptions, hashPassword } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { z } from 'zod/v4';
 
+// Prevent Next.js from caching this route — always return fresh data
+export const dynamic = 'force-dynamic';
+
 const createWeddingSchema = z.object({
   coupleName: z.string().min(2, 'Couple name is required'),
   brideName: z.string().nullable().optional(),
@@ -45,6 +48,8 @@ export async function GET(req: NextRequest) {
         { brideName: { contains: search } },
         { groomName: { contains: search } },
         { slug: { contains: search } },
+        { jobNumber: { contains: search } },
+        { venue: { contains: search } },
       ];
     }
     if (status) where.status = status;
@@ -58,14 +63,16 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: 'desc' },
         include: {
           owner: { select: { id: true, name: true, email: true } },
+          consultant: { select: { id: true, name: true } },
           features: { select: { featureKey: true, isEnabled: true } },
-          _count: { select: { rsvps: true, wishes: true, guests: true, contacts: true } },
         },
       }),
       db.weddingAccount.count({ where }),
     ]);
 
-    return NextResponse.json({ weddings, total, page, limit });
+    const response = NextResponse.json({ weddings, total, page, limit });
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    return response;
   } catch (error) {
     console.error('Weddings list error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -58,7 +58,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useCMSStore } from '@/store/useCMSStore';
+// useCMSStore import removed — selectWedding was dead code
 import WeddingCreationWizard from './WeddingCreationWizard';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -81,6 +81,7 @@ interface Wedding {
   couplePhone: string | null;
   internalNotes: string | null;
   consultantId: string | null;
+  consultant?: { id: string; name: string } | null;
   coordinatorId: string | null;
   accountStatus: string;
   features?: { featureKey: string; isEnabled: boolean }[];
@@ -227,7 +228,8 @@ function EmptyState({ hasSearch }: { hasSearch: boolean }) {
 // ── Main Component ─────────────────────────────────────────────────────────
 
 export default function MasterWeddings() {
-  const { selectWedding } = useCMSStore();
+  // selectWedding removed — was dead code (set selectedWeddingId but nothing read it)
+  // View button now uses window.open(`/${w.slug}`, '_blank') instead
 
   // Data state
   const [weddings, setWeddings] = useState<Wedding[]>([]);
@@ -515,7 +517,7 @@ export default function MasterWeddings() {
           <div className="relative flex-1 min-w-[200px] max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
-              placeholder="Search by couple name, bride, groom, or slug..."
+              placeholder="Search by couple name, bride, groom, slug, job number, or venue..."
               className="pl-9 border-slate-200 bg-white"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -540,8 +542,10 @@ export default function MasterWeddings() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Packages</SelectItem>
+              <SelectItem value="FREE">Free</SelectItem>
               <SelectItem value="GOLD">Gold</SelectItem>
               <SelectItem value="PLATINUM">Platinum</SelectItem>
+              <SelectItem value="PREMIUM">Premium</SelectItem>
               <SelectItem value="DIAMOND">Diamond</SelectItem>
             </SelectContent>
           </Select>
@@ -572,7 +576,10 @@ export default function MasterWeddings() {
                     Wedding Date
                   </TableHead>
                   <TableHead className="text-slate-600 font-semibold">
-                    Venue
+                    Wedding Venue
+                  </TableHead>
+                  <TableHead className="text-slate-600 font-semibold">
+                    Job Number
                   </TableHead>
                   <TableHead className="text-slate-600 font-semibold">
                     Status
@@ -580,11 +587,8 @@ export default function MasterWeddings() {
                   <TableHead className="text-slate-600 font-semibold">
                     Plan
                   </TableHead>
-                  <TableHead className="text-slate-600 font-semibold text-center">
-                    RSVPs
-                  </TableHead>
-                  <TableHead className="text-slate-600 font-semibold text-center">
-                    Wishes
+                  <TableHead className="text-slate-600 font-semibold">
+                    Consultant
                   </TableHead>
                   <TableHead className="text-slate-600 font-semibold text-right">
                     Actions
@@ -615,9 +619,14 @@ export default function MasterWeddings() {
                         : '—'}
                     </TableCell>
 
-                    {/* Venue */}
+                    {/* Wedding Venue */}
                     <TableCell className="text-sm text-slate-600 max-w-[160px] truncate">
-                      {truncate(w.venueAddress, 24)}
+                      {truncate(w.venue, 24)}
+                    </TableCell>
+
+                    {/* Job Number */}
+                    <TableCell className="text-sm text-slate-600 font-mono">
+                      {w.jobNumber ?? '—'}
                     </TableCell>
 
                     {/* Status */}
@@ -646,18 +655,9 @@ export default function MasterWeddings() {
                       </Badge>
                     </TableCell>
 
-                    {/* RSVPs */}
-                    <TableCell className="text-center">
-                      <Badge variant="secondary" className="bg-slate-100 text-slate-700">
-                        {w._count?.rsvps ?? 0}
-                      </Badge>
-                    </TableCell>
-
-                    {/* Wishes */}
-                    <TableCell className="text-center">
-                      <Badge variant="secondary" className="bg-slate-100 text-slate-700">
-                        {w._count?.wishes ?? 0}
-                      </Badge>
+                    {/* Consultant */}
+                    <TableCell className="text-sm text-slate-600">
+                      {w.consultant?.name ?? '—'}
                     </TableCell>
 
                     {/* Actions */}

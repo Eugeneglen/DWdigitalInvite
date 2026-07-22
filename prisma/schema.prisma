@@ -88,6 +88,13 @@ model WeddingAccount {
   contacts      ContactSubmission[]
   auditLogs     AuditLog[]
   notifications Notification[]
+
+  // Indexes for Admin CMS search + filter performance at scale
+  @@index([coupleName])       // Search by couple name
+  @@index([status])           // Filter by status
+  @@index([plan])             // Filter by plan
+  @@index([createdAt])        // Default ordering (newest first)
+  @@index([consultantId])     // Filter by consultant
 }
 
 model WeddingFeature {

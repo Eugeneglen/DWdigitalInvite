@@ -210,7 +210,7 @@ export default function MasterDashboard() {
               <StatCard label="Total Weddings" value={data.totalWeddings} icon={Heart} color="text-rose-500" bg="bg-rose-50" />
               <StatCard label="Active Invitations" value={data.activeWeddings} icon={CheckCircle} color="text-emerald-500" bg="bg-emerald-50" />
               <StatCard label="Total RSVPs" value={data.totalRsvps} icon={Mail} color="text-blue-500" bg="bg-blue-50" />
-              <StatCard label="Total Guests" value={data.totalGuests} icon={Users} color="text-amber-500" bg="bg-amber-50" />
+              <StatCard label="Total RSVP Guests" value={data.totalGuests} icon={Users} color="text-amber-500" bg="bg-amber-50" />
             </>
           )
         }
