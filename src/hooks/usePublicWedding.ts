@@ -63,6 +63,7 @@ export interface PublicWeddingData {
   mediaByCategory: Record<string, PublicWeddingData['media']>;
   featureFlags: Record<string, boolean>;
   featureConfigs: Record<string, Record<string, unknown>>;
+  animationAvailability?: Record<string, boolean>;
   rsvpCount: number;
   totalGuestCount: number;
   wishes: {

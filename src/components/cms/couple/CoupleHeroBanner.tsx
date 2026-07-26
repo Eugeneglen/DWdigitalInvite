@@ -13,20 +13,22 @@ import {
 } from '@/components/ui/dialog';
 import { useCoupleCMSStore } from '@/store/useCoupleCMSStore';
 import { invalidateWeddingCache } from '@/hooks/usePublicWedding';
-import MirrorImageUpload from './MirrorImageUpload';
 
 const WEDDING_API = '/api/cms/wedding?XTransformPort=3000';
+const UPLOAD_API = '/api/cms/upload?XTransformPort=3000';
 
 /** ─── Hero Visual Section (image OR video) — used by CoupleHome ──────────── */
 
 export function HeroVisualSection({ weddingData }: { weddingData: Record<string, unknown> | null }) {
   const [uploading, setUploading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [uploadType, setUploadType] = useState<'image' | 'video' | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const heroImgUrl = (weddingData as Record<string, string>)?.heroImageUrl || '';
   const heroVideoUrl = (weddingData as Record<string, string>)?.heroVideoUrl || '';
 
+  // Upload a file (image or video) via the file storage backend.
+  // Stores the file on disk and saves the returned URL to WeddingAccount.
   const handleFile = async (file: File) => {
     const isVideo = file.type.startsWith('video/');
     if (!isVideo && !file.type.startsWith('image/')) {
@@ -41,28 +43,31 @@ export function HeroVisualSection({ weddingData }: { weddingData: Record<string,
     }
 
     setUploading(true);
+    setUploadType(isVideo ? 'video' : 'image');
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      // Step 1: Upload file to the storage backend
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('category', 'hero');
+      const uploadRes = await fetch(UPLOAD_API, { method: 'POST', body: formData });
+      if (!uploadRes.ok) {
+        const err = await uploadRes.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to upload file');
+      }
+      const uploadResult = await uploadRes.json();
+      const fileUrl: string = uploadResult.url;
 
+      // Step 2: Save the URL to the WeddingAccount (and clear the other field)
       const fieldKey = isVideo ? 'heroVideoUrl' : 'heroImageUrl';
       const clearKey = isVideo ? 'heroImageUrl' : 'heroVideoUrl';
-
       const res = await fetch(WEDDING_API, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          [fieldKey]: dataUrl,
-          [clearKey]: '',
-        }),
+        body: JSON.stringify({ [fieldKey]: fileUrl, [clearKey]: '' }),
       });
+      if (!res.ok) throw new Error('Failed to save');
 
-      if (!res.ok) throw new Error('Failed to upload');
-
+      // Step 3: Refresh wedding data in the store
       const weddingRes = await fetch(WEDDING_API);
       if (weddingRes.ok) {
         const data = await weddingRes.json();
@@ -70,35 +75,11 @@ export function HeroVisualSection({ weddingData }: { weddingData: Record<string,
       }
       invalidateWeddingCache();
       toast({ title: 'Success', description: `${isVideo ? 'Video' : 'Image'} updated` });
-    } catch {
-      toast({ title: 'Error', description: 'Failed to upload', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to upload', variant: 'destructive' });
     } finally {
       setUploading(false);
-    }
-  };
-
-  // Upload a hero image from a base64 data URL (used by MirrorImageUpload,
-  // which already converts the file to a data URL for the thumbnail preview).
-  const handleHeroImageDataUrl = async (dataUrl: string) => {
-    setUploading(true);
-    try {
-      const res = await fetch(WEDDING_API, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ heroImageUrl: dataUrl, heroVideoUrl: '' }),
-      });
-      if (!res.ok) throw new Error('Failed to upload');
-      const weddingRes = await fetch(WEDDING_API);
-      if (weddingRes.ok) {
-        const data = await weddingRes.json();
-        useCoupleCMSStore.getState().setWeddingData(data.wedding ?? data);
-      }
-      invalidateWeddingCache();
-      toast({ title: 'Success', description: 'Image updated' });
-    } catch {
-      toast({ title: 'Error', description: 'Failed to upload', variant: 'destructive' });
-    } finally {
-      setUploading(false);
+      setUploadType(null);
     }
   };
 
@@ -137,6 +118,7 @@ export function HeroVisualSection({ weddingData }: { weddingData: Record<string,
             </div>
           </div>
 
+          {/* Current media display (video or image) with remove button */}
           {heroVideoUrl ? (
             <div className="relative aspect-video rounded-lg overflow-hidden border border-charcoal-ink/10 group">
               <video src={heroVideoUrl} className="w-full h-full object-cover" controls />
@@ -154,21 +136,72 @@ export function HeroVisualSection({ weddingData }: { weddingData: Record<string,
                 </span>
               </div>
             </div>
-          ) : (
-            <MirrorImageUpload
-              value={heroImgUrl}
-              onChange={handleHeroImageDataUrl}
-              onRemove={() => handleRemove('image')}
-              label="Hero Image"
-              helperText="Full-bleed hero on the home page · 16:9 crop mirrors the guest site"
-              aspectClass="aspect-[16/9]"
-            />
-          )}
+          ) : heroImgUrl ? (
+            <div className="relative aspect-video rounded-lg overflow-hidden border border-charcoal-ink/10 group">
+              <img src={heroImgUrl} alt="Hero" className="w-full h-full object-cover" unoptimized />
+              <button
+                type="button"
+                onClick={() => handleRemove('image')}
+                className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 text-white hover:bg-red-500 transition-colors"
+                title="Remove image"
+              >
+                <X className="size-3.5" />
+              </button>
+              <div className="absolute bottom-2 left-2">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/50 text-white text-[10px] font-medium">
+                  <ImageIcon className="size-3" /> Image
+                </span>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Upload buttons — always visible, support both image and video.
+              Stack vertically on mobile, side-by-side on sm+ screens. */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (fileRef.current) {
+                  fileRef.current.accept = 'image/*';
+                  fileRef.current.click();
+                }
+              }}
+              disabled={uploading}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-charcoal-ink/10 hover:border-cinematic-gold hover:bg-cinematic-gold/5 transition-colors text-xs font-medium text-charcoal-ink/70 disabled:opacity-50"
+            >
+              {uploading && uploadType === 'image' ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <ImageIcon className="size-3.5" />
+              )}
+              {heroImgUrl ? 'Replace Image' : 'Upload Image'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (fileRef.current) {
+                  fileRef.current.accept = 'video/mp4,video/webm,video/ogg';
+                  fileRef.current.click();
+                }
+              }}
+              disabled={uploading}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-charcoal-ink/10 hover:border-cinematic-gold hover:bg-cinematic-gold/5 transition-colors text-xs font-medium text-charcoal-ink/70 disabled:opacity-50"
+            >
+              {uploading && uploadType === 'video' ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Video className="size-3.5" />
+              )}
+              {heroVideoUrl ? 'Replace Video' : 'Upload Video'}
+            </button>
+          </div>
+          <p className="text-[10px] text-charcoal-ink/30 text-center">
+            Image: max 10 MB · Video: max 50 MB (MP4, WebM, OGG) · Silent autoplay loop on guest page
+          </p>
 
           <input
             ref={fileRef}
             type="file"
-            accept="image/*,video/mp4,video/webm,video/ogg"
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -178,15 +211,6 @@ export function HeroVisualSection({ weddingData }: { weddingData: Record<string,
           />
         </CardContent>
       </Card>
-
-      <Dialog open={!!previewUrl} onOpenChange={() => setPreviewUrl(null)}>
-        <DialogContent className="sm:max-w-3xl p-2">
-          <DialogHeader>
-            <DialogTitle className="sr-only">Hero Preview</DialogTitle>
-          </DialogHeader>
-          <img src={previewUrl ?? ''} alt="Preview" className="w-full rounded-lg" unoptimized />
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
@@ -212,20 +236,25 @@ export function BannerSection({ weddingData }: { weddingData: Record<string, unk
 
     setUploading(true);
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      // Step 1: Upload file to the storage backend
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('category', 'banner');
+      const uploadRes = await fetch(UPLOAD_API, { method: 'POST', body: formData });
+      if (!uploadRes.ok) {
+        const err = await uploadRes.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to upload file');
+      }
+      const uploadResult = await uploadRes.json();
+      const fileUrl: string = uploadResult.url;
 
+      // Step 2: Save the URL to the WeddingAccount
       const res = await fetch(WEDDING_API, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bannerUrl: dataUrl }),
+        body: JSON.stringify({ bannerUrl: fileUrl }),
       });
-
-      if (!res.ok) throw new Error('Failed to upload');
+      if (!res.ok) throw new Error('Failed to save');
 
       const weddingRes = await fetch(WEDDING_API);
       if (weddingRes.ok) {
@@ -234,8 +263,8 @@ export function BannerSection({ weddingData }: { weddingData: Record<string, unk
       }
       invalidateWeddingCache();
       toast({ title: 'Success', description: 'Banner updated' });
-    } catch {
-      toast({ title: 'Error', description: 'Failed to upload', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to upload', variant: 'destructive' });
     } finally {
       setUploading(false);
     }

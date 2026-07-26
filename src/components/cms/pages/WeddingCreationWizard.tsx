@@ -56,6 +56,9 @@ const ALL_FEATURES: FeatureInfo[] = [
   { key: 'gallery', label: 'Photo Gallery', description: 'Additional gallery' },
   { key: 'music', label: 'Background Music', description: 'Music player' },
   { key: 'video', label: 'Wedding Video', description: 'Embedded video' },
+  { key: 'animation:gold-dust', label: 'Gold Dust Animation', description: 'Ambient gold particles drifting upward' },
+  { key: 'animation:flying-stars', label: 'Meteors Animation', description: 'Shooting-star streaks falling through a starfield' },
+  { key: 'animation:raining', label: 'Bubbles Animation', description: 'Raindrop ripple rings expanding and fading' },
   { key: 'templates', label: 'Theme Templates', description: '6 curated design themes' },
 ];
 
@@ -159,11 +162,16 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
     }
   }, [open, fetchInitialData]);
 
-  // When package changes, auto-apply that package's features
+  // When package changes, auto-apply that package's features.
+  // Gold Dust animation is ON by default for all new weddings; admin can
+  // toggle individual animations ON/OFF in the feature grid.
   useEffect(() => {
     const pkg = packages.find((p) => p.name === form.plan);
     if (pkg) {
-      setForm((prev) => ({ ...prev, features: [...pkg.features] }));
+      const features = [...pkg.features];
+      // Default: Gold Dust ON, Meteors OFF, Bubbles OFF
+      if (!features.includes('animation:gold-dust')) features.push('animation:gold-dust');
+      setForm((prev) => ({ ...prev, features }));
     }
   }, [form.plan, packages]);
 

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, Wand2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,14 +9,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import { useCoupleCMSStore } from '@/store/useCoupleCMSStore';
 import { HeroVisualSection, BannerSection } from './CoupleHeroBanner';
 import MirrorImageUpload from './MirrorImageUpload';
 import FontPicker from './FontPicker';
 import BackgroundColorPicker from './BackgroundColorPicker';
 import { invalidateWeddingCache } from '@/hooks/usePublicWedding';
+import {
+  ANIMATION_STYLES,
+} from '@/lib/animation-registry';
 
 const CONTENT_API = '/api/cms/content?XTransformPort=3000';
+const FEATURES_API = '/api/cms/features?XTransformPort=3000';
 
 interface ContentItem {
   id: string;
@@ -53,6 +58,13 @@ export default function CoupleHome() {
   const [saving, setSaving] = useState(false);
   const [editedFields, setEditedFields] = useState<Record<string, string>>({});
 
+  // Animation state — per-style feature flags (one WeddingFeature row per style)
+  // Each animation style is its own feature row: 'animation:gold-dust', etc.
+  // Admin controls which rows exist (via Create New Wedding wizard).
+  // Couple controls isEnabled for each row via these toggles.
+  const [animFeatureStates, setAnimFeatureStates] = useState<Record<string, boolean>>({});
+  const [savingAnimation, setSavingAnimation] = useState<string | null>(null);
+
   const fetchContent = useCallback(async () => {
     try {
       setLoading(true);
@@ -71,9 +83,57 @@ export default function CoupleHome() {
     }
   }, []);
 
+  // Fetch animation feature rows (each style is its own WeddingFeature row)
+  const fetchAnimation = useCallback(async () => {
+    try {
+      const res = await fetch(FEATURES_API);
+      if (!res.ok) return;
+      const data = await res.json();
+      const states: Record<string, boolean> = {};
+      for (const f of (data.features ?? []) as { featureKey: string; isEnabled: boolean }[]) {
+        if (f.featureKey.startsWith('animation:')) {
+          states[f.featureKey] = f.isEnabled;
+        }
+      }
+      setAnimFeatureStates(states);
+    } catch {
+      // Silent fail — animation toggles just won't appear
+    }
+  }, []);
+
   useEffect(() => {
     fetchContent();
-  }, [fetchContent]);
+    fetchAnimation();
+  }, [fetchContent, fetchAnimation]);
+
+  // Toggle a single animation style ON/OFF (couple activation)
+  const handleToggleAnimation = async (featureKey: string, checked: boolean) => {
+    setAnimFeatureStates((prev) => ({ ...prev, [featureKey]: checked }));
+    setSavingAnimation(featureKey);
+    try {
+      const res = await fetch(FEATURES_API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          features: [{ featureKey, isEnabled: checked }],
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to save animation setting');
+      invalidateWeddingCache();
+      const styleLabel = ANIMATION_STYLES.find((s) => `animation:${s.key}` === featureKey)?.label ?? featureKey;
+      toast({ title: 'Success', description: `${styleLabel} ${checked ? 'enabled' : 'disabled'}` });
+    } catch {
+      // Revert on failure
+      setAnimFeatureStates((prev) => ({ ...prev, [featureKey]: !checked }));
+      toast({ title: 'Error', description: 'Failed to save animation setting', variant: 'destructive' });
+    } finally {
+      setSavingAnimation(null);
+    }
+  };
+
+  // Animation styles available to this couple (only those with a feature row)
+  const ANIMATION_FEATURE_KEYS = ['animation:gold-dust', 'animation:flying-stars', 'animation:raining'];
+  const availableAnimStyles = ANIMATION_STYLES.filter((s) => `animation:${s.key}` in animFeatureStates);
 
   const getFieldValue = (fieldKey: string): string => {
     const edited = editedFields[`hero/${fieldKey}`];
@@ -183,6 +243,56 @@ export default function CoupleHome() {
         </Label>
         <BannerSection weddingData={weddingData} />
       </div>
+
+      <Separator className="bg-champagne-silk" />
+
+      {/* 2.5. Ambient Animation — per-style ON/OFF toggles (above Color/Font) */}
+      {availableAnimStyles.length > 0 && (
+        <div className="space-y-2">
+          <Label className="text-xs font-medium text-charcoal-ink/50 uppercase tracking-wider flex items-center gap-1.5">
+            <Wand2 className="size-3.5" />
+            Ambient Animation
+          </Label>
+          <Card className="border-charcoal-ink/5 shadow-none">
+            <CardContent className="p-4 space-y-3">
+              <p className="text-[11px] text-charcoal-ink/40 leading-relaxed">
+                Toggle which ambient animation effects appear on your invitation. You can enable multiple effects simultaneously, or turn all off for a clean, minimal design.
+              </p>
+              {availableAnimStyles.map((style) => {
+                const featureKey = `animation:${style.key}`;
+                const isActive = animFeatureStates[featureKey] === true;
+                const isSaving = savingAnimation === featureKey;
+                return (
+                  <div
+                    key={style.key}
+                    className="flex items-start justify-between gap-4 rounded-lg border border-champagne-silk/40 p-3"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-charcoal-ink">{style.label}</span>
+                        {isActive && (
+                          <span className="text-[9px] font-medium text-cinematic-gold uppercase tracking-wide">Active</span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-charcoal-ink/40 mt-0.5 leading-relaxed">{style.description}</p>
+                    </div>
+                    <div className="shrink-0 pt-0.5">
+                      {isSaving ? (
+                        <Loader2 className="size-4 animate-spin text-cinematic-gold/60" />
+                      ) : (
+                        <Switch
+                          checked={isActive}
+                          onCheckedChange={(checked) => handleToggleAnimation(featureKey, checked)}
+                        />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <Separator className="bg-champagne-silk" />
 

@@ -206,6 +206,22 @@ export async function POST(req: NextRequest) {
       })),
     });
 
+    // Seed the 3 individual animation feature rows.
+    // Each animation style is its own WeddingFeature row with featureKey
+    // 'animation:gold-dust', 'animation:flying-stars', 'animation:raining'.
+    // The admin's toggle selection from the wizard determines isEnabled.
+    // Couples can later toggle these ON/OFF via their Couple CMS Home page.
+    const ANIMATION_STYLE_KEYS = ['animation:gold-dust', 'animation:flying-stars', 'animation:raining'];
+    await db.weddingFeature.createMany({
+      data: ANIMATION_STYLE_KEYS.map((key) => ({
+        weddingId: wedding.id,
+        featureKey: key,
+        isEnabled: enabledFeatures.includes(key),
+      })),
+    }).catch(() => {
+      // Defensive — ignore errors if rows already exist
+    });
+
     // Audit log
     await db.auditLog.create({
       data: {
@@ -319,6 +335,35 @@ export async function PATCH(req: NextRequest) {
       where: { id },
       data: updateData,
     });
+
+    // ── Ensure animation feature rows exist on plan change ──────────────
+    //
+    // With the per-animation-feature-row model, each animation style is its
+    // own WeddingFeature row (animation:gold-dust, animation:flying-stars,
+    // animation:raining). On plan change, we ensure all 3 rows exist so the
+    // couple can toggle them via their CMS. Existing rows are preserved.
+    if (updates.plan) {
+      try {
+        const ANIMATION_KEYS = ['animation:gold-dust', 'animation:flying-stars', 'animation:raining'];
+        for (const key of ANIMATION_KEYS) {
+          const existing = await db.weddingFeature.findFirst({
+            where: { weddingId: id, featureKey: key },
+          });
+          if (!existing) {
+            await db.weddingFeature.create({
+              data: {
+                weddingId: id,
+                featureKey: key,
+                isEnabled: key === 'animation:gold-dust', // Gold Dust ON by default
+              },
+            });
+          }
+        }
+      } catch (err) {
+        // Don't fail the wedding update just because the animation ensure failed.
+        console.error('[master/weddings PATCH] Animation ensure failed:', err);
+      }
+    }
 
     // Audit log
     await db.auditLog.create({

@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import type { AnimationDensity } from '@/lib/animation-registry';
 
 const styles = `
   .gd-particle {
@@ -21,24 +22,63 @@ const styles = `
     75%  { margin-left: var(--gd-sway,12px); }
     100% { margin-left: 0; }
   }
-
+  /* Accessibility: guests who prefer reduced motion see no animation. */
+  @media (prefers-reduced-motion: reduce) {
+    .gd-particle { display: none !important; }
+  }
 `;
+
+const DENSITY_COUNT: Record<AnimationDensity, number> = {
+  low: 10,
+  medium: 18,
+  high: 26,
+};
+
+const MOBILE_PARTICLE_CAP = 12;
+
+interface GoldDustProps {
+  /** Particle density. Defaults to 'medium' (the historical count of 18). */
+  density?: AnimationDensity;
+}
 
 /**
  * Ambient gold dust particles.
  * Purely decorative, pointer-events-none, sits behind all interactive elements.
+ *
+ * Performance safeguards:
+ *   - Pure CSS animation (GPU-composited, no rAF loop).
+ *   - Mobile particle cap (≤ 12 on screens < 768px).
+ *   - prefers-reduced-motion: particles hidden entirely.
  */
-export default function GoldDust() {
-  const particles = useMemo(() =>
-    Array.from({ length: 18 }).map((_, i) => ({
-      left: `${(i * 5.5 + 2) % 100}%`,
-      size: 2 + (i % 4),
-      duration: 16 + (i % 8) * 2,
-      delay: (i * 1.7) % 12,
-      sway: 8 + (i % 3) * 6,
-      opacity: 0.3 + (i % 3) * 0.2,
-    })),
-  []);
+export default function GoldDust({ density = 'medium' }: GoldDustProps) {
+  // Initialise from the actual viewport on first render (client-only —
+  // GuestSite is dynamically imported with ssr:false so window always exists).
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 767px)').matches : false,
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  const baseCount = DENSITY_COUNT[density] ?? DENSITY_COUNT.medium;
+  const count = isMobile ? Math.min(baseCount, MOBILE_PARTICLE_CAP) : baseCount;
+
+  const particles = useMemo(
+    () =>
+      Array.from({ length: count }).map((_, i) => ({
+        left: `${(i * (100 / count) + 2) % 100}%`,
+        size: 2 + (i % 4),
+        duration: 16 + (i % 8) * 2,
+        delay: (i * 1.7) % 12,
+        sway: 8 + (i % 3) * 6,
+        opacity: 0.3 + (i % 3) * 0.2,
+      })),
+    [count],
+  );
 
   return (
     <div className="fixed inset-0 pointer-events-none z-[1] overflow-hidden" aria-hidden="true">

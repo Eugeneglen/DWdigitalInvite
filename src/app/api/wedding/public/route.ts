@@ -86,7 +86,9 @@ export async function GET(req: Request) {
       mediaByCategory[m.category].push(m);
     }
 
-    // Build feature flags map
+    // Build feature flags map — each animation style is its own feature row
+    // ('animation:gold-dust', 'animation:flying-stars', 'animation:raining').
+    // The guest site reads these individual flags to decide which animations render.
     const featureFlags: Record<string, boolean> = {};
     const featureConfigs: Record<string, Record<string, unknown>> = {};
     for (const f of wedding.features) {

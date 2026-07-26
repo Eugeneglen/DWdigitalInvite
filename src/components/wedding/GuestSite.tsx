@@ -15,7 +15,7 @@ import MobileDrawer from '@/components/wedding/MobileDrawer';
 import BottomNav from '@/components/wedding/BottomNav';
 import Footer from '@/components/wedding/Footer';
 import MusicPlayer from '@/components/wedding/MusicPlayer';
-import GoldDust from '@/components/wedding/GoldDust';
+import AnimationRenderer from '@/components/wedding/AnimationRenderer';
 import { LoginModal } from '@/components/cms/LoginModal';
 import type { Section } from '@/store/useNavigationStore';
 import dynamic from 'next/dynamic';
@@ -190,7 +190,7 @@ export default function GuestSite({ slug, topOffset, showEditorButton = false }:
     >
       {/* Dynamic theme overrides — must be first child for cascade order */}
       <style dangerouslySetInnerHTML={{ __html: themeOverrideCSS }} />
-      <GoldDust />
+      <AnimationRenderer featureFlags={weddingData?.featureFlags} />
       <WeddingSlugProvider slug={slug}>
       <Header topOffset={topOffset} headerTextColor={headerTextColor} />
       <MobileDrawer />

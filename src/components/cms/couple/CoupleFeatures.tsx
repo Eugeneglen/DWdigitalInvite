@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Loader2, Timer, CalendarClock, Mail, BookOpen, Image, Heart, MapPin, HelpCircle, Sparkles, Video, Music2, Save, Palette } from 'lucide-react';
+import { Loader2, Timer, CalendarClock, Mail, BookOpen, Image, Heart, MapPin, HelpCircle, Sparkles, Video, Music2, Save, Palette, Upload } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { invalidateWeddingCache } from '@/hooks/usePublicWedding';
+// (Animation settings now live in CoupleHome.tsx — no imports needed here)
 
 const API_BASE = '/api/cms/features?XTransformPort=3000';
 
@@ -179,11 +180,14 @@ export default function CoupleFeatures() {
   // Music config local state
   const [musicConfig, setMusicConfig] = useState<MusicConfig>(DEFAULT_MUSIC_CONFIG);
   const [savingMusic, setSavingMusic] = useState(false);
+  const [uploadingMusic, setUploadingMusic] = useState(false);
+  const musicFileRef = useRef<HTMLInputElement>(null);
 
   // Video config local state
   const [videoConfig, setVideoConfig] = useState<VideoConfig>(DEFAULT_VIDEO_CONFIG);
   const [savingVideo, setSavingVideo] = useState(false);
 
+  // (Animation settings moved to CoupleHome.tsx — placed above the Color/Font pickers)
 
 
   const fetchFeatures = useCallback(async () => {
@@ -304,6 +308,43 @@ export default function CoupleFeatures() {
     }
   };
 
+  // Upload a music file to the storage backend and set the URL in the config.
+  const handleMusicFileUpload = async (file: File) => {
+    if (!file.type.startsWith('audio/')) {
+      toast({ title: 'Error', description: 'Please select an audio file (MP3, WAV, OGG, M4A)', variant: 'destructive' });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: 'Error', description: 'File too large. Max 10 MB.', variant: 'destructive' });
+      return;
+    }
+
+    setUploadingMusic(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('category', 'music');
+      const uploadRes = await fetch('/api/cms/upload?XTransformPort=3000', { method: 'POST', body: formData });
+      if (!uploadRes.ok) {
+        const err = await uploadRes.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to upload file');
+      }
+      const uploadResult = await uploadRes.json();
+      // Set the URL in the music config and auto-fill the title if empty
+      setMusicConfig((prev) => ({
+        ...prev,
+        url: uploadResult.url,
+        title: prev.title || file.name.replace(/\.[^/.]+$/, ''),
+      }));
+      invalidateWeddingCache();
+      toast({ title: 'Success', description: 'Music file uploaded. Click "Save Music Settings" to apply.' });
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to upload', variant: 'destructive' });
+    } finally {
+      setUploadingMusic(false);
+    }
+  };
+
   const handleSaveVideoConfig = async () => {
     setSavingVideo(true);
     try {
@@ -336,6 +377,8 @@ export default function CoupleFeatures() {
 
 
   const isMusicEnabled = features.find((f) => f.featureKey === 'music')?.isEnabled ?? false;
+
+  // (Animation settings moved to CoupleHome.tsx)
 
   if (loading) {
     return (
@@ -413,14 +456,43 @@ export default function CoupleFeatures() {
                 {key === 'music' && isEnabled && (
                   <div className="mt-4 pt-4 border-t border-champagne-silk/60 space-y-3">
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-medium text-charcoal-ink/70">Music URL</Label>
-                      <Input
-                        type="url"
-                        placeholder="https://example.com/song.mp3"
-                        value={musicConfig.url}
-                        onChange={(e) => setMusicConfig((prev) => ({ ...prev, url: e.target.value }))}
-                        className="h-8 text-xs"
-                      />
+                      <Label className="text-xs font-medium text-charcoal-ink/70">Music File</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="url"
+                          placeholder="https://example.com/song.mp3"
+                          value={musicConfig.url}
+                          onChange={(e) => setMusicConfig((prev) => ({ ...prev, url: e.target.value }))}
+                          className="h-8 text-xs flex-1"
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={uploadingMusic}
+                          onClick={() => musicFileRef.current?.click()}
+                          className="h-8 text-xs shrink-0"
+                        >
+                          {uploadingMusic ? (
+                            <Loader2 className="size-3 animate-spin mr-1.5" />
+                          ) : (
+                            <Upload className="size-3 mr-1.5" />
+                          )}
+                          Upload
+                        </Button>
+                        <input
+                          ref={musicFileRef}
+                          type="file"
+                          accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/m4a,audio/x-m4a"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleMusicFileUpload(file);
+                            e.target.value = '';
+                          }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-charcoal-ink/30">Upload an MP3/WAV/OGG/M4A file (max 10 MB) or paste a direct URL</p>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
@@ -543,6 +615,8 @@ export default function CoupleFeatures() {
                     </Button>
                   </div>
                 )}
+
+                {/* (Animation settings moved to CoupleHome.tsx) */}
 
 
               </CardContent>
