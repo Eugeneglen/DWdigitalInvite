@@ -87,11 +87,13 @@ export default function StoryPage() {
   const heroImg = storyImages[0]?.url || '';
 
   // Tidbits — read from CMS content, fallback to defaults
+  const tidbitsEnabled = getField('story', 'tidbitsEnabled', 'true') === 'true';
   const tidbits = safeParseJSON<Tidbit[]>(getField('story', 'tidbits', ''), FALLBACK_TIDBITS);
   const tidbitsTitle = getField('story', 'tidbitsTitle', 'Tidbits');
   const tidbitsSubtitle = getField('story', 'tidbitsSubtitle', 'A few things you might not know.');
 
   // Honeymoon — read from CMS content, fallback to defaults
+  const honeymoonEnabled = getField('story', 'honeymoonEnabled', 'true') === 'true';
   const destinations = safeParseJSON<Destination[]>(getField('story', 'honeymoonDestinations', ''), FALLBACK_DESTINATIONS);
   const honeymoonTitle = getField('story', 'honeymoonTitle', 'Where Next?');
   const honeymoonSubtitle = getField('story', 'honeymoonSubtitle', 'Help us choose our honeymoon destination. Cast your vote!');
@@ -211,8 +213,8 @@ export default function StoryPage() {
           )}
         </section>
 
-        {/* Tidbits — only show if there are tidbits */}
-        {tidbits.length > 0 && (
+        {/* Tidbits — only show if enabled and there are tidbits */}
+        {tidbitsEnabled && tidbits.length > 0 && (
           <section className="reveal py-section-gap">
             <div className="text-center mb-16">
               <h2 className="text-[32px] md:text-[48px] text-charcoal-ink mb-4" style={{ fontFamily: "'Playfair Display', serif", fontWeight: 600, lineHeight: '56px' }}>
@@ -240,8 +242,8 @@ export default function StoryPage() {
           </section>
         )}
 
-        {/* Honeymoon Widget — only show if there are destinations */}
-        {destinations.length > 0 && (
+        {/* Honeymoon Widget — only show if enabled and there are destinations */}
+        {honeymoonEnabled && destinations.length > 0 && (
           <section className="reveal py-section-gap">
             <div className="max-w-2xl mx-auto text-center">
               <p

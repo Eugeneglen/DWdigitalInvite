@@ -5,12 +5,7 @@ import { Loader2, Upload, Video, X, ImageIcon, Sparkles } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+
 import { useCoupleCMSStore } from '@/store/useCoupleCMSStore';
 import { invalidateWeddingCache } from '@/hooks/usePublicWedding';
 
@@ -219,7 +214,6 @@ export function HeroVisualSection({ weddingData }: { weddingData: Record<string,
 
 export function BannerSection({ weddingData }: { weddingData: Record<string, unknown> | null }) {
   const [uploading, setUploading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const bannerUrl = (weddingData as Record<string, string>)?.bannerUrl || '';
@@ -307,8 +301,7 @@ export function BannerSection({ weddingData }: { weddingData: Record<string, unk
 
           {bannerUrl ? (
             <div
-              className="relative aspect-[21/9] rounded-lg overflow-hidden border border-charcoal-ink/10 group cursor-pointer"
-              onClick={() => setPreviewUrl(bannerUrl)}
+              className="relative aspect-[21/9] rounded-lg overflow-hidden border border-charcoal-ink/10 group"
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
@@ -317,20 +310,6 @@ export function BannerSection({ weddingData }: { weddingData: Record<string, unk
               }}
             >
               <img src={bannerUrl} alt="Banner" className="w-full h-full object-cover" unoptimized />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); handleRemove(); }}
-                className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 text-white hover:bg-red-500 transition-colors"
-                title="Remove banner"
-              >
-                <X className="size-3.5" />
-              </button>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                  Click to preview · Drag to replace
-                </span>
-              </div>
             </div>
           ) : (
             <div
@@ -355,6 +334,36 @@ export function BannerSection({ weddingData }: { weddingData: Record<string, unk
             </div>
           )}
 
+          {/* Action buttons */}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-charcoal-ink/10 hover:border-cinematic-gold hover:bg-cinematic-gold/5 transition-colors text-xs font-medium text-charcoal-ink/70 disabled:opacity-50"
+            >
+              {uploading ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <ImageIcon className="size-3.5" />
+              )}
+              {bannerUrl ? 'Replace' : 'Upload'}
+            </button>
+            {bannerUrl && (
+              <button
+                type="button"
+                onClick={handleRemove}
+                className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 hover:border-red-400 hover:bg-red-50 transition-colors text-xs font-medium text-red-600"
+              >
+                <X className="size-3.5" />
+                Remove
+              </button>
+            )}
+          </div>
+          <p className="text-[10px] text-charcoal-ink/30 text-center">
+            Max 10 MB · Wide aspect ratio recommended · Drag & drop to replace
+          </p>
+
           <input
             ref={fileRef}
             type="file"
@@ -369,14 +378,6 @@ export function BannerSection({ weddingData }: { weddingData: Record<string, unk
         </CardContent>
       </Card>
 
-      <Dialog open={!!previewUrl} onOpenChange={() => setPreviewUrl(null)}>
-        <DialogContent className="sm:max-w-3xl p-2">
-          <DialogHeader>
-            <DialogTitle className="sr-only">Banner Preview</DialogTitle>
-          </DialogHeader>
-          <img src={previewUrl ?? ''} alt="Preview" className="w-full rounded-lg" unoptimized />
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

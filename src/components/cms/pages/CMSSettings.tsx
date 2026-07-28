@@ -376,10 +376,10 @@ export default function CMSSettings() {
                 </FormField>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField label="Tea Ceremony Title" htmlFor="teaCeremonyTitle">
+                <FormField label="Ceremony Section Title" htmlFor="teaCeremonyTitle">
                   <Input id="teaCeremonyTitle" {...register('teaCeremonyTitle')} className="h-9 border-gray-300" />
                 </FormField>
-                <FormField label="Tea Ceremony Subtitle" htmlFor="teaCeremonySubtitle">
+                <FormField label="Ceremony Section Subtitle" htmlFor="teaCeremonySubtitle">
                   <Input id="teaCeremonySubtitle" {...register('teaCeremonySubtitle')} className="h-9 border-gray-300" />
                 </FormField>
               </div>

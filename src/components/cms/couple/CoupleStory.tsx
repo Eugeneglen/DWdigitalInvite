@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -577,7 +578,7 @@ export default function CoupleStory() {
                     </div>
                   </div>
 
-                  {/* Image + text side-by-side (matches Tea Ceremony layout).
+                  {/* Image + text side-by-side (matches Ceremony Section layout).
                       Inline upload — no need to open the edit dialog just to
                       add/replace an image. 16:9 mirrors the guest-site story
                       chapter; constrained to 280px so it stays compact. */}
@@ -608,17 +609,28 @@ export default function CoupleStory() {
       <Separator className="bg-champagne-silk" />
 
       {/* ═══════════════ Did You Know? (Tidbits) Section ═══════════════ */}
-      <Card className="border-charcoal-ink/5 shadow-none">
-        <CardContent className="p-6 space-y-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-cinematic-gold/10 text-cinematic-gold">
-                <Lightbulb className="size-4" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-charcoal-ink">Did You Know?</h3>
-                <p className="text-xs text-charcoal-ink/40">Fun Q&amp;A facts about the couple</p>
-              </div>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-cinematic-gold/10 text-cinematic-gold">
+              <Lightbulb className="size-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-charcoal-ink">Did You Know?</h3>
+              <p className="text-xs text-charcoal-ink/40">Fun Q&amp;A facts about the couple</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-charcoal-ink/40">
+                {contentFields['tidbitsEnabled'] !== 'false' ? 'Visible to guests' : 'Hidden from guests'}
+              </span>
+              <Switch
+                checked={contentFields['tidbitsEnabled'] !== 'false'}
+                onCheckedChange={(checked) => {
+                  handleContentChange('tidbitsEnabled', String(checked));
+                }}
+              />
             </div>
             <Button
               onClick={openAddTidbit}
@@ -629,6 +641,9 @@ export default function CoupleStory() {
               Add
             </Button>
           </div>
+        </div>
+      <Card className={`border-charcoal-ink/5 shadow-none transition-opacity duration-200 ${contentFields['tidbitsEnabled'] !== 'false' ? '' : 'opacity-40 pointer-events-none'}`}>
+        <CardContent className="p-6 space-y-5">
 
           {/* Tidbit Title & Subtitle */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -698,21 +713,33 @@ export default function CoupleStory() {
           )}
         </CardContent>
       </Card>
+      </div>
 
       <Separator className="bg-champagne-silk" />
 
       {/* ═══════════════ Honeymoon Voting Section ═══════════════ */}
-      <Card className="border-charcoal-ink/5 shadow-none">
-        <CardContent className="p-6 space-y-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-cinematic-gold/10 text-cinematic-gold">
-                <Plane className="size-4" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-charcoal-ink">Honeymoon Voting</h3>
-                <p className="text-xs text-charcoal-ink/40">Let guests vote on your honeymoon destination</p>
-              </div>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-cinematic-gold/10 text-cinematic-gold">
+              <Plane className="size-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-charcoal-ink">Honeymoon Voting</h3>
+              <p className="text-xs text-charcoal-ink/40">Let guests vote on your honeymoon destination</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-charcoal-ink/40">
+                {contentFields['honeymoonEnabled'] !== 'false' ? 'Visible to guests' : 'Hidden from guests'}
+              </span>
+              <Switch
+                checked={contentFields['honeymoonEnabled'] !== 'false'}
+                onCheckedChange={(checked) => {
+                  handleContentChange('honeymoonEnabled', String(checked));
+                }}
+              />
             </div>
             <Button
               onClick={openAddDestination}
@@ -723,6 +750,9 @@ export default function CoupleStory() {
               Add
             </Button>
           </div>
+        </div>
+      <Card className={`border-charcoal-ink/5 shadow-none transition-opacity duration-200 ${contentFields['honeymoonEnabled'] !== 'false' ? '' : 'opacity-40 pointer-events-none'}`}>
+        <CardContent className="p-6 space-y-5">
 
           {/* Honeymoon Eyebrow */}
           <div className="space-y-1.5">
@@ -812,6 +842,7 @@ export default function CoupleStory() {
           )}
         </CardContent>
       </Card>
+      </div>
 
       {/* ═══════════════ Unified Dialog ═══════════════ */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

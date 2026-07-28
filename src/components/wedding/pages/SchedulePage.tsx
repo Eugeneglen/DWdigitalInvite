@@ -129,6 +129,9 @@ export default function SchedulePage() {
   const ceremonyImg = scheduleImages[0]?.url || '';
   const celebrationImg = scheduleImages[1]?.url || '';
 
+  // Wedding Venue toggle
+  const venueEnabled = getField('getting-there', 'venueEnabled', 'true') === 'true';
+
   const handleAddToCalendar = useCallback(() => {
     const calendarDates = getCalendarDateStr(data?.wedding.weddingDate);
     const params = new URLSearchParams({
@@ -242,6 +245,7 @@ export default function SchedulePage() {
         </section>
 
         {/* Wedding Venue Section */}
+        {venueEnabled && (
         <section className="stagger-4 mb-24 flex flex-col md:flex-row gap-8 md:gap-12 items-center">
           <div className="w-full md:w-1/2 shrink-0">
             <div className="aspect-[4/3] overflow-hidden rounded border border-cinematic-gold/30">
@@ -260,6 +264,7 @@ export default function SchedulePage() {
             </p>
           </div>
         </section>
+        )}
       </main>
     </>
   );

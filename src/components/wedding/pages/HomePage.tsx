@@ -84,11 +84,33 @@ export default function HomePage() {
     : parseWeddingTimestamp(data?.wedding.weddingDate);
   const heroDescription = getField('hero', 'description', FALLBACK_HERO_DESCRIPTION);
 
-  // Tea Ceremony section
+  // Ceremony section
+  const teaCeremonyEnabled = getField('hero', 'teaCeremonyEnabled', 'true') === 'true';
   const teaCeremonyImage = getField('hero', 'teaCeremonyImage', FALLBACK_TEA_IMG);
   const teaCeremonyLabel = getField('hero', 'teaCeremonyLabel', 'The Tradition');
-  const teaCeremonyTitle = getField('hero', 'teaCeremonyTitle', 'The Tea Ceremony');
+  const teaCeremonyTitle = getField('hero', 'teaCeremonyTitle', 'The Ceremony Section');
   const teaCeremonyBody = getField('hero', 'teaCeremonyBody', '');
+
+  const teaCeremonySection = teaCeremonyEnabled ? (
+          <section className="py-section-gap px-4 md:px-canvas-margin max-w-[1440px] mx-auto">
+            <div className="max-w-4xl mx-auto flex flex-col items-center">
+              <div className="relative w-full aspect-[2/3] md:aspect-auto md:h-[800px] overflow-hidden rounded-lg shadow-xl mb-8 group">
+                <img
+                  alt={teaCeremonyTitle}
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  src={teaCeremonyImage}
+                />
+              </div>
+              <div className="text-center">
+                <span className="font-label-sm text-label-sm leading-label-sm text-cinematic-gold tracking-[0.2em] uppercase block mb-2 font-semibold">{teaCeremonyLabel}</span>
+                <h3 className="font-display-hero text-headline-lg-mobile leading-headline-lg-mobile md:text-headline-lg md:leading-headline-lg font-semibold text-charcoal-ink">{teaCeremonyTitle}</h3>
+                {teaCeremonyBody && (
+                  <p className="font-body-md text-body-md text-charcoal-ink/80 leading-relaxed mt-4 max-w-2xl mx-auto">{teaCeremonyBody}</p>
+                )}
+              </div>
+            </div>
+          </section>
+  ) : null;
 
   // CMS font — applied ONLY to the master head copy (couple name)
   const heroFont = getField('hero', 'fontFamily', 'Playfair Display');
@@ -227,25 +249,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ===== TEA CEREMONY SECTION ===== */}
-        <section className="py-section-gap px-4 md:px-canvas-margin max-w-[1440px] mx-auto">
-          <div className="max-w-4xl mx-auto flex flex-col items-center">
-            <div className="relative w-full aspect-[2/3] md:aspect-auto md:h-[800px] overflow-hidden rounded-lg shadow-xl mb-8 group">
-              <img
-                alt={teaCeremonyTitle}
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                src={teaCeremonyImage}
-              />
-            </div>
-            <div className="text-center">
-              <span className="font-label-sm text-label-sm leading-label-sm text-cinematic-gold tracking-[0.2em] uppercase block mb-2 font-semibold">{teaCeremonyLabel}</span>
-              <h3 className="font-display-hero text-headline-lg-mobile leading-headline-lg-mobile md:text-headline-lg md:leading-headline-lg font-semibold text-charcoal-ink">{teaCeremonyTitle}</h3>
-              {teaCeremonyBody && (
-                <p className="font-body-md text-body-md text-charcoal-ink/80 leading-relaxed mt-4 max-w-2xl mx-auto">{teaCeremonyBody}</p>
-              )}
-            </div>
-          </div>
-        </section>
+        {teaCeremonySection}
 
         {/* ===== NARRATIVE SECTION ===== */}
         <section className="py-section-gap px-4 md:px-canvas-margin max-w-[1440px] mx-auto">

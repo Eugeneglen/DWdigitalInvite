@@ -79,7 +79,7 @@ const MEDIA_CATEGORIES = [
 
 const CATEGORY_LABELS: Record<string, string> = {
   hero: 'Hero',
-  'tea-ceremony': 'Tea Ceremony',
+  'tea-ceremony': 'Ceremony Section',
   venue: 'Venue',
   schedule: 'Schedule',
   story: 'Story',

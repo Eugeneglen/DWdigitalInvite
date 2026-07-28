@@ -40,9 +40,8 @@ const VOLUME_MOUNT_PATH = process.env.RAILWAY_VOLUME_MOUNT_PATH || '';
 const UPLOADS_ROOT = VOLUME_MOUNT_PATH
   ? path.join(VOLUME_MOUNT_PATH, 'uploads', 'weddings')
   : path.join(process.cwd(), 'public', 'uploads', 'weddings');
-// When using volume storage, files are served via /api/uploads/... route.
-// When using local public dir, files are served directly via /uploads/...
-const PUBLIC_URL_PREFIX = VOLUME_MOUNT_PATH ? '/api/uploads/weddings' : '/uploads/weddings';
+// Always serve via /api/uploads/... route to avoid conflicts with [slug] catch-all route.
+const PUBLIC_URL_PREFIX = '/api/uploads/weddings';
 
 /** Whether files are stored on a persistent volume (Railway) or local public dir. */
 export const IS_VOLUME_STORAGE = !!VOLUME_MOUNT_PATH;
@@ -54,7 +53,7 @@ export const IS_VOLUME_STORAGE = !!VOLUME_MOUNT_PATH;
  * Returns null if the URL is not a stored file URL.
  */
 export function getFilePathFromUrl(url: string): string | null {
-  // Handle both URL prefixes (old local format and new volume format)
+  // Handle both URL prefixes for backward compatibility
   const prefixes = ['/api/uploads/weddings', '/uploads/weddings'];
   for (const prefix of prefixes) {
     if (url.startsWith(prefix)) {
@@ -218,9 +217,16 @@ export async function uploadFile(options: UploadOptions): Promise<UploadResult> 
  * Silently does nothing if the file doesn't exist.
  */
 export async function deleteFile(url: string): Promise<void> {
-  // Convert URL to filesystem path
-  if (!url.startsWith(PUBLIC_URL_PREFIX)) return;
-  const relativePath = url.substring(PUBLIC_URL_PREFIX.length);
+  // Convert URL to filesystem path (handle both prefixes for backward compat)
+  const prefixes = ['/api/uploads/weddings', '/uploads/weddings'];
+  let relativePath = '';
+  for (const prefix of prefixes) {
+    if (url.startsWith(prefix)) {
+      relativePath = url.substring(prefix.length);
+      break;
+    }
+  }
+  if (!relativePath) return;
   const filePath = path.join(UPLOADS_ROOT, relativePath);
   try {
     await fs.unlink(filePath);
@@ -241,7 +247,7 @@ export function isDataUrl(url: string): boolean {
  * Check if a URL is a stored file URL (from this storage backend).
  */
 export function isStoredFileUrl(url: string): boolean {
-  return url.startsWith(PUBLIC_URL_PREFIX);
+  return url.startsWith('/api/uploads/weddings') || url.startsWith('/uploads/weddings');
 }
 
 /**

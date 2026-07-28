@@ -41,8 +41,8 @@ const HERO_FIELDS = [
 
 const TEA_CEREMONY_FIELDS = [
   { key: 'teaCeremonyLabel', label: 'Label', type: 'text' as const, placeholder: 'e.g. The Tradition' },
-  { key: 'teaCeremonyTitle', label: 'Title', type: 'text' as const, placeholder: 'e.g. The Tea Ceremony' },
-  { key: 'teaCeremonyBody', label: 'Body Text', type: 'textarea' as const, placeholder: 'A short description of the tea ceremony…' },
+  { key: 'teaCeremonyTitle', label: 'Title', type: 'text' as const, placeholder: 'e.g. The Ceremony Section' },
+  { key: 'teaCeremonyBody', label: 'Body Text', type: 'textarea' as const, placeholder: 'A short description of the ceremony…' },
 ];
 
 const NARRATIVE_FIELDS = [
@@ -141,6 +141,11 @@ export default function CoupleHome() {
 
     const item = content.find((c) => c.section === 'hero' && c.fieldKey === fieldKey);
     return item?.fieldValue ?? '';
+  };
+
+  const isEnabled = (fieldKey: string, defaultOn = true): boolean => {
+    const val = getFieldValue(fieldKey);
+    return val !== '' ? val === 'true' : defaultOn;
   };
 
   const setFieldValue = (fieldKey: string, value: string) => {
@@ -365,15 +370,26 @@ export default function CoupleHome() {
 
       <Separator className="bg-champagne-silk" />
 
-      {/* 7. Tea Ceremony Section — image beside text fields (compact) */}
+      {/* 7. Ceremony Section — image beside text fields (compact) */}
       <div className="space-y-3">
-        <Label className="text-xs font-medium text-charcoal-ink/50 uppercase tracking-wider">
-          Tea Ceremony Section
-        </Label>
-        <Card className="border-charcoal-ink/5 shadow-none">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs font-medium text-charcoal-ink/50 uppercase tracking-wider">
+            CEREMONY SECTION
+          </Label>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-charcoal-ink/40">
+              {isEnabled('teaCeremonyEnabled') ? 'Visible to guests' : 'Hidden from guests'}
+            </span>
+            <Switch
+              checked={isEnabled('teaCeremonyEnabled')}
+              onCheckedChange={(checked) => setFieldValue('teaCeremonyEnabled', String(checked))}
+            />
+          </div>
+        </div>
+        <Card className={`border-charcoal-ink/5 shadow-none transition-opacity duration-200 ${isEnabled('teaCeremonyEnabled') ? '' : 'opacity-40 pointer-events-none'}`}>
           <CardContent className="p-4">
             <div className="flex flex-col md:flex-row gap-4 items-start">
-              {/* Tea Ceremony Image — constrained to 280px, 2:3 portrait */}
+              {/* Ceremony Section Image — constrained to 280px, 2:3 portrait */}
               <MirrorImageUpload
                 value={getFieldValue('teaCeremonyImage')}
                 onChange={(dataUrl) => setFieldValue('teaCeremonyImage', dataUrl)}

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { Loader2, Plus, Pencil, Trash2, Clock, MapPin, CalendarRange, Save } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import MirrorImageGallery from './MirrorImageGallery';
 import MirrorImageUpload from './MirrorImageUpload';
 import { toast } from '@/hooks/use-toast';
@@ -32,7 +33,7 @@ import { invalidateWeddingCache } from '@/hooks/usePublicWedding';
 const API_BASE = '/api/cms/schedule?XTransformPort=3000';
 
 const EVENT_TYPES = [
-  { value: 'TEA_CEREMONY', label: 'Tea Ceremony' },
+  { value: 'TEA_CEREMONY', label: 'Ceremony Section' },
   { value: 'CEREMONY', label: 'Ceremony' },
   { value: 'RECEPTION', label: 'Reception' },
   { value: 'DINNER', label: 'Dinner' },
@@ -358,70 +359,76 @@ export default function CoupleSchedule() {
       <MirrorImageGallery category="schedule" label="Schedule Images" maxImages={3} aspectClass="aspect-[4/3]" helperText="4:3 crop mirrors the guest-site schedule images" />
 
       {/* Wedding Venue Card */}
-      <Card className="border-charcoal-ink/5 shadow-none">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-charcoal-ink">Wedding Venue</h3>
-            {Object.values(venueEdited).some(Boolean) && (
-              <span className="text-[11px] text-cinematic-gold font-medium uppercase tracking-[0.08em]">Edited</span>
-            )}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs font-medium text-charcoal-ink/50 uppercase tracking-wider">WEDDING VENUE</Label>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-charcoal-ink/40">
+              {venueFields["venueEnabled"] !== "false" ? "Visible to guests" : "Hidden from guests"}
+            </span>
+            <Switch
+              checked={venueFields["venueEnabled"] !== "false"}
+              onCheckedChange={(checked) => handleVenueChange("venueEnabled", String(checked))}
+            />
           </div>
-          <div className="space-y-4">
-            {/* Venue Image — image upload (not a text URL input).
-                Stored in section 'getting-there', fieldKey 'venueImage'.
-                4:3 mirrors the guest-site Schedule page venue image. */}
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <Label className="text-xs font-medium text-charcoal-ink/50 uppercase tracking-wider">
-                  Venue Image
-                </Label>
-                {venueEdited['venueImage'] && (
-                  <span className="bg-cinematic-gold w-1.5 h-1.5 rounded-full" />
-                )}
-              </div>
-              <MirrorImageUpload
-                value={venueFields['venueImage'] ?? ''}
-                onChange={(dataUrl) => handleVenueChange('venueImage', dataUrl)}
-                onRemove={() => handleVenueChange('venueImage', '')}
-                label="Venue Image"
-                helperText="4:3 · mirrors the guest-site schedule page"
-                aspectClass="aspect-[4/3]"
-                maxWidth="320px"
-              />
-            </div>
-
-            {/* Remaining venue fields (venueDescription, etc.) as text inputs */}
-            {VENUE_KEYS.filter(({ key }) => key !== 'venueImage').map(({ key, label, placeholder, type }) => (
-              <div key={key} className="space-y-1.5">
+        </div>
+        <Card className="border-charcoal-ink/5 shadow-none">
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
                   <Label className="text-xs font-medium text-charcoal-ink/50 uppercase tracking-wider">
-                    {label}
+                    Venue Image
                   </Label>
-                  {venueEdited[key] && (
+                  {venueEdited["venueImage"] && (
                     <span className="bg-cinematic-gold w-1.5 h-1.5 rounded-full" />
                   )}
                 </div>
-                {type === 'textarea' ? (
-                  <Textarea
-                    value={venueFields[key] ?? ''}
-                    onChange={(e) => handleVenueChange(key, e.target.value)}
-                    placeholder={placeholder}
-                    rows={3}
-                    className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20 resize-none"
-                  />
-                ) : (
-                  <Input
-                    value={venueFields[key] ?? ''}
-                    onChange={(e) => handleVenueChange(key, e.target.value)}
-                    placeholder={placeholder}
-                    className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
-                  />
-                )}
+                <MirrorImageUpload
+                  value={venueFields["venueImage"] ?? ""}
+                  onChange={(dataUrl) => handleVenueChange("venueImage", dataUrl)}
+                  onRemove={() => handleVenueChange("venueImage", "")}
+                  label="Venue Image"
+                  helperText="4:3 mirrors the guest-site schedule page"
+                  aspectClass="aspect-[4/3]"
+                  maxWidth="320px"
+                />
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              {VENUE_KEYS.filter((v) => v.key !== "venueImage").map((item) => {
+                const { key, label, placeholder, type } = item;
+                return (
+                  <div key={key} className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs font-medium text-charcoal-ink/50 uppercase tracking-wider">
+                        {label}
+                      </Label>
+                      {venueEdited[key] && (
+                        <span className="bg-cinematic-gold w-1.5 h-1.5 rounded-full" />
+                      )}
+                    </div>
+                    {type === "textarea" ? (
+                      <Textarea
+                        value={venueFields[key] ?? ""}
+                        onChange={(e) => handleVenueChange(key, e.target.value)}
+                        placeholder={placeholder}
+                        rows={3}
+                        className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20 resize-none"
+                      />
+                    ) : (
+                      <Input
+                        value={venueFields[key] ?? ""}
+                        onChange={(e) => handleVenueChange(key, e.target.value)}
+                        placeholder={placeholder}
+                        className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Content Card */}
       <Card className="border-charcoal-ink/5 shadow-none">
@@ -575,7 +582,7 @@ export default function CoupleSchedule() {
                 id="sched-title"
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
-                placeholder="e.g. Tea Ceremony"
+                placeholder="e.g. Ceremony Section"
                 className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
               />
             </div>
