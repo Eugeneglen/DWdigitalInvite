@@ -22,8 +22,49 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
-const UPLOADS_ROOT = path.join(process.cwd(), 'public', 'uploads', 'weddings');
-const PUBLIC_URL_PREFIX = '/uploads/weddings';
+/**
+ * Storage root: uses Railway Volume Mount path when available (persistent
+ * across deploys), falls back to public/uploads for local development.
+ *
+ * On Railway:
+ *   - Set RAILWAY_VOLUME_MOUNT_PATH=/data (or similar) in Railway variables
+ *   - Files are stored at /data/uploads/weddings/{weddingId}/{category}/
+ *   - Served via /api/uploads/[...path] route (reads from the volume)
+ *   - URL prefix becomes /api/uploads/weddings/...
+ *
+ * Locally:
+ *   - Files are stored at public/uploads/weddings/{weddingId}/{category}/
+ *   - Served directly by Next.js as static assets via /uploads/weddings/...
+ */
+const VOLUME_MOUNT_PATH = process.env.RAILWAY_VOLUME_MOUNT_PATH || '';
+const UPLOADS_ROOT = VOLUME_MOUNT_PATH
+  ? path.join(VOLUME_MOUNT_PATH, 'uploads', 'weddings')
+  : path.join(process.cwd(), 'public', 'uploads', 'weddings');
+// When using volume storage, files are served via /api/uploads/... route.
+// When using local public dir, files are served directly via /uploads/...
+const PUBLIC_URL_PREFIX = VOLUME_MOUNT_PATH ? '/api/uploads/weddings' : '/uploads/weddings';
+
+/** Whether files are stored on a persistent volume (Railway) or local public dir. */
+export const IS_VOLUME_STORAGE = !!VOLUME_MOUNT_PATH;
+
+/**
+ * Get the absolute filesystem path for a stored file URL.
+ * Used by the /api/uploads/[...path] route to serve volume-stored files.
+ * Handles both /uploads/weddings/... and /api/uploads/weddings/... URL formats.
+ * Returns null if the URL is not a stored file URL.
+ */
+export function getFilePathFromUrl(url: string): string | null {
+  // Handle both URL prefixes (old local format and new volume format)
+  const prefixes = ['/api/uploads/weddings', '/uploads/weddings'];
+  for (const prefix of prefixes) {
+    if (url.startsWith(prefix)) {
+      const relativePath = url.substring(prefix.length);
+      const cleanPath = relativePath.replace(/^\//, '');
+      return path.join(UPLOADS_ROOT, cleanPath);
+    }
+  }
+  return null;
+}
 
 /** Allowed file categories — determines the subdirectory. */
 export type FileCategory = 'hero' | 'banner' | 'music' | 'gallery' | 'story' | 'wishes' | 'moments' | 'schedule' | 'couple-photo';
