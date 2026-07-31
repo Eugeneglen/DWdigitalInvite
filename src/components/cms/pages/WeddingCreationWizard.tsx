@@ -112,6 +112,19 @@ const INITIAL_FORM: FormData = {
   internalNotes: '',
 };
 
+/**
+ * Format a date string (YYYY-MM-DD or ISO) as DD/MM/YYYY for display.
+ * Parses the string manually to avoid timezone shifts and locale quirks
+ * from `new Date().toLocaleDateString()`.
+ */
+function formatDateDisplay(dateStr: string): string {
+  const parts = dateStr.split('T')[0].split('-');
+  if (parts.length !== 3) return dateStr;
+  const [year, month, day] = parts;
+  if (!year || !month || !day) return dateStr;
+  return `${day}/${month}/${year}`;
+}
+
 export default function WeddingCreationWizard({ open, onOpenChange, onCreated }: WeddingCreationWizardProps) {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormData>(INITIAL_FORM);
@@ -524,7 +537,7 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
                   <div><span className="text-charcoal-ink/50">Couple:</span> <span className="font-medium text-charcoal-ink">{form.coupleName}</span></div>
                   <div><span className="text-charcoal-ink/50">Email:</span> <span className="font-medium text-charcoal-ink">{form.coupleEmail}</span></div>
                   <div><span className="text-charcoal-ink/50">Mobile:</span> <span className="font-medium text-charcoal-ink">{form.couplePhone || '—'}</span></div>
-                  <div><span className="text-charcoal-ink/50">Date:</span> <span className="font-medium text-charcoal-ink">{form.weddingDate ? new Date(form.weddingDate).toLocaleDateString('en-SG') : '—'}</span></div>
+                  <div><span className="text-charcoal-ink/50">Date:</span> <span className="font-medium text-charcoal-ink">{form.weddingDate ? formatDateDisplay(form.weddingDate) : '—'}</span></div>
                   <div><span className="text-charcoal-ink/50">Venue:</span> <span className="font-medium text-charcoal-ink">{form.venue || '—'}</span></div>
                   <div><span className="text-charcoal-ink/50">Job #:</span> <span className="font-medium text-charcoal-ink">{form.jobNumber || '(auto)'}</span></div>
                 </div>

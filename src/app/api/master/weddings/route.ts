@@ -100,7 +100,16 @@ export async function POST(req: NextRequest) {
     // Check if couple email is already registered
     const existingUser = await db.user.findUnique({ where: { email: data.coupleEmail.toLowerCase() } });
     if (existingUser) {
-      return NextResponse.json({ error: 'A user with this email already exists' }, { status: 409 });
+      // If the existing user is a COUPLE, reuse their account instead of
+      // failing. This lets an admin create a second wedding for an existing
+      // couple (e.g. vow renewal) without a "email already exists" error.
+      if (existingUser.role !== 'COUPLE') {
+        return NextResponse.json(
+          { error: 'A user with this email already exists (non-couple account)' },
+          { status: 409 },
+        );
+      }
+      // Fall through — coupleUser will be resolved to existingUser below
     }
 
     // Generate slug
@@ -159,17 +168,26 @@ export async function POST(req: NextRequest) {
     const accessExpiryDate = new Date(weddingDate);
     accessExpiryDate.setDate(accessExpiryDate.getDate() + expiryDays);
 
-    // Create couple user account
-    const passwordHash = await hashPassword(defaultPassword);
-    const coupleUser = await db.user.create({
-      data: {
-        email: data.coupleEmail.toLowerCase(),
-        passwordHash,
-        name: data.coupleName,
-        role: 'COUPLE',
-        isActive: true,
-      },
-    });
+    // Create couple user account (or reuse existing COUPLE user)
+    let coupleUser;
+    if (existingUser) {
+      // Reuse the existing COUPLE account — update the name in case it changed
+      coupleUser = await db.user.update({
+        where: { id: existingUser.id },
+        data: { name: data.coupleName },
+      });
+    } else {
+      const passwordHash = await hashPassword(defaultPassword);
+      coupleUser = await db.user.create({
+        data: {
+          email: data.coupleEmail.toLowerCase(),
+          passwordHash,
+          name: data.coupleName,
+          role: 'COUPLE',
+          isActive: true,
+        },
+      });
+    }
 
     // Create wedding account
     const wedding = await db.weddingAccount.create({
