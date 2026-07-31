@@ -241,6 +241,24 @@ export async function POST(req: NextRequest) {
       // Defensive — ignore errors if rows already exist
     });
 
+    // Seed default content, schedule, FAQs, and stories so the couple has
+    // a starting template to customize (rather than an empty shell).
+    try {
+      const { seedDefaultWeddingContent } = await import('@/lib/wedding-defaults');
+      await seedDefaultWeddingContent({
+        weddingId: wedding.id,
+        coupleName: data.coupleName,
+        brideName: data.brideName,
+        groomName: data.groomName,
+        weddingDate,
+        weddingTime: data.weddingTime || null,
+        venue: data.venue || null,
+        venueAddress: data.venueAddress,
+      });
+    } catch (err) {
+      console.error('[master/weddings POST] Default content seed failed (non-blocking):', err);
+    }
+
     // Audit log
     await db.auditLog.create({
       data: {
