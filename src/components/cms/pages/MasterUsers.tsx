@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Eye,
   EyeOff,
+  KeyRound,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -195,6 +196,11 @@ export default function MasterUsers() {
   const [form, setForm] = useState<UserForm>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  // Reset password dialog state
+  const [resetUser, setResetUser] = useState<UserItem | null>(null);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [resetting, setResetting] = useState(false);
 
   // ── Fetch users ──────────────────────────────────────────────────────
 
@@ -390,6 +396,39 @@ export default function MasterUsers() {
     }
   }
 
+  // ── Reset password handler ──────────────────────────────────────────
+
+  function openReset(user: UserItem) {
+    setResetUser(user);
+    setNewPassword('');
+    setResetOpen(true);
+  }
+
+  async function handleResetPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!resetUser) return;
+    if (newPassword.length < 8) {
+      toast({ title: 'Validation Error', description: 'Password must be at least 8 characters', variant: 'destructive' });
+      return;
+    }
+    try {
+      setResetting(true);
+      const res = await fetch(
+        `/api/master/users/${resetUser.id}/reset-password?XTransformPort=3000`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ newPassword }) }
+      );
+      if (!res.ok) throw new Error('Failed to reset password');
+      toast({ title: 'Password Reset', description: `Password updated for ${resetUser.name}.` });
+      setResetOpen(false);
+      setResetUser(null);
+      setNewPassword('');
+    } catch (err) {
+      toast({ title: 'Reset Failed', description: err instanceof Error ? err.message : 'An unexpected error occurred', variant: 'destructive' });
+    } finally {
+      setResetting(false);
+    }
+  }
+
   // ── Render ───────────────────────────────────────────────────────────
 
   return (
@@ -568,6 +607,16 @@ export default function MasterUsers() {
                           >
                             <Pencil className="h-4 w-4 text-slate-500" />
                             <span className="sr-only">Edit user</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => openReset(user)}
+                            title="Reset password"
+                          >
+                            <KeyRound className="h-4 w-4 text-amber-500" />
+                            <span className="sr-only">Reset password</span>
                           </Button>
                           <Button
                             variant="ghost"
@@ -803,6 +852,53 @@ export default function MasterUsers() {
               Delete User
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+            <DialogDescription>
+              Set a new password for {resetUser?.name} ({resetUser?.email}).
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="new-password" className="text-xs uppercase tracking-wider text-slate-500">
+                New Password
+              </Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Minimum 8 characters"
+                required
+                disabled={resetting}
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setResetOpen(false)} disabled={resetting}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={resetting || newPassword.length < 8}>
+                {resetting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Resetting...
+                  </>
+                ) : (
+                  <>
+                    <KeyRound className="h-4 w-4 mr-2" />
+                    Reset Password
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

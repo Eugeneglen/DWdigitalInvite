@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type CMSPage = 'dashboard' | 'weddings' | 'users' | 'templates' | 'analytics' | 'settings' | 'audit';
+export type CMSPage = 'dashboard' | 'weddings' | 'users' | 'roles' | 'templates' | 'analytics' | 'settings' | 'audit';
 
 /** Auth user context passed to CMS page components */
 export interface AuthUser {

@@ -13,6 +13,7 @@ import {
   ChevronsUpDown,
   ArrowRightLeft,
   ScrollText,
+  Shield,
 } from 'lucide-react';
 import { useAuthModalStore } from '@/store/useAuthModalStore';
 import { NotificationBell } from '@/components/cms/NotificationBell';
@@ -56,6 +57,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'analytics', label: 'Analytics', icon: BarChart3, tooltip: 'Analytics', permission: 'platform:analytics:read' },
   { key: 'settings', label: 'Settings', icon: Settings, tooltip: 'Settings', permission: 'platform:settings:read' },
   { key: 'users', label: 'Team', icon: Users, tooltip: 'Team', permission: 'platform:users:manage' },
+  { key: 'roles', label: 'Roles & Permissions', icon: Shield, tooltip: 'Roles & Permissions', permission: 'platform:users:manage' },
   { key: 'audit', label: 'Audit Log', icon: ScrollText, tooltip: 'Audit Log', permission: 'platform:audit:read' },
 ];
 
@@ -63,6 +65,7 @@ const PAGE_TITLES: Record<CMSPage, string> = {
   dashboard: 'Dashboard',
   weddings: 'Wedding Accounts',
   users: 'Team',
+  roles: 'Roles & Permissions',
   templates: 'Content Templates',
   analytics: 'Analytics',
   settings: 'Settings',
