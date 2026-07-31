@@ -4,11 +4,15 @@ import React, { useEffect, useState } from 'react';
 import {
   Heart, CheckCircle, Mail, Users, MessageSquareHeart,
   AlertTriangle, Clock, Calendar, TrendingUp, TrendingDown,
-  FileWarning, Activity, ChevronRight,
+  FileWarning, Activity, ChevronRight, Download, ExternalLink,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+} from 'recharts';
 
 // ── Types (matches new /api/master/dashboard response) ─────────────────────
 
@@ -193,10 +197,13 @@ export default function MasterDashboard() {
             color="text-red-500"
             emptyMsg="No weddings expiring soon"
             items={data.alerts.expiringWeddings.map((w) => (
-              <div key={w.id} className="flex items-center justify-between text-xs">
-                <span className="font-medium text-slate-700">{w.coupleName}</span>
-                <Badge variant="outline" className={planBadge[w.plan] || ''}>{w.plan}</Badge>
-              </div>
+              <a key={w.id} href={`/${w.slug}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between text-xs hover:bg-slate-50 rounded px-1 py-0.5 -mx-1 transition-colors">
+                <span className="font-medium text-slate-700 hover:text-blue-600">{w.coupleName}</span>
+                <div className="flex items-center gap-1.5">
+                  <Badge variant="outline" className={planBadge[w.plan] || ''}>{w.plan}</Badge>
+                  <ExternalLink className="size-3 text-slate-300" />
+                </div>
+              </a>
             ))}
           />
           <AlertCard
@@ -205,10 +212,13 @@ export default function MasterDashboard() {
             color="text-blue-500"
             emptyMsg="No weddings in next 30 days"
             items={data.alerts.upcomingWeddings.map((w) => (
-              <div key={w.id} className="flex items-center justify-between text-xs">
-                <span className="font-medium text-slate-700">{w.coupleName}</span>
-                <span className="text-slate-400">{formatDate(w.weddingDate)}</span>
-              </div>
+              <a key={w.id} href={`/${w.slug}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between text-xs hover:bg-slate-50 rounded px-1 py-0.5 -mx-1 transition-colors">
+                <span className="font-medium text-slate-700 hover:text-blue-600">{w.coupleName}</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-400">{formatDate(w.weddingDate)}</span>
+                  <ExternalLink className="size-3 text-slate-300" />
+                </div>
+              </a>
             ))}
           />
           <AlertCard
@@ -243,25 +253,40 @@ export default function MasterDashboard() {
         <h3 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">Pipeline</h3>
         <Card>
           <CardContent className="p-5">
-            <div className="flex items-end gap-2 h-32">
-              {pipelineStages.map((stage) => {
-                const count = data.pipeline[stage.key];
-                const pct = Math.round((count / pipelineTotal) * 100);
-                const height = Math.max(pct, 5); // min 5% height for visibility
-                return (
-                  <div key={stage.key} className="flex-1 flex flex-col items-center justify-end">
-                    <span className="text-sm font-bold text-slate-900 mb-1">{count}</span>
-                    <div
-                      className={`w-full ${stage.color} rounded-t-md transition-all`}
-                      style={{ height: `${height}%` }}
-                      title={`${stage.label}: ${count} (${pct}%)`}
-                    />
-                    <span className="text-xs text-slate-500 mt-2">{stage.label}</span>
-                    <span className="text-xs text-slate-400">{pct}%</span>
-                  </div>
-                );
-              })}
-            </div>
+            {pipelineTotal === 0 ? (
+              <div className="flex items-center justify-center h-32 text-sm text-slate-400 italic">No weddings in pipeline</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart
+                  data={pipelineStages.map((s) => ({
+                    name: s.label,
+                    count: data.pipeline[s.key],
+                    color: s.color.replace('bg-', '#').replace('-500', '').replace('-400', ''),
+                  }))}
+                  layout="vertical"
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} width={90} />
+                  <Tooltip
+                    formatter={(value: number) => [`${value} wedding(s)`, 'Count']}
+                    contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+                  />
+                  <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                    {pipelineStages.map((s, i) => {
+                      const colorMap: Record<string, string> = {
+                        'bg-blue-500': '#3b82f6',
+                        'bg-emerald-500': '#10b981',
+                        'bg-slate-400': '#94a3b8',
+                        'bg-red-400': '#f87171',
+                        'bg-orange-400': '#fb923c',
+                      };
+                      return <Cell key={i} fill={colorMap[s.color] || '#94a3b8'} />;
+                    })}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -270,7 +295,31 @@ export default function MasterDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Staff Workload */}
         <div>
-          <h3 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">Staff Workload</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Staff Workload</h3>
+            {data.staffWorkload.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const csv = ['Name,Email,Role,Consultant Weddings,Coordinator Weddings,Total Weddings,Last Login'];
+                  for (const s of data.staffWorkload) {
+                    csv.push(`"${s.name}","${s.email}","${s.role}",${s.consultantWeddings},${s.coordinatorWeddings},${s.totalWeddings},"${s.lastLoginAt || 'Never'}"`);
+                  }
+                  const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'staff-workload.csv';
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                <Download className="size-3.5 mr-1.5" />
+                Export
+              </Button>
+            )}
+          </div>
           <Card>
             <CardContent className="p-0">
               <table className="w-full text-sm">
