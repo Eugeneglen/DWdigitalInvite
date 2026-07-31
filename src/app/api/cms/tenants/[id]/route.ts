@@ -18,7 +18,7 @@ export async function GET(
       return Response.json({ success: false, error: error || 'Authentication required' }, { status: 401 });
     }
 
-    if (!hasPlatformPermission(user.role, 'platform:weddings:read')) {
+    if (!(await hasPlatformPermission(user.userId, user.role, 'platform:weddings:read'))) {
       return Response.json({ success: false, error: 'Access denied. Admin privileges required.' }, { status: 403 });
     }
 
@@ -106,7 +106,7 @@ export async function PATCH(
       return Response.json({ success: false, error: error || 'Authentication required' }, { status: 401 });
     }
 
-    if (!hasPlatformPermission(user.role, 'platform:weddings:write')) {
+    if (!(await hasPlatformPermission(user.userId, user.role, 'platform:weddings:write'))) {
       return Response.json({ success: false, error: 'Access denied. Admin privileges required.' }, { status: 403 });
     }
 
@@ -190,7 +190,7 @@ export async function DELETE(
       return Response.json({ success: false, error: error || 'Authentication required' }, { status: 401 });
     }
 
-    if (!hasPlatformPermission(user.role, 'platform:weddings:write')) {
+    if (!(await hasPlatformPermission(user.userId, user.role, 'platform:weddings:write'))) {
       return Response.json({ success: false, error: 'Access denied. Admin privileges required.' }, { status: 403 });
     }
 

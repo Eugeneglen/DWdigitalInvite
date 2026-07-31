@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     }
 
     // Phase 3b: Added role check (was missing — security gap fixed)
-    if (!hasPlatformPermission(user.role, 'platform:weddings:read')) {
+    if (!(await hasPlatformPermission(user.userId, user.role, 'platform:weddings:read'))) {
       return Response.json({ success: false, error: 'Access denied. Admin privileges required.' }, { status: 403 });
     }
 
@@ -61,7 +61,7 @@ export async function PATCH(request: Request) {
       return Response.json({ success: false, error: error || 'Authentication required' }, { status: 401 });
     }
 
-    if (!hasPlatformPermission(user.role, 'platform:templates:manage')) {
+    if (!(await hasPlatformPermission(user.userId, user.role, 'platform:templates:manage'))) {
       return Response.json({ success: false, error: 'Access denied. Admin privileges required.' }, { status: 403 });
     }
 

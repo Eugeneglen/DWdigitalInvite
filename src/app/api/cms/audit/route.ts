@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
       return Response.json({ success: false, error: error || 'Authentication required' }, { status: 401 });
     }
 
-    if (!hasPlatformPermission(user.role, 'platform:audit:read')) {
+    if (!(await hasPlatformPermission(user.userId, user.role, 'platform:audit:read'))) {
       return Response.json({ success: false, error: 'Access denied. Admin privileges required.' }, { status: 403 });
     }
 

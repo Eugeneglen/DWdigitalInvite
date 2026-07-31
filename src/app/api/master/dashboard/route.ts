@@ -7,7 +7,7 @@ import { hasPlatformPermission } from '@/lib/permissions';
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || !hasPlatformPermission(session.user.role, 'platform:weddings:read')) {
+    if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:weddings:read'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

@@ -13,7 +13,7 @@ export async function GET(request: Request) {
       return Response.json({ success: false, error: error || 'Authentication required' }, { status: 401 });
     }
 
-    if (hasPlatformPermission(user.role, 'platform:weddings:read')) {
+    if ((await hasPlatformPermission(user.userId, user.role, 'platform:weddings:read'))) {
       const [totalTenants, activeTenants, totalUsers, recentLogCount] = await Promise.all([
         db.weddingAccount.count(),
         db.weddingAccount.count({ where: { status: 'ACTIVE' } }),

@@ -13,7 +13,7 @@ import { DEFAULT_TEMPLATES } from '@/lib/wedding-templates';
 export async function POST() {
   try {
     const session = await getServerSession();
-    if (!session?.user || !hasPlatformPermission(session.user.role, 'platform:templates:manage')) {
+    if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:templates:manage'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

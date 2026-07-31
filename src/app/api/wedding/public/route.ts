@@ -17,8 +17,12 @@ export async function GET(req: Request) {
     // Check if the requester is platform staff (admin preview)
     const session = await getServerSession();
     const role = session?.user?.role;
-    const isAdmin = hasPlatformPermission(role || '', 'platform:weddings:read') ||
-                    hasPlatformPermission(role || '', 'platform:weddings:read-all');
+    const userId = session?.user?.id || '';
+    // If no session (guest), isAdmin is false. If logged in, check DB-driven permissions.
+    const isAdmin = userId
+      ? (await hasPlatformPermission(userId, role || '', 'platform:weddings:read')) ||
+        (await hasPlatformPermission(userId, role || '', 'platform:weddings:read-all'))
+      : false;
 
     // Build the where clause:
     // - No slug → first ACTIVE wedding (platform landing page)

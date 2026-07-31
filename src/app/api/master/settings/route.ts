@@ -8,7 +8,7 @@ import { hasPlatformPermission } from '@/lib/permissions';
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || !hasPlatformPermission(session.user.role, 'platform:settings:read')) {
+    if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:settings:read'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -29,7 +29,7 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || !hasPlatformPermission(session.user.role, 'platform:settings:write')) {
+    if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:settings:write'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

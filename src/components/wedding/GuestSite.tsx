@@ -10,7 +10,7 @@ import { WeddingSlugProvider } from '@/hooks/useWeddingSlug';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { getAutoTextColor, getAutoBorderColor, generateThemeOverrideStyle } from '@/lib/contrast';
 import { filterTabsByFeatures } from '@/store/useNavigationStore';
-import { normalizePlatformRole, hasPlatformPermission } from '@/lib/permissions';
+import { normalizePlatformRole, hasPlatformPermissionSync as hasPlatformPermission } from '@/lib/permissions';
 import Header from '@/components/wedding/Header';
 import MobileDrawer from '@/components/wedding/MobileDrawer';
 import BottomNav from '@/components/wedding/BottomNav';

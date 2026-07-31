@@ -9,7 +9,7 @@ export async function GET() {
     if (!session?.user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
-    if (!hasPlatformPermission(session.user.role, 'platform:weddings:read')) {
+    if (!(await hasPlatformPermission(session.user.id, session.user.role, 'platform:weddings:read'))) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 

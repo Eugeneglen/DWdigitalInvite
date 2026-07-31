@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     // SUPER_ADMIN and ACCOUNT_MANAGER_1 (formerly ADMIN_1) can create weddings
-    if (!session?.user || !hasPlatformPermission(session.user.role, 'platform:weddings:write')) {
+    if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:weddings:write'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -324,7 +324,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || !hasPlatformPermission(session.user.role, 'platform:weddings:write')) {
+    if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:weddings:write'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -424,7 +424,7 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || !hasPlatformPermission(session.user.role, 'platform:weddings:write')) {
+    if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:weddings:write'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

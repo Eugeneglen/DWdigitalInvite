@@ -169,6 +169,30 @@ const ROLES: RoleSeed[] = [
     permissions: WILDCARD, // full control of their own wedding (scoped by hasWeddingPermission)
     sortOrder: 8,
   },
+  {
+    key: 'EDITOR',
+    label: 'Editor',
+    tier: 'account',
+    isSystem: true, // couple-invited, can't delete
+    permissions: [
+      'wedding:read',
+      'wedding:content:write',
+      'wedding:media:write',
+      'wedding:analytics:read',
+    ],
+    sortOrder: 9,
+  },
+  {
+    key: 'VIEWER',
+    label: 'Viewer',
+    tier: 'account',
+    isSystem: true, // couple-invited, can't delete
+    permissions: [
+      'wedding:read',
+      'wedding:analytics:read',
+    ],
+    sortOrder: 10,
+  },
 ];
 
 async function main() {

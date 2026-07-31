@@ -45,7 +45,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useCMSStore, type CMSPage } from '@/store/useCMSStore';
-import { hasPlatformPermission, type PlatformAction } from '@/lib/permissions';
+import { hasPlatformPermissionSync as hasPlatformPermission, type PlatformAction } from '@/lib/permissions';
 
 type NavItem = { key: CMSPage; label: string; icon: React.ElementType; tooltip: string; permission: PlatformAction };
 
