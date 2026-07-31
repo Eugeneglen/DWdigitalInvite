@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getServerSession } from '@/lib/auth';
+import { hasPlatformPermission } from '@/lib/permissions';
 
 export async function GET() {
   try {
@@ -8,8 +9,7 @@ export async function GET() {
     if (!session?.user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
-    const role = session.user.role;
-    if (role !== 'SUPER_ADMIN' && role !== 'ACCOUNT_MANAGER') {
+    if (!hasPlatformPermission(session.user.role, 'platform:weddings:read')) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 

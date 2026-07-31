@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { authenticateRequest, requireTenantAccess, createAuditLog } from '@/lib/auth-middleware';
+import { hasWeddingPermission } from '@/lib/permissions';
 
 // ============================================
 // GET — List feature toggles for a wedding
@@ -18,6 +19,12 @@ export async function GET(
     }
 
     const { id: weddingId } = await params;
+
+    // Phase 3b: Added role check (was missing — security gap fixed)
+    const canAccess = await hasWeddingPermission(user.userId, user.role, weddingId, 'wedding:read');
+    if (!canAccess) {
+      return Response.json({ success: false, error: 'Access denied. You do not have access to this wedding.' }, { status: 403 });
+    }
 
     // Verify wedding account exists
     const account = await db.weddingAccount.findUnique({ where: { id: weddingId } });

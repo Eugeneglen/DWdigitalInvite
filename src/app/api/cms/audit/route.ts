@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
-import { authenticateRequest, requireMasterAdmin } from '@/lib/auth-middleware';
+import { authenticateRequest } from '@/lib/auth-middleware';
+import { hasPlatformPermission } from '@/lib/permissions';
 
 // ============================================
 // GET — Paginated, filtered audit logs
@@ -13,9 +14,8 @@ export async function GET(request: NextRequest) {
       return Response.json({ success: false, error: error || 'Authentication required' }, { status: 401 });
     }
 
-    const authError = requireMasterAdmin(user);
-    if (authError) {
-      return Response.json({ success: false, error: authError }, { status: 403 });
+    if (!hasPlatformPermission(user.role, 'platform:audit:read')) {
+      return Response.json({ success: false, error: 'Access denied. Admin privileges required.' }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);

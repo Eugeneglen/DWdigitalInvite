@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getServerSession } from '@/lib/auth';
+import { hasPlatformPermission } from '@/lib/permissions';
 
 // GET /api/wedding/public?slug=eleanor-james
 // Returns all wedding data needed by guest-facing pages.
 // - Guests (no auth): only see ACTIVE weddings
-// - Admins (SUPER_ADMIN, ADMIN_1, ADMIN_2): can preview any wedding by slug
+// - Platform staff (SUPER_ADMIN, ACCOUNT_MANAGER_1/2, SUPPORT): can preview any wedding by slug
 // - Authenticated couple (COUPLE): can preview their own wedding by slug
 //   (even if DRAFT), so they can see their changes on the guest site
 export async function GET(req: Request) {
@@ -13,10 +14,11 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const slug = searchParams.get('slug');
 
-    // Check if the requester is an admin or the wedding's owner
+    // Check if the requester is platform staff (admin preview)
     const session = await getServerSession();
     const role = session?.user?.role;
-    const isAdmin = role === 'SUPER_ADMIN' || role === 'ADMIN_1' || role === 'ADMIN_2';
+    const isAdmin = hasPlatformPermission(role || '', 'platform:weddings:read') ||
+                    hasPlatformPermission(role || '', 'platform:weddings:read-all');
 
     // Build the where clause:
     // - No slug → first ACTIVE wedding (platform landing page)

@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { authenticateRequest } from '@/lib/auth-middleware';
+import { hasPlatformPermission } from '@/lib/permissions';
 
 // ============================================
 // GET — Dashboard stats (role-dependent)
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
       return Response.json({ success: false, error: error || 'Authentication required' }, { status: 401 });
     }
 
-    if (user.role === 'SUPER_ADMIN' || user.role === 'ACCOUNT_MANAGER') {
+    if (hasPlatformPermission(user.role, 'platform:weddings:read')) {
       const [totalTenants, activeTenants, totalUsers, recentLogCount] = await Promise.all([
         db.weddingAccount.count(),
         db.weddingAccount.count({ where: { status: 'ACTIVE' } }),
