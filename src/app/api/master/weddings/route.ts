@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions, hashPassword } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { hasPlatformPermission } from '@/lib/permissions';
 import { z } from 'zod/v4';
 
 // Prevent Next.js from caching this route — always return fresh data
@@ -83,8 +84,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    // SUPER_ADMIN and ADMIN_1 (Consultant) can create weddings
-    if (!session?.user || (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'ADMIN_1')) {
+    // SUPER_ADMIN and ACCOUNT_MANAGER_1 (formerly ADMIN_1) can create weddings
+    if (!session?.user || !hasPlatformPermission(session.user.role, 'platform:weddings:write')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -305,7 +306,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'SUPER_ADMIN') {
+    if (!session?.user || !hasPlatformPermission(session.user.role, 'platform:weddings:write')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -405,7 +406,7 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'SUPER_ADMIN') {
+    if (!session?.user || !hasPlatformPermission(session.user.role, 'platform:weddings:write')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

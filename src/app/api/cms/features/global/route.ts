@@ -61,9 +61,8 @@ export async function PATCH(request: Request) {
       return Response.json({ success: false, error: error || 'Authentication required' }, { status: 401 });
     }
 
-    const authError = requireMasterAdmin(user);
-    if (authError) {
-      return Response.json({ success: false, error: authError }, { status: 403 });
+    if (!hasPlatformPermission(user.role, 'platform:templates:manage')) {
+      return Response.json({ success: false, error: 'Access denied. Admin privileges required.' }, { status: 403 });
     }
 
     // Global feature toggles are not supported.
