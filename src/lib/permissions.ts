@@ -85,11 +85,23 @@ const LEGACY_PLATFORM_ROLE_MAP: Record<string, PlatformRole> = {
   // Unchanged
   SUPER_ADMIN: 'SUPER_ADMIN',
   COUPLE: 'COUPLE',
-  // Legacy → new
+  // Legacy → intermediate vocabulary
   ADMIN_1: 'ACCOUNT_MANAGER_1',
   ADMIN_2: 'ACCOUNT_MANAGER_2',
   ADMIN_3: 'SUPPORT',
   ACCOUNT_MANAGER: 'ACCOUNT_MANAGER_1',
+  // New DB-driven vocabulary → intermediate vocabulary (bridge until Phase B)
+  SUPER_ADMIN_1: 'SUPER_ADMIN',
+  SUPER_ADMIN_2: 'SUPER_ADMIN',
+  CONSULTANT_1: 'ACCOUNT_MANAGER_1',
+  CONSULTANT_2: 'ACCOUNT_MANAGER_1', // junior consultant ≈ account manager 1 (Phase B will differentiate)
+  COORDINATOR_1: 'ACCOUNT_MANAGER_2',
+  SUPPORT_1: 'SUPPORT',
+  SUPPORT_2: 'SUPPORT',
+  // Phase 1-4 intermediate vocabulary (still valid)
+  ACCOUNT_MANAGER_1: 'ACCOUNT_MANAGER_1',
+  ACCOUNT_MANAGER_2: 'ACCOUNT_MANAGER_2',
+  SUPPORT: 'SUPPORT',
 };
 
 /**

@@ -10,6 +10,7 @@ import { WeddingSlugProvider } from '@/hooks/useWeddingSlug';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { getAutoTextColor, getAutoBorderColor, generateThemeOverrideStyle } from '@/lib/contrast';
 import { filterTabsByFeatures } from '@/store/useNavigationStore';
+import { normalizePlatformRole, hasPlatformPermission } from '@/lib/permissions';
 import Header from '@/components/wedding/Header';
 import MobileDrawer from '@/components/wedding/MobileDrawer';
 import BottomNav from '@/components/wedding/BottomNav';
@@ -165,8 +166,9 @@ export default function GuestSite({ slug, topOffset, showEditorButton = false }:
     return <GuestSiteSkeleton />;
   }
 
-  const isAdmin = session?.user?.role === 'SUPER_ADMIN' || session?.user?.role === 'ACCOUNT_MANAGER';
-  const isCouple = session?.user?.role === 'COUPLE';
+  const isAdmin = hasPlatformPermission(session?.user?.role || '', 'platform:weddings:read') ||
+                  hasPlatformPermission(session?.user?.role || '', 'platform:weddings:read-all');
+  const isCouple = normalizePlatformRole(session?.user?.role || '') === 'COUPLE';
 
   // Generate dynamic <style> to override Tailwind's hardcoded colour values.
   // Tailwind 4 resolves @theme colours at build time, so CSS variable

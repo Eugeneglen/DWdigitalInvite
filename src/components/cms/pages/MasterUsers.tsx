@@ -45,6 +45,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
+import { normalizePlatformRole } from '@/lib/permissions';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -229,7 +230,10 @@ export default function MasterUsers() {
   const stats = useMemo(() => {
     const total = users.length;
     const active = users.filter((u) => u.isActive).length;
-    const admins = users.filter((u) => u.role.startsWith('ADMIN')).length;
+    const admins = users.filter((u) => {
+      const r = normalizePlatformRole(u.role);
+      return r !== 'COUPLE';
+    }).length;
     return { total, active, admins };
   }, [users]);
 
