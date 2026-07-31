@@ -1,5 +1,7 @@
 'use client';
 
+import { useState, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 import dynamic from 'next/dynamic';
 
 const GuestSite = dynamic(() => import('@/components/wedding/GuestSite'), {
@@ -17,12 +19,36 @@ const AdminCMSView = dynamic(
   { ssr: false, loading: () => <div className="loading-state">Loading...</div> },
 );
 
+const ChangePasswordModal = dynamic(
+  () => import('@/components/cms/ChangePasswordModal').then((m) => ({ default: m.ChangePasswordModal })),
+  { ssr: false },
+);
+
 /**
  * Renders the appropriate top-level view based on the `?view=` query param.
- * The `view` string is passed from PageClientView which reads it via
- * `useSearchParams()` in a non-dynamically-imported shell component.
+ * If the user's mustChangePassword flag is true, shows the Change Password
+ * modal before rendering any CMS content.
  */
 export function PageContent({ view }: { view: string | null }) {
+  const { data: session, update } = useSession();
+  const [passwordChanged, setPasswordChanged] = useState(false);
+
+  const handlePasswordChanged = useCallback(async () => {
+    setPasswordChanged(true);
+    // Refresh the session so mustChangePassword is cleared
+    await update();
+  }, [update]);
+
+  const mustChangePassword = session?.user?.mustChangePassword && !passwordChanged;
+
+  if (mustChangePassword) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-paper-cream">
+        <ChangePasswordModal open={true} onSuccess={handlePasswordChanged} />
+      </div>
+    );
+  }
+
   if (view === 'couple') {
     return <CoupleCMSView />;
   }

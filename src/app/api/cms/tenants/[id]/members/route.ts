@@ -104,6 +104,7 @@ export async function POST(
           passwordHash,
           role: 'COUPLE', // Platform role COUPLE (routes to couple CMS)
           isActive: true,
+          mustChangePassword: true,  // Force password change on first login
         },
       });
     }

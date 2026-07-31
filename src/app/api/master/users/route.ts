@@ -131,6 +131,7 @@ export async function POST(req: NextRequest) {
         passwordHash,
         role,
         isActive,
+        mustChangePassword: true,  // Force password change on first login
       },
       select: {
         id: true,

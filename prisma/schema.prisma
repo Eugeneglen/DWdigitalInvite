@@ -25,6 +25,7 @@ model User {
   role         String   @default("CONSULTANT_1")
   avatarUrl         String?
   isActive          Boolean  @default(true)
+  mustChangePassword Boolean @default(false)  // true = forced to change password on next login
   resetToken        String?
   resetTokenExpiry  DateTime?
   lastLoginAt       DateTime?

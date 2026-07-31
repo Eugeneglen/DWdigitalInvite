@@ -44,7 +44,12 @@ export async function POST(
 
     await db.user.update({
       where: { id: userId },
-      data: { passwordHash, resetToken: null, resetTokenExpiry: null },
+      data: {
+        passwordHash,
+        resetToken: null,
+        resetTokenExpiry: null,
+        mustChangePassword: true,  // Force password change on next login after admin reset
+      },
     });
 
     // Audit log

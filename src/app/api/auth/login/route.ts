@@ -85,6 +85,7 @@ export async function POST(request: Request) {
         name: user.name,
         email: user.email,
         role: user.role,
+        mustChangePassword: user.mustChangePassword,
         iat: Math.floor(Date.now() / 1000),
         exp: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
       },
@@ -94,6 +95,7 @@ export async function POST(request: Request) {
     const response = NextResponse.json({
       success: true,
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
+      mustChangePassword: user.mustChangePassword,
     });
 
     response.cookies.set('next-auth.session-token', token, {

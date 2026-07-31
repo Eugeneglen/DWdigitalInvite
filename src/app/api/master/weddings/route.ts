@@ -186,6 +186,7 @@ export async function POST(req: NextRequest) {
           name: data.coupleName,
           role: 'COUPLE',
           isActive: true,
+          mustChangePassword: true,  // Force password change on first login
         },
       });
     }
