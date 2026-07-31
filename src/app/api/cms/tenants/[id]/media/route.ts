@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { authenticateRequest, requireTenantAccess, createAuditLog } from '@/lib/auth-middleware';
+import { authenticateRequest, createAuditLog } from '@/lib/auth-middleware';
+import { hasWeddingPermission } from '@/lib/permissions';
 
 // ============================================
 // GET — List media items for a wedding (with optional category filter)
@@ -18,9 +19,9 @@ export async function GET(
 
     const { id: weddingId } = await params;
 
-    const accessError = await requireTenantAccess(user, weddingId, 'viewer');
-    if (accessError) {
-      return Response.json({ success: false, error: accessError }, { status: 403 });
+    const canAccess = await hasWeddingPermission(user.userId, user.role, weddingId, 'wedding:read');
+    if (!canAccess) {
+      return Response.json({ success: false, error: 'Access denied. You do not have access to this wedding.' }, { status: 403 });
     }
 
     // Verify wedding account exists
@@ -89,9 +90,9 @@ export async function POST(
 
     const { id: weddingId } = await params;
 
-    const accessError = await requireTenantAccess(user, weddingId, 'editor');
-    if (accessError) {
-      return Response.json({ success: false, error: accessError }, { status: 403 });
+    const canAccess = await hasWeddingPermission(user.userId, user.role, weddingId, 'wedding:media:write');
+    if (!canAccess) {
+      return Response.json({ success: false, error: 'Access denied. You do not have permission to manage media.' }, { status: 403 });
     }
 
     // Verify wedding account exists

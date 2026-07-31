@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { authenticateRequest, requireTenantAccess, createAuditLog } from '@/lib/auth-middleware';
+import { authenticateRequest, createAuditLog } from '@/lib/auth-middleware';
+import { hasWeddingPermission } from '@/lib/permissions';
 
 // ============================================
 // PATCH — Update a schedule item
@@ -28,9 +29,9 @@ export async function PATCH(
 
     const { id: weddingId, itemId } = await params;
 
-    const accessError = await requireTenantAccess(user, weddingId, 'editor');
-    if (accessError) {
-      return Response.json({ success: false, error: accessError }, { status: 403 });
+    const canAccess = await hasWeddingPermission(user.userId, user.role, weddingId, 'wedding:schedule:write');
+    if (!canAccess) {
+      return Response.json({ success: false, error: 'Access denied. You do not have permission to edit the schedule.' }, { status: 403 });
     }
 
     const existing = await db.eventSchedule.findFirst({
@@ -102,9 +103,9 @@ export async function DELETE(
 
     const { id: weddingId, itemId } = await params;
 
-    const accessError = await requireTenantAccess(user, weddingId, 'editor');
-    if (accessError) {
-      return Response.json({ success: false, error: accessError }, { status: 403 });
+    const canAccess = await hasWeddingPermission(user.userId, user.role, weddingId, 'wedding:schedule:write');
+    if (!canAccess) {
+      return Response.json({ success: false, error: 'Access denied. You do not have permission to edit the schedule.' }, { status: 403 });
     }
 
     const existing = await db.eventSchedule.findFirst({

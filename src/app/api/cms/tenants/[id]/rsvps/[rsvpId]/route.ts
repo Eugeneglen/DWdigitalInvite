@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
-import { authenticateRequest, requireTenantAccess, createAuditLog } from '@/lib/auth-middleware';
+import { authenticateRequest, createAuditLog } from '@/lib/auth-middleware';
+import { hasWeddingPermission } from '@/lib/permissions';
 
 // ============================================
 // GET — Single RSVP with guests
@@ -17,9 +18,9 @@ export async function GET(
     }
 
     const { id: weddingId, rsvpId } = await params;
-    const accessError = await requireTenantAccess(user, weddingId, 'viewer');
-    if (accessError) {
-      return Response.json({ success: false, error: accessError }, { status: 403 });
+    const canAccess = await hasWeddingPermission(user.userId, user.role, weddingId, 'wedding:read');
+    if (!canAccess) {
+      return Response.json({ success: false, error: 'Access denied. You do not have access to this wedding.' }, { status: 403 });
     }
 
     const rsvp = await db.rSVPSubmission.findFirst({
@@ -71,9 +72,9 @@ export async function DELETE(
     }
 
     const { id: weddingId, rsvpId } = await params;
-    const accessError = await requireTenantAccess(user, weddingId, 'editor');
-    if (accessError) {
-      return Response.json({ success: false, error: accessError }, { status: 403 });
+    const canAccess = await hasWeddingPermission(user.userId, user.role, weddingId, 'wedding:rsvps:manage');
+    if (!canAccess) {
+      return Response.json({ success: false, error: 'Access denied. You do not have permission to manage RSVPs.' }, { status: 403 });
     }
 
     const existing = await db.rSVPSubmission.findFirst({
