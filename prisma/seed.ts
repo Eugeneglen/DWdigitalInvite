@@ -135,6 +135,27 @@ async function seed() {
   console.log(`✅ Wedding #3: ${wedding3.coupleName} (${wedding3.slug}) — ${wedding3.status}/${wedding3.plan}`);
 
   // ============================================================
+  // 4b. USER_WEDDING_ROLE — Per-wedding role assignments (Tier 2 + Tier 3)
+  //     Mirrors the ownerId FK into the new UserWeddingRole junction table
+  //     so the new permission layer (Phase 3) has data to read.
+  //     Existing ownerId/consultantId/coordinatorId FKs are kept for
+  //     backward compatibility until Phase 3c cleanup.
+  // ============================================================
+  const weddingRoleAssignments = [
+    { userId: couple.id, weddingId: wedding1.id, role: 'COUPLE' as const },
+    // Weddings #2 and #3 are unowned (no ownerId) — no role rows needed
+  ];
+
+  for (const a of weddingRoleAssignments) {
+    await db.userWeddingRole.upsert({
+      where: { userId_weddingId_role: { userId: a.userId, weddingId: a.weddingId, role: a.role } },
+      update: {},
+      create: { userId: a.userId, weddingId: a.weddingId, role: a.role },
+    });
+  }
+  console.log(`✅ UserWeddingRole: ${weddingRoleAssignments.length} role assignments seeded`);
+
+  // ============================================================
   // 5. FEATURES — Wedding #1 gets all 11 features enabled.
   //    Weddings #2 and #3 get the 10 default wizard features.
   // ============================================================
