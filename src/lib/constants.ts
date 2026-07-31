@@ -34,13 +34,19 @@ export const GLOBAL_FEATURE_LABELS: Record<string, string> = {
 };
 
 // ── Role labels ─────────────────────────────────────────────────────
+// New 3-tier vocabulary + legacy values (for backward compatibility)
 export const ROLE_LABELS: Record<string, string> = {
-  SUPER_ADMIN: 'Platform Admin',
-  ACCOUNT_MANAGER: 'Account Manager',
+  // Tier 1 — Platform roles
+  SUPER_ADMIN: 'Super Admin',
+  ACCOUNT_MANAGER_1: 'Account Manager (Senior)',
+  ACCOUNT_MANAGER_2: 'Account Manager (Junior)',
+  SUPPORT: 'Support (Read-only)',
   COUPLE: 'Couple',
-  ADMIN_1: 'Consultant',
-  ADMIN_2: 'Coordinator',
-  ADMIN_3: 'Operations Staff',
+  // Legacy values (normalized at runtime — kept for display of existing DB rows)
+  ACCOUNT_MANAGER: 'Account Manager (Legacy)',
+  ADMIN_1: 'Consultant (Legacy → Account Manager Senior)',
+  ADMIN_2: 'Coordinator (Legacy → Account Manager Junior)',
+  ADMIN_3: 'Operations Staff (Legacy → Support)',
 };
 
 export const TENANT_ROLE_LABELS: Record<string, string> = {

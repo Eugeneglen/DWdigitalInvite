@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { getServerSession } from './auth';
 import { getIpAddress } from './auth';
+import { normalizePlatformRole } from '@/lib/permissions';
 
 export interface AuthContext {
   user: {
@@ -29,7 +30,7 @@ export async function authenticateRequest(request: Request): Promise<AuthContext
     // For couple users, resolve their wedding account as tenantId
     let tenantId: string | undefined;
     let tenantRole: string | undefined;
-    if (session.user.role === 'COUPLE') {
+    if (normalizePlatformRole(session.user.role) === 'COUPLE') {
       const wedding = await db.weddingAccount.findFirst({
         where: { ownerId: session.user.id },
         select: { id: true },
@@ -52,46 +53,6 @@ export async function authenticateRequest(request: Request): Promise<AuthContext
   } catch {
     return { user: null, error: 'Authentication failed. Please try again.' };
   }
-}
-
-/**
- * Requires SUPER_ADMIN or ACCOUNT_MANAGER role.
- */
-export function requireMasterAdmin(user: { role: string }): string | null {
-  if (user.role !== 'SUPER_ADMIN' && user.role !== 'ACCOUNT_MANAGER') {
-    return 'Access denied. Admin privileges required.';
-  }
-  return null;
-}
-
-/**
- * Requires at least viewer role for a specific wedding (tenant).
- * Master admins have access to everything.
- */
-export async function requireTenantAccess(
-  user: { userId: string; role: string; tenantId?: string },
-  weddingId: string,
-  _requiredRole: string = 'viewer'
-): Promise<string | null> {
-  // Master admins have access to everything
-  if (user.role === 'SUPER_ADMIN' || user.role === 'ACCOUNT_MANAGER') return null;
-
-  // Couple users can only access their own wedding
-  if (user.role === 'COUPLE') {
-    if (user.tenantId === weddingId) return null;
-    return 'Access denied. You do not have access to this wedding.';
-  }
-
-  // For other roles, check if user owns the wedding
-  const wedding = await db.weddingAccount.findFirst({
-    where: { id: weddingId, ownerId: user.userId },
-  });
-
-  if (!wedding) {
-    return 'Access denied. You do not have access to this wedding.';
-  }
-
-  return null;
 }
 
 /**

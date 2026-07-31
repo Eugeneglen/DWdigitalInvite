@@ -72,7 +72,7 @@ const EMPTY_FORM: UserForm = {
   name: '',
   email: '',
   password: '',
-  role: 'ADMIN_1',
+  role: 'ACCOUNT_MANAGER_1',
   isActive: true,
 };
 
@@ -80,16 +80,28 @@ const EMPTY_FORM: UserForm = {
 
 const roleVariant: Record<string, string> = {
   SUPER_ADMIN: 'bg-cinematic-gold/15 text-cinematic-gold border-cinematic-gold/30',
+  ACCOUNT_MANAGER_1: 'bg-charcoal-ink/10 text-charcoal-ink border-charcoal-ink/20',
+  ACCOUNT_MANAGER_2: 'bg-charcoal-ink/10 text-charcoal-ink border-charcoal-ink/20',
+  SUPPORT: 'bg-charcoal-ink/5 text-charcoal-ink/60 border-charcoal-ink/10',
+  COUPLE: 'bg-cinematic-gold/5 text-cinematic-gold/70 border-cinematic-gold/20',
+  // Legacy values (for display of existing DB rows)
   ADMIN_1: 'bg-charcoal-ink/10 text-charcoal-ink border-charcoal-ink/20',
   ADMIN_2: 'bg-charcoal-ink/10 text-charcoal-ink border-charcoal-ink/20',
   ADMIN_3: 'bg-charcoal-ink/10 text-charcoal-ink border-charcoal-ink/20',
+  ACCOUNT_MANAGER: 'bg-charcoal-ink/10 text-charcoal-ink border-charcoal-ink/20',
 };
 
 const roleLabel: Record<string, string> = {
   SUPER_ADMIN: 'Super Admin',
-  ADMIN_1: 'Admin 1',
-  ADMIN_2: 'Admin 2',
-  ADMIN_3: 'Admin 3',
+  ACCOUNT_MANAGER_1: 'Account Manager (Senior)',
+  ACCOUNT_MANAGER_2: 'Account Manager (Junior)',
+  SUPPORT: 'Support (Read-only)',
+  COUPLE: 'Couple',
+  // Legacy values
+  ADMIN_1: 'Consultant (Legacy)',
+  ADMIN_2: 'Coordinator (Legacy)',
+  ADMIN_3: 'Operations (Legacy)',
+  ACCOUNT_MANAGER: 'Account Manager (Legacy)',
 };
 
 function relativeTime(dateStr: string | null): string {
@@ -664,9 +676,9 @@ export default function MasterUsers() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
-                  <SelectItem value="ADMIN_1">Admin 1</SelectItem>
-                  <SelectItem value="ADMIN_2">Admin 2</SelectItem>
-                  <SelectItem value="ADMIN_3">Admin 3</SelectItem>
+                  <SelectItem value="ACCOUNT_MANAGER_1">Account Manager (Senior)</SelectItem>
+                  <SelectItem value="ACCOUNT_MANAGER_2">Account Manager (Junior)</SelectItem>
+                  <SelectItem value="SUPPORT">Support (Read-only)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
