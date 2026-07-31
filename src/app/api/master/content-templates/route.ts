@@ -183,12 +183,19 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PATCH /api/master/content-templates — update a template (name, description)
+// PATCH /api/master/content-templates — update a template
+// Can update: name, description, isActive, content, schedule, faqs, stories, media, theme
 const updateTemplateSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(2).optional(),
   description: z.string().optional(),
   isActive: z.boolean().optional(),
+  content: z.string().optional(),   // JSON string of content items
+  schedule: z.string().optional(),  // JSON string of schedule items
+  faqs: z.string().optional(),      // JSON string of FAQ items
+  stories: z.string().optional(),   // JSON string of story items
+  media: z.string().optional(),     // JSON string of media items
+  theme: z.string().optional(),     // JSON string of theme
 });
 
 export async function PATCH(req: NextRequest) {
@@ -205,7 +212,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
 
-    const { id, name, description, isActive } = parsed.data;
+    const { id, name, description, isActive, content, schedule, faqs, stories, media, theme } = parsed.data;
 
     const existing = await db.contentTemplate.findUnique({ where: { id } });
     if (!existing) {
@@ -214,13 +221,18 @@ export async function PATCH(req: NextRequest) {
 
     const updateData: Record<string, unknown> = {};
     if (name !== undefined) {
-      // Check uniqueness
       const conflict = await db.contentTemplate.findFirst({ where: { name, NOT: { id } } });
       if (conflict) return NextResponse.json({ error: 'A template with this name already exists' }, { status: 409 });
       updateData.name = name;
     }
     if (description !== undefined) updateData.description = description;
     if (isActive !== undefined) updateData.isActive = isActive;
+    if (content !== undefined) updateData.content = content;
+    if (schedule !== undefined) updateData.schedule = schedule;
+    if (faqs !== undefined) updateData.faqs = faqs;
+    if (stories !== undefined) updateData.stories = stories;
+    if (media !== undefined) updateData.media = media;
+    if (theme !== undefined) updateData.theme = theme;
 
     const template = await db.contentTemplate.update({ where: { id }, data: updateData });
 

@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   Plus, Star, Trash2, Copy, Check, Loader2, FileText,
   Palette, Calendar, HelpCircle, BookOpen, Image as ImageIcon,
-  RefreshCw, Lock,
+  RefreshCw, Lock, Pencil,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
@@ -51,6 +51,19 @@ export default function MasterTemplates() {
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ContentTemplate | null>(null);
   const [applying, setApplying] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<ContentTemplate | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editData, setEditData] = useState<{
+    name: string;
+    description: string;
+    content: { section: string; fieldKey: string; fieldValue: string; fieldType: string }[];
+    schedule: { eventType: string; title: string; description: string | null; startTime: string; endTime: string | null; location: string | null; sortOrder: number }[];
+    faqs: { question: string; answer: string; sortOrder: number; isActive: boolean }[];
+    stories: { title: string; content: string; date: string | null; imageUrl: string | null; sortOrder: number }[];
+    theme: { colors: { bg: string; text: string; accent: string; secondary: string; muted: string }; fonts: { heading: string; body: string } };
+  } | null>(null);
+  const [editTab, setEditTab] = useState<'details' | 'content' | 'schedule' | 'faqs' | 'stories' | 'theme'>('details');
+  const [saving, setSaving] = useState(false);
 
   // Create form
   const [newName, setNewName] = useState('');
@@ -153,6 +166,63 @@ export default function MasterTemplates() {
     }
   }
 
+  async function openEdit(template: ContentTemplate) {
+    try {
+      const res = await fetch(`/api/master/content-templates/${template.id}?XTransformPort=3000`);
+      if (!res.ok) throw new Error('Failed to load template');
+      const data = await res.json();
+      setEditTarget(template);
+      setEditData({
+        name: data.name,
+        description: data.description || '',
+        content: data.content,
+        schedule: data.schedule,
+        faqs: data.faqs,
+        stories: data.stories,
+        theme: data.theme,
+      });
+      setEditTab('details');
+      setEditOpen(true);
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load template for editing', variant: 'destructive' });
+    }
+  }
+
+  async function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editTarget || !editData) return;
+    try {
+      setSaving(true);
+      const res = await fetch('/api/master/content-templates?XTransformPort=3000', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editTarget.id,
+          name: editData.name,
+          description: editData.description,
+          content: JSON.stringify(editData.content),
+          schedule: JSON.stringify(editData.schedule),
+          faqs: JSON.stringify(editData.faqs),
+          stories: JSON.stringify(editData.stories),
+          theme: JSON.stringify(editData.theme),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to save template');
+      }
+      toast({ title: 'Template Saved', description: `${editData.name} has been updated.` });
+      setEditOpen(false);
+      setEditTarget(null);
+      setEditData(null);
+      fetchTemplates();
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to save template', variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleDelete(template: ContentTemplate) {
     try {
       const res = await fetch(`/api/master/content-templates?id=${template.id}&XTransformPort=3000`, { method: 'DELETE' });
@@ -251,6 +321,14 @@ export default function MasterTemplates() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEdit(t)}
+                          title="Edit template"
+                        >
+                          <Pencil className="size-4 text-slate-500" />
+                        </Button>
                         {!t.isDefault && (
                           <Button
                             variant="ghost"
@@ -383,6 +461,261 @@ export default function MasterTemplates() {
               Delete
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Template Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Template</DialogTitle>
+            <DialogDescription>Update template details, content, schedule, FAQs, stories, and theme.</DialogDescription>
+          </DialogHeader>
+          {editData && (
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              {/* Tab selector */}
+              <div className="flex gap-1 border-b border-slate-200 pb-2">
+                {(['details', 'content', 'schedule', 'faqs', 'stories', 'theme'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setEditTab(tab)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors capitalize ${
+                      editTab === tab ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+
+              {/* Details tab */}
+              {editTab === 'details' && (
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs uppercase tracking-wider text-slate-500">Template Name</Label>
+                    <Input
+                      value={editData.name}
+                      onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                      required
+                      disabled={saving}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs uppercase tracking-wider text-slate-500">Description</Label>
+                    <Input
+                      value={editData.description}
+                      onChange={(e) => setEditData({ ...editData, description: e.target.value })}
+                      disabled={saving}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Content tab */}
+              {editTab === 'content' && (
+                <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                  {editData.content.map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-3 gap-2 items-start">
+                      <div className="col-span-1">
+                        <Badge variant="outline" className="text-xs">{item.section}</Badge>
+                        <p className="text-xs text-slate-400 mt-1">{item.fieldKey}</p>
+                      </div>
+                      <Input
+                        className="col-span-2 text-sm"
+                        value={item.fieldValue}
+                        onChange={(e) => {
+                          const updated = [...editData.content];
+                          updated[idx] = { ...item, fieldValue: e.target.value };
+                          setEditData({ ...editData, content: updated });
+                        }}
+                        disabled={saving}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Schedule tab */}
+              {editTab === 'schedule' && (
+                <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                  {editData.schedule.map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-2 gap-2 items-start border-b border-slate-50 pb-2">
+                      <Input
+                        className="text-sm"
+                        value={item.title}
+                        placeholder="Title"
+                        onChange={(e) => {
+                          const updated = [...editData.schedule];
+                          updated[idx] = { ...item, title: e.target.value };
+                          setEditData({ ...editData, schedule: updated });
+                        }}
+                        disabled={saving}
+                      />
+                      <Input
+                        className="text-sm"
+                        value={item.startTime}
+                        placeholder="Time (e.g. 16:00)"
+                        onChange={(e) => {
+                          const updated = [...editData.schedule];
+                          updated[idx] = { ...item, startTime: e.target.value };
+                          setEditData({ ...editData, schedule: updated });
+                        }}
+                        disabled={saving}
+                      />
+                      <Input
+                        className="col-span-2 text-sm"
+                        value={item.location || ''}
+                        placeholder="Location"
+                        onChange={(e) => {
+                          const updated = [...editData.schedule];
+                          updated[idx] = { ...item, location: e.target.value };
+                          setEditData({ ...editData, schedule: updated });
+                        }}
+                        disabled={saving}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* FAQs tab */}
+              {editTab === 'faqs' && (
+                <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                  {editData.faqs.map((item, idx) => (
+                    <div key={idx} className="space-y-1 border-b border-slate-50 pb-2">
+                      <Input
+                        className="text-sm font-medium"
+                        value={item.question}
+                        placeholder="Question"
+                        onChange={(e) => {
+                          const updated = [...editData.faqs];
+                          updated[idx] = { ...item, question: e.target.value };
+                          setEditData({ ...editData, faqs: updated });
+                        }}
+                        disabled={saving}
+                      />
+                      <textarea
+                        className="w-full text-sm border border-slate-200 rounded px-2 py-1.5"
+                        value={item.answer}
+                        placeholder="Answer"
+                        rows={2}
+                        onChange={(e) => {
+                          const updated = [...editData.faqs];
+                          updated[idx] = { ...item, answer: e.target.value };
+                          setEditData({ ...editData, faqs: updated });
+                        }}
+                        disabled={saving}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Stories tab */}
+              {editTab === 'stories' && (
+                <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                  {editData.stories.map((item, idx) => (
+                    <div key={idx} className="space-y-1 border-b border-slate-50 pb-2">
+                      <Input
+                        className="text-sm font-medium"
+                        value={item.title}
+                        placeholder="Title"
+                        onChange={(e) => {
+                          const updated = [...editData.stories];
+                          updated[idx] = { ...item, title: e.target.value };
+                          setEditData({ ...editData, stories: updated });
+                        }}
+                        disabled={saving}
+                      />
+                      <Input
+                        className="text-sm"
+                        value={item.date || ''}
+                        placeholder="Date (e.g. March 2023)"
+                        onChange={(e) => {
+                          const updated = [...editData.stories];
+                          updated[idx] = { ...item, date: e.target.value };
+                          setEditData({ ...editData, stories: updated });
+                        }}
+                        disabled={saving}
+                      />
+                      <textarea
+                        className="w-full text-sm border border-slate-200 rounded px-2 py-1.5"
+                        value={item.content}
+                        placeholder="Story content"
+                        rows={3}
+                        onChange={(e) => {
+                          const updated = [...editData.stories];
+                          updated[idx] = { ...item, content: e.target.value };
+                          setEditData({ ...editData, stories: updated });
+                        }}
+                        disabled={saving}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Theme tab */}
+              {editTab === 'theme' && (
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-xs uppercase tracking-wider text-slate-500 mb-2 block">Colors</Label>
+                    <div className="grid grid-cols-5 gap-3">
+                      {(['bg', 'text', 'accent', 'secondary', 'muted'] as const).map((key) => (
+                        <div key={key} className="text-center">
+                          <Label className="text-xs text-slate-400 capitalize">{key}</Label>
+                          <input
+                            type="color"
+                            value={editData.theme.colors[key]}
+                            onChange={(e) => {
+                              setEditData({
+                                ...editData,
+                                theme: {
+                                  ...editData.theme,
+                                  colors: { ...editData.theme.colors, [key]: e.target.value },
+                                },
+                              });
+                            }}
+                            className="w-full h-10 rounded border border-slate-200 cursor-pointer"
+                            disabled={saving}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs uppercase tracking-wider text-slate-500 mb-2 block">Fonts</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs text-slate-400">Heading</Label>
+                        <Input
+                          value={editData.theme.fonts.heading}
+                          onChange={(e) => setEditData({ ...editData, theme: { ...editData.theme, fonts: { ...editData.theme.fonts, heading: e.target.value } } })}
+                          disabled={saving}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-slate-400">Body</Label>
+                        <Input
+                          value={editData.theme.fonts.body}
+                          onChange={(e) => setEditData({ ...editData, theme: { ...editData.theme, fonts: { ...editData.theme.fonts, body: e.target.value } } })}
+                          disabled={saving}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <DialogFooter className="pt-4">
+                <Button type="button" variant="outline" onClick={() => setEditOpen(false)} disabled={saving}>Cancel</Button>
+                <Button type="submit" disabled={saving}>
+                  {saving ? <><Loader2 className="size-4 mr-2 animate-spin" />Saving...</> : 'Save Changes'}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>
