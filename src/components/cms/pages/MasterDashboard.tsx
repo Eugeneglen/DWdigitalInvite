@@ -19,6 +19,8 @@ import {
 interface DashboardData {
   totalWeddings: number;
   activeWeddings: number;
+  avgRsvpsPerWedding: number;
+  avgWishesPerWedding: number;
   totalRsvps: number;
   totalWishes: number;
   alerts: {
@@ -178,8 +180,8 @@ export default function MasterDashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard label="Total Weddings" value={data.totalWeddings} icon={Heart} color="text-rose-500" bg="bg-rose-50" />
         <StatCard label="Active Sites" value={data.activeWeddings} icon={CheckCircle} color="text-emerald-500" bg="bg-emerald-50" />
-        <StatCard label="Total RSVPs" value={data.totalRsvps} icon={Mail} color="text-blue-500" bg="bg-blue-50" />
-        <StatCard label="Total Wishes" value={data.totalWishes} icon={MessageSquareHeart} color="text-amber-500" bg="bg-amber-50" />
+        <StatCard label="Avg RSVPs / Wedding" value={data.avgRsvpsPerWedding} icon={Mail} color="text-blue-500" bg="bg-blue-50" />
+        <StatCard label="Avg Wishes / Wedding" value={data.avgWishesPerWedding} icon={MessageSquareHeart} color="text-amber-500" bg="bg-amber-50" />
       </div>
 
       {/* ── Period Selector + Stats ───────────────────────────────────── */}

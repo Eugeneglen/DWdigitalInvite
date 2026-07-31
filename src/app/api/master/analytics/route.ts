@@ -214,12 +214,14 @@ export async function GET(req: NextRequest) {
 
     const totalWeddings = allWeddings.length;
     const activeWeddings = allWeddings.filter((w) => w.status === 'ACTIVE').length;
+    const avgRsvpsPerWedding = totalWeddings > 0 ? Math.round((totalRsvpsInRange / totalWeddings) * 10) / 10 : 0;
 
     return NextResponse.json({
       range: rangeDaysSafe,
       period,
       periodStart: rangeStart.toISOString(),
       periodEnd: rangeEnd.toISOString(),
+      avgRsvpsPerWedding,
       // Revenue & Packaging
       planDistribution,
       monthlyTrend,

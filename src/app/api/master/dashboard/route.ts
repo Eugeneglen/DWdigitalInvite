@@ -176,12 +176,18 @@ export async function GET(req: NextRequest) {
     const totalRsvps = await db.rSVPSubmission.count();
     const totalWishes = await db.wish.count();
 
+    // Averages per wedding (more business-actionable than raw totals)
+    const avgRsvpsPerWedding = totalWeddings > 0 ? Math.round((totalRsvps / totalWeddings) * 10) / 10 : 0;
+    const avgWishesPerWedding = totalWeddings > 0 ? Math.round((totalWishes / totalWeddings) * 10) / 10 : 0;
+
     return NextResponse.json({
       // Summary
       totalWeddings,
       activeWeddings,
-      totalRsvps,
-      totalWishes,
+      avgRsvpsPerWedding,
+      avgWishesPerWedding,
+      totalRsvps, // kept for reference
+      totalWishes, // kept for reference
       // Alerts
       alerts: {
         expiringWeddings: expiringWeddings.map((w) => ({

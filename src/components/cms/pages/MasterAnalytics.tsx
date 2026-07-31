@@ -21,6 +21,7 @@ import {
 
 interface AnalyticsData {
   range: number;
+  avgRsvpsPerWedding: number;
   planDistribution: { plan: string; count: number; percentage: number }[];
   monthlyTrend: { month: string; GOLD: number; PLATINUM: number; DIAMOND: number }[];
   growthData: { month: string; count: number }[];
@@ -196,10 +197,10 @@ export default function MasterAnalytics() {
           <CardContent className="p-5">
             <div className="flex items-center gap-3 mb-2">
               <Mail className="size-5 text-blue-500" />
-              <span className="text-xs text-slate-500 uppercase tracking-wider">RSVPs ({data.range}d)</span>
+              <span className="text-xs text-slate-500 uppercase tracking-wider">Avg RSVPs / Wedding</span>
             </div>
-            <p className="text-2xl font-bold text-slate-900">{data.rsvpAnalytics.totalInRange}</p>
-            <p className="text-xs text-slate-400 mt-1">{data.rsvpAnalytics.totalGuestsInRange} guests</p>
+            <p className="text-2xl font-bold text-slate-900">{data.avgRsvpsPerWedding}</p>
+            <p className="text-xs text-slate-400 mt-1">{data.rsvpAnalytics.totalInRange} total in period</p>
           </CardContent>
         </Card>
         <Card>
