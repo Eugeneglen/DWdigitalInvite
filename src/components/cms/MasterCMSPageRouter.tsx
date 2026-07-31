@@ -8,6 +8,7 @@ const MasterWeddings = dynamic(() => import('./pages/MasterWeddings'), { ssr: fa
 const MasterUsers = dynamic(() => import('./pages/MasterUsers'), { ssr: false });
 const MasterRoles = dynamic(() => import('./pages/MasterRoles'), { ssr: false });
 const MasterTemplates = dynamic(() => import('./pages/MasterTemplates'), { ssr: false });
+const TemplateEditor = dynamic(() => import('./pages/TemplateEditor'), { ssr: false });
 const MasterAnalytics = dynamic(() => import('./pages/MasterAnalytics'), { ssr: false });
 const MasterSettings = dynamic(() => import('./pages/MasterSettings'), { ssr: false });
 const MasterAuditLog = dynamic(() => import('./pages/MasterAuditLog'), { ssr: false });
@@ -18,6 +19,7 @@ const PAGE_MAP: Partial<Record<CMSPage, React.ComponentType>> = {
   users: MasterUsers,
   roles: MasterRoles,
   templates: MasterTemplates,
+  'template-editor': TemplateEditor,
   analytics: MasterAnalytics,
   settings: MasterSettings,
   audit: MasterAuditLog,

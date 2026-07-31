@@ -7,6 +7,7 @@ import {
   RefreshCw, Lock, Pencil,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { useCMSStore } from '@/store/useCMSStore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,6 +47,7 @@ interface Wedding {
 }
 
 export default function MasterTemplates() {
+  const { setPage, setEditingTemplateId } = useCMSStore();
   const [templates, setTemplates] = useState<ContentTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -167,25 +169,9 @@ export default function MasterTemplates() {
   }
 
   async function openEdit(template: ContentTemplate) {
-    try {
-      const res = await fetch(`/api/master/content-templates/${template.id}?XTransformPort=3000`);
-      if (!res.ok) throw new Error('Failed to load template');
-      const data = await res.json();
-      setEditTarget(template);
-      setEditData({
-        name: data.name,
-        description: data.description || '',
-        content: data.content,
-        schedule: data.schedule,
-        faqs: data.faqs,
-        stories: data.stories,
-        theme: data.theme,
-      });
-      setEditTab('details');
-      setEditOpen(true);
-    } catch {
-      toast({ title: 'Error', description: 'Failed to load template for editing', variant: 'destructive' });
-    }
+    // Navigate to the full-page template editor
+    setEditingTemplateId(template.id);
+    setPage('template-editor');
   }
 
   async function handleSaveEdit(e: React.FormEvent) {

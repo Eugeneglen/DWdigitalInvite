@@ -67,6 +67,7 @@ const PAGE_TITLES: Record<CMSPage, string> = {
   users: 'Team',
   roles: 'Roles & Permissions',
   templates: 'Content Templates',
+  'template-editor': 'Edit Template',
   analytics: 'Analytics',
   settings: 'Settings',
   audit: 'Audit Log',
