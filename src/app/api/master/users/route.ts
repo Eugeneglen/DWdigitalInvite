@@ -50,13 +50,22 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('search') || '';
+    const status = searchParams.get('status') || ''; // 'active' | 'deactivated' | ''
 
-    const where: Record<string, unknown> = {};
+    // Filter out COUPLE users — the Team page is for internal staff only
+    const where: Record<string, unknown> = {
+      role: { not: 'COUPLE' },
+    };
     if (search) {
       where.OR = [
         { name: { contains: search } },
         { email: { contains: search } },
       ];
+    }
+    if (status === 'active') {
+      where.isActive = true;
+    } else if (status === 'deactivated') {
+      where.isActive = false;
     }
 
     const users = await db.user.findMany({
