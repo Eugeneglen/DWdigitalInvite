@@ -39,7 +39,11 @@ export function PageContent({ view }: { view: string | null }) {
     await update();
   }, [update]);
 
-  const mustChangePassword = session?.user?.mustChangePassword && !passwordChanged;
+  // Only check mustChangePassword for CMS views (admin/couple), NOT the guest site.
+  // Guests don't have accounts and should never see a password change prompt.
+  const mustChangePassword = (view === 'couple' || view === 'cms')
+    && session?.user?.mustChangePassword === true
+    && !passwordChanged;
 
   if (mustChangePassword) {
     return (
