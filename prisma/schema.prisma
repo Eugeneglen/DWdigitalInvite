@@ -78,6 +78,32 @@ model UserPermissionOverride {
 }
 
 // ============================================================
+// CONTENT TEMPLATES (DB-managed wedding blueprints)
+// ============================================================
+// A ContentTemplate is a complete wedding blueprint — content text, schedule,
+// FAQs, stories, media (URLs), and theme (colors + fonts). When a new couple
+// is created, the default template is cloned into their wedding.
+// Admins can create/edit/delete templates (including seasonal variants).
+// Only one template can be isDefault=true at a time.
+model ContentTemplate {
+  id          String   @id @default(cuid())
+  name        String   @unique  // "Classic Elegance", "Summer Garden"
+  description String?
+  isDefault   Boolean  @default(false)  // only one can be true
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  // Complete wedding content stored as JSON strings
+  content     String   // JSON: [{section, fieldKey, fieldValue, fieldType}]
+  schedule    String   // JSON: [{eventType, title, description, startTime, endTime, location, sortOrder}]
+  faqs        String   // JSON: [{question, answer, sortOrder, isActive}]
+  stories     String   // JSON: [{title, content, date, imageUrl, sortOrder}]
+  media       String   // JSON: [{url, thumbnailUrl, fileName, fileType, category, sortOrder}]
+  theme       String   // JSON: {colors: {bg,text,accent,secondary,muted}, fonts: {heading,body}}
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ============================================================
 // MULTI-TENANT WEDDING ACCOUNTS
 // ============================================================
 

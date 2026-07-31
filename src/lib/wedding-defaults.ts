@@ -1,27 +1,18 @@
 /**
- * Default wedding content — clones the gold standard template wedding.
+ * Default wedding content — reads from the ContentTemplate table.
  *
- * The wedding with slug 'eleanor-james-2027' is the GOLD STANDARD template.
- * When a new wedding is created via the admin wizard, this module clones
- * ALL content, schedule, FAQs, stories, and media from the gold standard
- * into the new wedding — so the couple sees exactly the same populated
- * CMS as the demo wedding, and then edits it to make it their own.
+ * The default ContentTemplate (isDefault=true) is cloned into every newly
+ * created wedding. Admins can manage templates via the Content Templates
+ * page — change the default, create seasonal variants, etc.
  *
- * Only two fields are substituted with the new couple's details:
- *   - hero/title        → coupleName
- *   - hero/dateDisplay  → formatted wedding date
+ * Only hero/title and hero/dateDisplay are substituted with the new
+ * couple's details. Everything else is copied verbatim from the template.
  *
- * Everything else (venue text, transit directions, stories, images, FAQs,
- * schedule, media) is copied verbatim from the gold standard.
- *
- * If the admin updates the gold standard wedding's content, new weddings
- * will automatically get the updated template (read live at creation time).
+ * Images are stored as local paths (not base64) in the template, keeping
+ * it lightweight. Couples replace them with their own uploads.
  */
 
 import { db } from '@/lib/db';
-
-/** The slug of the gold standard template wedding */
-const GOLD_STANDARD_SLUG = 'eleanor-james-2027';
 
 interface WeddingCreateInfo {
   weddingId: string;
@@ -60,11 +51,52 @@ function formatDateDisplay(date: Date): string {
   return `${dayName}, ${dayNum}${suffix(dayNum)} ${monthName} ${year}`;
 }
 
+interface TemplateContentItem {
+  section: string;
+  fieldKey: string;
+  fieldValue: string;
+  fieldType: string;
+}
+
+interface TemplateScheduleItem {
+  eventType: string;
+  title: string;
+  description: string | null;
+  startTime: string;
+  endTime: string | null;
+  location: string | null;
+  sortOrder: number;
+}
+
+interface TemplateFaqItem {
+  question: string;
+  answer: string;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+interface TemplateStoryItem {
+  title: string;
+  content: string;
+  date: string | null;
+  imageUrl: string | null;
+  sortOrder: number;
+}
+
+interface TemplateMediaItem {
+  url: string;
+  thumbnailUrl: string | null;
+  fileName: string;
+  fileType: string;
+  category: string;
+  sortOrder: number;
+}
+
 /**
- * Clone all content, schedule, FAQs, stories, and media from the gold
- * standard template wedding into a newly created wedding.
+ * Seed default content, schedule, FAQs, stories, and media for a newly
+ * created wedding. Reads from the default ContentTemplate in the DB.
  *
- * @returns summary of items created, or null if the gold standard was not found
+ * @returns summary of items created, or null if no template was found
  */
 export async function seedDefaultWeddingContent(info: WeddingCreateInfo): Promise<{
   content: number;
@@ -76,24 +108,26 @@ export async function seedDefaultWeddingContent(info: WeddingCreateInfo): Promis
   const { weddingId, coupleName, weddingDate } = info;
   const dateDisplay = formatDateDisplay(weddingDate);
 
-  // ── Find the gold standard template wedding ─────────────────────────
-  const template = await db.weddingAccount.findUnique({
-    where: { slug: GOLD_STANDARD_SLUG },
-    select: { id: true },
+  // ── Find the default ContentTemplate ──────────────────────────────────
+  const template = await db.contentTemplate.findFirst({
+    where: { isDefault: true, isActive: true },
   });
 
   if (!template) {
-    console.error(`[wedding-defaults] Gold standard wedding '${GOLD_STANDARD_SLUG}' not found — cannot clone content`);
+    console.error('[wedding-defaults] No default ContentTemplate found — cannot seed content');
     return null;
   }
 
-  // ── 1. Clone content (substitute hero/title + hero/dateDisplay) ─────
-  const templateContent = await db.weddingContent.findMany({
-    where: { weddingId: template.id },
-  });
+  // Parse template JSON data
+  const contentItems: TemplateContentItem[] = JSON.parse(template.content);
+  const scheduleItems: TemplateScheduleItem[] = JSON.parse(template.schedule);
+  const faqItems: TemplateFaqItem[] = JSON.parse(template.faqs);
+  const storyItems: TemplateStoryItem[] = JSON.parse(template.stories);
+  const mediaItems: TemplateMediaItem[] = JSON.parse(template.media);
 
+  // ── 1. Clone content (substitute hero/title + hero/dateDisplay) ───────
   await db.weddingContent.createMany({
-    data: templateContent.map((item) => ({
+    data: contentItems.map((item) => ({
       weddingId,
       section: item.section,
       fieldKey: item.fieldKey,
@@ -102,14 +136,9 @@ export async function seedDefaultWeddingContent(info: WeddingCreateInfo): Promis
     })),
   });
 
-  // ── 2. Clone schedule ───────────────────────────────────────────────
-  const templateSchedule = await db.eventSchedule.findMany({
-    where: { weddingId: template.id },
-    orderBy: { sortOrder: 'asc' },
-  });
-
+  // ── 2. Clone schedule ─────────────────────────────────────────────────
   await db.eventSchedule.createMany({
-    data: templateSchedule.map((item) => ({
+    data: scheduleItems.map((item) => ({
       weddingId,
       eventType: item.eventType,
       title: item.title,
@@ -121,14 +150,9 @@ export async function seedDefaultWeddingContent(info: WeddingCreateInfo): Promis
     })),
   });
 
-  // ── 3. Clone FAQs ───────────────────────────────────────────────────
-  const templateFaqs = await db.fAQ.findMany({
-    where: { weddingId: template.id },
-    orderBy: { sortOrder: 'asc' },
-  });
-
+  // ── 3. Clone FAQs ─────────────────────────────────────────────────────
   await db.fAQ.createMany({
-    data: templateFaqs.map((item) => ({
+    data: faqItems.map((item) => ({
       weddingId,
       question: item.question,
       answer: item.answer,
@@ -137,14 +161,9 @@ export async function seedDefaultWeddingContent(info: WeddingCreateInfo): Promis
     })),
   });
 
-  // ── 4. Clone stories (including images) ─────────────────────────────
-  const templateStories = await db.storyItem.findMany({
-    where: { weddingId: template.id },
-    orderBy: { sortOrder: 'asc' },
-  });
-
+  // ── 4. Clone stories ──────────────────────────────────────────────────
   await db.storyItem.createMany({
-    data: templateStories.map((item) => ({
+    data: storyItems.map((item) => ({
       weddingId,
       title: item.title,
       content: item.content,
@@ -154,31 +173,25 @@ export async function seedDefaultWeddingContent(info: WeddingCreateInfo): Promis
     })),
   });
 
-  // ── 5. Clone media (including base64 images) ────────────────────────
-  const templateMedia = await db.weddingMedia.findMany({
-    where: { weddingId: template.id },
-    orderBy: { sortOrder: 'asc' },
-  });
-
+  // ── 5. Clone media ────────────────────────────────────────────────────
   await db.weddingMedia.createMany({
-    data: templateMedia.map((item) => ({
+    data: mediaItems.map((item) => ({
       weddingId,
       url: item.url,
       thumbnailUrl: item.thumbnailUrl,
       fileName: item.fileName,
       fileType: item.fileType,
-      fileSize: item.fileSize,
       category: item.category,
       sortOrder: item.sortOrder,
     })),
   });
 
   return {
-    content: templateContent.length,
-    schedule: templateSchedule.length,
-    faqs: templateFaqs.length,
-    stories: templateStories.length,
-    media: templateMedia.length,
+    content: contentItems.length,
+    schedule: scheduleItems.length,
+    faqs: faqItems.length,
+    stories: storyItems.length,
+    media: mediaItems.length,
   };
 }
 
