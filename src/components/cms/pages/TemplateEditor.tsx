@@ -101,6 +101,12 @@ const HOME_FIELDS: { key: string; label: string; type: 'text' | 'textarea' | 'im
   { key: 'teaCeremonyImage', label: 'Tea Ceremony Image', type: 'image', placeholder: '/wedding-images/tea-ceremony.png' },
 ];
 
+// Hero/Banner images stored on WeddingAccount (not WeddingContent)
+const HERO_VISUAL_FIELDS: { key: string; label: string; aspect: string; maxWidth: string; placeholder: string }[] = [
+  { key: 'heroImageUrl', label: 'Hero Visual (Full-bleed image)', aspect: 'aspect-[16/9]', maxWidth: '480px', placeholder: '/wedding-images/hero-portrait.png' },
+  { key: 'bannerUrl', label: 'Banner Image', aspect: 'aspect-[21/9]', maxWidth: '480px', placeholder: '/wedding-images/banner-bg.png' },
+];
+
 const GETTING_THERE_FIELDS: { key: string; label: string; type: 'text' | 'textarea' | 'image'; placeholder?: string }[] = [
   { key: 'title', label: 'Section Title', type: 'text', placeholder: 'Getting There' },
   { key: 'subtitle', label: 'Section Subtitle', type: 'text', placeholder: 'Find your way to our celebration' },
@@ -282,6 +288,74 @@ function ImageUpload({ value, onChange, label, aspectClass = 'aspect-[4/3]', max
   );
 }
 
+// ── SimpleImageGallery component ───────────────────────────────────────────
+// A lightweight gallery that stores images as data URLs in the template's
+// media JSON array. Supports add (file upload) and remove.
+interface SimpleImageGalleryProps {
+  media: MediaItem[];
+  onAdd: (url: string) => void;
+  onRemove: (index: number) => void;
+  maxImages: number;
+  aspectClass: string;
+}
+
+function SimpleImageGallery({ media, onAdd, onRemove, maxImages, aspectClass }: SimpleImageGalleryProps) {
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    Array.from(files).forEach((file) => {
+      if (!file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        onAdd(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  return (
+    <div className="space-y-3">
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => handleFiles(e.target.files)}
+      />
+      {media.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {media.map((item, idx) => (
+            <div key={idx} className={`relative group ${aspectClass} rounded-lg overflow-hidden border border-charcoal-ink/10`}>
+              <img src={item.url} alt={item.fileName} className="w-full h-full object-cover" />
+              <button
+                type="button"
+                onClick={() => onRemove(idx)}
+                className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {media.length < maxImages && (
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className={`w-full ${aspectClass} max-h-32 border-2 border-dashed border-charcoal-ink/15 rounded-lg flex flex-col items-center justify-center gap-2 hover:border-cinematic-gold/50 hover:bg-cinematic-gold/5 transition-colors`}
+        >
+          <div className="w-8 h-8 rounded-full bg-charcoal-ink/5 flex items-center justify-center">
+            <Upload className="size-4 text-charcoal-ink/30" />
+          </div>
+          <span className="text-xs text-charcoal-ink/40">Click to upload ({media.length}/{maxImages})</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────
 
 export default function TemplateEditor() {
@@ -412,6 +486,31 @@ export default function TemplateEditor() {
     if (!data) return;
     if (!confirm('Remove this event from the template?')) return;
     setData({ ...data, schedule: data.schedule.filter((_, i) => i !== idx) });
+    setDirty(true);
+  }
+
+  // ── Media helpers ──────────────────────────────────────────────────────
+
+  function addMediaItem(category: string, url: string) {
+    if (!data) return;
+    const newItem: MediaItem = {
+      url,
+      thumbnailUrl: url,
+      fileName: `template-${category}-${Date.now()}.png`,
+      fileType: 'IMAGE',
+      category,
+      sortOrder: data.media.filter((m) => m.category === category).length,
+    };
+    setData({ ...data, media: [...data.media, newItem] });
+    setDirty(true);
+  }
+
+  function removeMediaItem(category: string, idx: number) {
+    if (!data) return;
+    const categoryMedia = data.media.filter((m) => m.category === category);
+    const itemToRemove = categoryMedia[idx];
+    if (!itemToRemove) return;
+    setData({ ...data, media: data.media.filter((m) => m !== itemToRemove) });
     setDirty(true);
   }
 
@@ -687,6 +786,29 @@ export default function TemplateEditor() {
       {/* ── HOME SECTION ────────────────────────────────────────────────── */}
       {activeSection === 'home' && (
         <div className="space-y-6 max-w-3xl">
+          {/* Hero Visual + Banner */}
+          <Card className="border-charcoal-ink/5 shadow-none">
+            <CardContent className="p-6 space-y-5">
+              <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Hero Visual</h3>
+              <p className="text-xs text-charcoal-ink/40">Full-bleed hero image shown at the top of the guest site.</p>
+              {HERO_VISUAL_FIELDS.map((field) => (
+                <div key={field.key} className="space-y-1.5">
+                  <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                    {field.label}
+                  </Label>
+                  <ImageUpload
+                    value={getContentField('hero', field.key) || null}
+                    onChange={(v) => setContentField('hero', field.key, v || '', 'IMAGE_URL')}
+                    label={field.label}
+                    aspectClass={field.aspect}
+                    maxWidth={field.maxWidth}
+                  />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Hero Content */}
           <Card className="border-charcoal-ink/5 shadow-none">
             <CardContent className="p-6 space-y-5">
               <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Hero Content</h3>
@@ -889,6 +1011,37 @@ export default function TemplateEditor() {
               );
             })
           )}
+
+          {/* Schedule Images Gallery */}
+          <Card className="border-charcoal-ink/5 shadow-none">
+            <CardContent className="p-6 space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Schedule Images</h3>
+                <p className="text-xs text-charcoal-ink/40 mt-1">4:3 crop mirrors the guest-site schedule images. Up to 3 images.</p>
+              </div>
+              <SimpleImageGallery
+                media={data.media.filter((m) => m.category === 'schedule')}
+                onAdd={(url) => addMediaItem('schedule', url)}
+                onRemove={(idx) => removeMediaItem('schedule', idx)}
+                maxImages={3}
+                aspectClass="aspect-[4/3]"
+              />
+            </CardContent>
+          </Card>
+
+          {/* Venue Image */}
+          <Card className="border-charcoal-ink/5 shadow-none">
+            <CardContent className="p-6 space-y-3">
+              <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Venue Image</h3>
+              <ImageUpload
+                value={getContentField('getting-there', 'venueImage') || null}
+                onChange={(v) => setContentField('getting-there', 'venueImage', v || '', 'IMAGE_URL')}
+                label="Venue Image"
+                aspectClass="aspect-[4/3]"
+                maxWidth="320px"
+              />
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -991,6 +1144,23 @@ export default function TemplateEditor() {
               ))}
             </div>
           )}
+
+          {/* Story Hero Images Gallery */}
+          <Card className="border-charcoal-ink/5 shadow-none">
+            <CardContent className="p-6 space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Story Hero Images</h3>
+                <p className="text-xs text-charcoal-ink/40 mt-1">16:9 banner images at the top of the guest story page. Up to 3 images.</p>
+              </div>
+              <SimpleImageGallery
+                media={data.media.filter((m) => m.category === 'story')}
+                onAdd={(url) => addMediaItem('story', url)}
+                onRemove={(idx) => removeMediaItem('story', idx)}
+                maxImages={3}
+                aspectClass="aspect-[16/9]"
+              />
+            </CardContent>
+          </Card>
         </div>
       )}
 
