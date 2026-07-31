@@ -17,7 +17,12 @@ model User {
   email        String   @unique
   passwordHash String
   name         String
-  role         String   @default("ADMIN_1") // SUPER_ADMIN | ADMIN_1 | ADMIN_2 | ADMIN_3 | COUPLE | ACCOUNT_MANAGER
+  // Platform role (Tier 1) — global identity used for auth routing + platform-wide permissions.
+  // Vocabulary (new 3-tier model):
+  //   SUPER_ADMIN | ACCOUNT_MANAGER_1 | ACCOUNT_MANAGER_2 | SUPPORT | COUPLE
+  // Legacy values still present during migration: ADMIN_1 | ADMIN_2 | ADMIN_3 | ACCOUNT_MANAGER
+  // Per-wedding roles (Tier 2 + Tier 3) live on UserWeddingRole, NOT here.
+  role         String   @default("ADMIN_1")
   avatarUrl         String?
   isActive          Boolean  @default(true)
   resetToken        String?
@@ -29,6 +34,7 @@ model User {
   ownedWeddings     WeddingAccount[]
   consultantWeddings WeddingAccount[] @relation("ConsultantWeddings")
   coordinatorWeddings WeddingAccount[] @relation("CoordinatorWeddings")
+  weddingRoles      UserWeddingRole[]   // Tier 2 + Tier 3 per-wedding roles
   auditLogs      AuditLog[]
   notifications  Notification[]
 }
@@ -88,6 +94,7 @@ model WeddingAccount {
   contacts      ContactSubmission[]
   auditLogs     AuditLog[]
   notifications Notification[]
+  members       UserWeddingRole[]   // Tier 2 + Tier 3 per-wedding role assignments
 
   // Indexes for Admin CMS search + filter performance at scale
   @@index([coupleName])       // Search by couple name
@@ -95,6 +102,36 @@ model WeddingAccount {
   @@index([plan])             // Filter by plan
   @@index([createdAt])        // Default ordering (newest first)
   @@index([consultantId])     // Filter by consultant
+}
+
+// ============================================================
+// PER-WEDDING ROLE ASSIGNMENTS (Tier 2 + Tier 3)
+// ============================================================
+// Junction table linking a User to a WeddingAccount with a specific
+// per-wedding role. This replaces the implicit consultantId/coordinatorId
+// FKs on WeddingAccount with a flexible, multi-role model.
+//
+// Tier 2 (wedding staff, assigned by platform admins):
+//   CONSULTANT_1 | CONSULTANT_2 | COORDINATOR
+// Tier 3 (account roles, couple-controlled):
+//   COUPLE | EDITOR | VIEWER
+//
+// A user can have multiple rows for the same wedding with different roles
+// (rare but allowed). The @@unique constraint prevents duplicate
+// (userId, weddingId, role) triples.
+model UserWeddingRole {
+  id         String         @id @default(cuid())
+  userId     String
+  weddingId  String
+  role       String         // CONSULTANT_1 | CONSULTANT_2 | COORDINATOR | COUPLE | EDITOR | VIEWER
+  createdAt  DateTime       @default(now())
+
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wedding    WeddingAccount @relation(fields: [weddingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weddingId, role])
+  @@index([weddingId])      // List all members of a wedding
+  @@index([userId])         // List all weddings a user has access to
 }
 
 model WeddingFeature {
