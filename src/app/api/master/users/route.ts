@@ -114,9 +114,10 @@ export async function POST(req: NextRequest) {
     }
 
     const { email, name, password, role, isActive } = parsed.data;
+    const normalizedEmail = email.trim().toLowerCase();
 
-    // Check email uniqueness
-    const existing = await db.user.findUnique({ where: { email } });
+    // Check email uniqueness (always lowercase — login lowercases too)
+    const existing = await db.user.findUnique({ where: { email: normalizedEmail } });
     if (existing) {
       return NextResponse.json({ error: 'A user with this email already exists' }, { status: 409 });
     }
@@ -125,7 +126,7 @@ export async function POST(req: NextRequest) {
 
     const user = await db.user.create({
       data: {
-        email,
+        email: normalizedEmail,
         name,
         passwordHash,
         role,
@@ -167,8 +168,9 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    // Base access: anyone who can read weddings can update user details (name/email/password)
-    if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:weddings:read'))) {
+    // SEC-1 fix: Only users with platform:users:manage (Super Admins) can edit users.
+    // Previously used platform:weddings:read which let consultants reset any user's password.
+    if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:users:manage'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -184,12 +186,13 @@ export async function PUT(req: NextRequest) {
     const updateData: Record<string, unknown> = {};
     if (updates.name !== undefined) updateData.name = updates.name;
     if (updates.email !== undefined) {
-      // Check email uniqueness if changing
-      const existing = await db.user.findFirst({ where: { email: updates.email, NOT: { id } } });
+      const normalizedEmail = updates.email.trim().toLowerCase();
+      // Check email uniqueness if changing (always lowercase — login lowercases too)
+      const existing = await db.user.findFirst({ where: { email: normalizedEmail, NOT: { id } } });
       if (existing) {
         return NextResponse.json({ error: 'A user with this email already exists' }, { status: 409 });
       }
-      updateData.email = updates.email;
+      updateData.email = normalizedEmail;
     }
     if (updates.password) {
       updateData.passwordHash = await bcrypt.hash(updates.password, 12);
