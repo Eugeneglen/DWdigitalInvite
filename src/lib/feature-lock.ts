@@ -26,6 +26,7 @@ export const ALWAYS_AVAILABLE_PAGES: CoupleCMSPage[] = [
   'analytics',
   'audit',
   'sharing',
+  'team',
   'features',
 ];
 

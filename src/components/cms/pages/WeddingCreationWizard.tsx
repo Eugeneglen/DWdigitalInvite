@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { normalizePlatformRole } from '@/lib/permissions';
 
 interface StaffUser {
   id: string;
@@ -153,7 +154,11 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
       if (usersRes.ok) {
         const userData = await usersRes.json();
         const allUsers: StaffUser[] = userData.users ?? [];
-        setStaff(allUsers.filter((u) => u.role === 'ADMIN_1' || u.role === 'ADMIN_2'));
+        // Include both legacy (ADMIN_1, ADMIN_2) and new (ACCOUNT_MANAGER_1, ACCOUNT_MANAGER_2) vocabulary
+        setStaff(allUsers.filter((u) => {
+          const normalized = normalizePlatformRole(u.role);
+          return normalized === 'ACCOUNT_MANAGER_1' || normalized === 'ACCOUNT_MANAGER_2';
+        }));
       }
 
       if (settingsRes.ok) {
@@ -194,8 +199,8 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
     }
   }, [form.plan, packages]);
 
-  const consultants = staff.filter((s) => s.role === 'ADMIN_1');
-  const coordinators = staff.filter((s) => s.role === 'ADMIN_2');
+  const consultants = staff.filter((s) => normalizePlatformRole(s.role) === 'ACCOUNT_MANAGER_1');
+  const coordinators = staff.filter((s) => normalizePlatformRole(s.role) === 'ACCOUNT_MANAGER_2');
 
   const handleCreate = async () => {
     try {
@@ -521,7 +526,7 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
           {step === 2 && (
             <div className="space-y-4">
               <div className="space-y-1.5">
-                <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Assigned Consultant (ADMIN_1)</Label>
+                <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Assigned Consultant (Senior)</Label>
                 <Select value={form.consultantId || 'none'} onValueChange={(v) => setForm({ ...form, consultantId: v === 'none' ? '' : v })}>
                   <SelectTrigger className="w-full border-charcoal-ink/10">
                     <SelectValue placeholder="Select consultant" />
@@ -535,7 +540,7 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Assigned Coordinator (ADMIN_2)</Label>
+                <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Assigned Coordinator (Junior)</Label>
                 <Select value={form.coordinatorId || 'none'} onValueChange={(v) => setForm({ ...form, coordinatorId: v === 'none' ? '' : v })}>
                   <SelectTrigger className="w-full border-charcoal-ink/10">
                     <SelectValue placeholder="Select coordinator" />

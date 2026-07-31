@@ -25,6 +25,7 @@ import {
   Palette,
   MoreHorizontal,
   Lock,
+  UserPlus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { NotificationBell } from '@/components/cms/NotificationBell';
@@ -51,6 +52,7 @@ const NAV_ITEMS: { key: CoupleCMSPage; label: string; icon: React.ElementType }[
   { key: 'analytics', label: 'Analytics', icon: BarChart3 },
   { key: 'audit', label: 'Activity', icon: ScrollText },
   { key: 'sharing', label: 'Sharing', icon: QrCode },
+  { key: 'team', label: 'Team Members', icon: UserPlus },
   { key: 'features', label: 'Features', icon: ToggleLeft },
 ];
 

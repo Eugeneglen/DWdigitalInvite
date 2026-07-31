@@ -45,15 +45,18 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useCMSStore, type CMSPage } from '@/store/useCMSStore';
+import { hasPlatformPermission, type PlatformAction } from '@/lib/permissions';
 
-const NAV_ITEMS: { key: CMSPage; label: string; icon: React.ElementType; tooltip: string }[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, tooltip: 'Dashboard' },
-  { key: 'weddings', label: 'Wedding Accounts', icon: Heart, tooltip: 'Wedding Accounts' },
-  { key: 'templates', label: 'Content Templates', icon: FileText, tooltip: 'Content Templates' },
-  { key: 'analytics', label: 'Analytics', icon: BarChart3, tooltip: 'Analytics' },
-  { key: 'settings', label: 'Settings', icon: Settings, tooltip: 'Settings' },
-  { key: 'users', label: 'Team', icon: Users, tooltip: 'Team' },
-  { key: 'audit', label: 'Audit Log', icon: ScrollText, tooltip: 'Audit Log' },
+type NavItem = { key: CMSPage; label: string; icon: React.ElementType; tooltip: string; permission: PlatformAction };
+
+const NAV_ITEMS: NavItem[] = [
+  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, tooltip: 'Dashboard', permission: 'platform:weddings:read' },
+  { key: 'weddings', label: 'Wedding Accounts', icon: Heart, tooltip: 'Wedding Accounts', permission: 'platform:weddings:read' },
+  { key: 'templates', label: 'Content Templates', icon: FileText, tooltip: 'Content Templates', permission: 'platform:templates:manage' },
+  { key: 'analytics', label: 'Analytics', icon: BarChart3, tooltip: 'Analytics', permission: 'platform:analytics:read' },
+  { key: 'settings', label: 'Settings', icon: Settings, tooltip: 'Settings', permission: 'platform:settings:read' },
+  { key: 'users', label: 'Team', icon: Users, tooltip: 'Team', permission: 'platform:users:manage' },
+  { key: 'audit', label: 'Audit Log', icon: ScrollText, tooltip: 'Audit Log', permission: 'platform:audit:read' },
 ];
 
 const PAGE_TITLES: Record<CMSPage, string> = {
@@ -85,6 +88,11 @@ function SidebarNav() {
   const { currentPage, setPage } = useCMSStore();
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
+  const { data: session } = useSession();
+  const userRole = session?.user?.role || '';
+
+  // Filter nav items by the user's platform permissions
+  const visibleItems = NAV_ITEMS.filter((item) => hasPlatformPermission(userRole, item.permission));
 
   return (
     <SidebarContent>
@@ -94,7 +102,7 @@ function SidebarNav() {
         </SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu>
-            {NAV_ITEMS.map((item) => {
+            {visibleItems.map((item) => {
               const Icon = item.icon;
               const isActive = currentPage === item.key;
 

@@ -26,6 +26,7 @@ const CoupleGuests = dynamic(() => import('./couple/CoupleGuests'), { ssr: false
 const CoupleAnalytics = dynamic(() => import('./couple/CoupleAnalytics'), { ssr: false });
 const CoupleAuditLog = dynamic(() => import('./couple/CoupleAuditLog'), { ssr: false });
 const CoupleSharing = dynamic(() => import('./couple/CoupleSharing'), { ssr: false });
+const CoupleTeam = dynamic(() => import('./couple/CoupleTeam'), { ssr: false });
 const CoupleFeatures = dynamic(() => import('./couple/CoupleFeatures'), { ssr: false });
 
 // Ordered list of all couple CMS pages and their components.
@@ -46,6 +47,7 @@ const ALL_PAGES: Array<{ key: CoupleCMSPage; component: React.ComponentType }> =
   { key: 'analytics', component: CoupleAnalytics },
   { key: 'audit', component: CoupleAuditLog },
   { key: 'sharing', component: CoupleSharing },
+  { key: 'team', component: CoupleTeam },
   { key: 'features', component: CoupleFeatures },
 ];
 
