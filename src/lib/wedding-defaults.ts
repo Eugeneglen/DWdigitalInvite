@@ -1,21 +1,27 @@
 /**
- * Default wedding content templates.
+ * Default wedding content — clones the gold standard template wedding.
  *
- * When a new wedding is created via the admin wizard, this module seeds
- * production-quality default content + schedule + FAQs + stories so the
- * couple has a complete starting template to customize (matching the
- * standard set by the seeded demo wedding).
+ * The wedding with slug 'eleanor-james-2027' is the GOLD STANDARD template.
+ * When a new wedding is created via the admin wizard, this module clones
+ * ALL content, schedule, FAQs, stories, and media from the gold standard
+ * into the new wedding — so the couple sees exactly the same populated
+ * CMS as the demo wedding, and then edits it to make it their own.
  *
- * The placeholders use the couple's names + wedding date + venue from
- * the form, plus the same rich default copy that the seed.ts uses for
- * the demo wedding.
+ * Only two fields are substituted with the new couple's details:
+ *   - hero/title        → coupleName
+ *   - hero/dateDisplay  → formatted wedding date
  *
- * Images: the teaCeremonyImage uses the same default as the seed so the
- * guest site renders properly. Story images are left NULL (couple uploads
- * their own). Section titles/subtitles are seeded so nothing shows empty.
+ * Everything else (venue text, transit directions, stories, images, FAQs,
+ * schedule, media) is copied verbatim from the gold standard.
+ *
+ * If the admin updates the gold standard wedding's content, new weddings
+ * will automatically get the updated template (read live at creation time).
  */
 
 import { db } from '@/lib/db';
+
+/** The slug of the gold standard template wedding */
+const GOLD_STANDARD_SLUG = 'eleanor-james-2027';
 
 interface WeddingCreateInfo {
   weddingId: string;
@@ -41,7 +47,6 @@ function formatDateDisplay(date: Date): string {
   const monthName = months[date.getMonth()];
   const year = date.getFullYear();
 
-  // Ordinal suffix
   const suffix = (n: number): string => {
     if (n >= 11 && n <= 13) return 'th';
     switch (n % 10) {
@@ -55,129 +60,145 @@ function formatDateDisplay(date: Date): string {
   return `${dayName}, ${dayNum}${suffix(dayNum)} ${monthName} ${year}`;
 }
 
-// Default images (local files in public/wedding-images/ — stable placeholders
-// so the guest site renders properly before the couple uploads their own)
-const DEFAULT_TEA_CEREMONY_IMAGE = '/wedding-images/tea-ceremony.png';
-const DEFAULT_VENUE_IMAGE = '/wedding-images/ceremony-venue.png';
-
 /**
- * Seed default content, schedule, FAQs, and stories for a newly created wedding.
- * Uses production-quality default copy matching the seeded demo wedding standard.
+ * Clone all content, schedule, FAQs, stories, and media from the gold
+ * standard template wedding into a newly created wedding.
  *
- * @returns summary of items created
+ * @returns summary of items created, or null if the gold standard was not found
  */
 export async function seedDefaultWeddingContent(info: WeddingCreateInfo): Promise<{
   content: number;
   schedule: number;
   faqs: number;
   stories: number;
-}> {
-  const { weddingId, coupleName, weddingDate, venue, venueAddress } = info;
+  media: number;
+} | null> {
+  const { weddingId, coupleName, weddingDate } = info;
   const dateDisplay = formatDateDisplay(weddingDate);
-  const venueName = venue || venueAddress || 'The Fullerton Hotel';
 
-  // ── 1. Content items (section headings + default copy) ──────────────
-  const contentItems: Array<{ section: string; fieldKey: string; fieldValue: string; fieldType: string }> = [
-    // global (theme)
-    { section: 'global', fieldKey: 'backgroundColor', fieldValue: '#FCF9F2', fieldType: 'TEXT' },
+  // ── Find the gold standard template wedding ─────────────────────────
+  const template = await db.weddingAccount.findUnique({
+    where: { slug: GOLD_STANDARD_SLUG },
+    select: { id: true },
+  });
 
-    // hero
-    { section: 'hero', fieldKey: 'title', fieldValue: coupleName, fieldType: 'TEXT' },
-    { section: 'hero', fieldKey: 'subtitle', fieldValue: 'Together with their families, request the pleasure of your company', fieldType: 'TEXT' },
-    { section: 'hero', fieldKey: 'description', fieldValue: 'We invite you to share in our joy as we begin our forever together.', fieldType: 'TEXT' },
-    { section: 'hero', fieldKey: 'dateDisplay', fieldValue: dateDisplay, fieldType: 'TEXT' },
-    { section: 'hero', fieldKey: 'fontFamily', fieldValue: 'Playfair Display', fieldType: 'TEXT' },
-    { section: 'hero', fieldKey: 'narrativeLabel', fieldValue: 'The Prelude', fieldType: 'TEXT' },
-    { section: 'hero', fieldKey: 'narrativeTitle', fieldValue: 'Our Story Begins Here', fieldType: 'TEXT' },
-    { section: 'hero', fieldKey: 'narrativeBody', fieldValue: 'Every great romance is a narrative woven over time. Ours began with a serendipitous meeting and has evolved into a tapestry of shared adventures, quiet moments, and a profound commitment to one another.', fieldType: 'RICHTEXT' },
-    { section: 'hero', fieldKey: 'teaCeremonyLabel', fieldValue: 'The Tradition', fieldType: 'TEXT' },
-    { section: 'hero', fieldKey: 'teaCeremonyTitle', fieldValue: 'The Tea Ceremony', fieldType: 'TEXT' },
-    { section: 'hero', fieldKey: 'teaCeremonyBody', fieldValue: 'A sacred tradition where we honour our elders with tea, receiving their blessings for a lifetime of happiness together.', fieldType: 'RICHTEXT' },
-    { section: 'hero', fieldKey: 'teaCeremonyImage', fieldValue: DEFAULT_TEA_CEREMONY_IMAGE, fieldType: 'TEXT' },
+  if (!template) {
+    console.error(`[wedding-defaults] Gold standard wedding '${GOLD_STANDARD_SLUG}' not found — cannot clone content`);
+    return null;
+  }
 
-    // schedule
-    { section: 'schedule', fieldKey: 'title', fieldValue: 'The Day', fieldType: 'TEXT' },
-    { section: 'schedule', fieldKey: 'subtitle', fieldValue: 'The Celebration', fieldType: 'TEXT' },
-
-    // getting-there (full default content, matching seeded eleanor-james-2027 standard exactly)
-    { section: 'getting-there', fieldKey: 'title', fieldValue: 'Getting There', fieldType: 'TEXT' },
-    { section: 'getting-there', fieldKey: 'subtitle', fieldValue: 'Find your way to our celebration', fieldType: 'TEXT' },
-    { section: 'getting-there', fieldKey: 'venueDescription', fieldValue: 'The Fullerton Hotel is a historic landmark in the heart of Singapore, blending colonial architecture with modern luxury.', fieldType: 'RICHTEXT' },
-    { section: 'getting-there', fieldKey: 'venueImage', fieldValue: DEFAULT_VENUE_IMAGE, fieldType: 'TEXT' },
-    { section: 'getting-there', fieldKey: 'transitTitle', fieldValue: 'Public Transit', fieldType: 'TEXT' },
-    { section: 'getting-there', fieldKey: 'transitContent', fieldValue: 'MRT\nOrchard Boulevard MRT Station (TE13)\n\nApproximately 4–5 minutes\' walk to the venue.\n\nOrchard MRT Station (NS22/TE14)\n\nApproximately 8–10 minutes\' walk to the venue.\n\nBUS\nGuests may alight at Bef Tomlinson Rd (09121) or Opp Four Seasons Hotel (09111), both of which are about a 2-minute walk from the venue.\n\nAvailable bus services: 7, 36, 36A, 36B, 77, 105, 106, 111, 123, 132, 174, and 174e.', fieldType: 'RICHTEXT' },
-    { section: 'getting-there', fieldKey: 'carTitle', fieldValue: 'By Car', fieldType: 'TEXT' },
-    { section: 'getting-there', fieldKey: 'carContent', fieldValue: '\nFROM THE AIRPORT\nVia CTE / Orchard Road, the journey from Singapore Changi Airport is approximately 25–30 minutes, subject to traffic conditions.', fieldType: 'RICHTEXT' },
-    { section: 'getting-there', fieldKey: 'parkingNote', fieldValue: 'PARKING\nValet parking is available at the hotel entrance. Alternatively, guests may utilise the hotel\'s basement car park, subject to availability.\n\nKindly inform the concierge that you are attending the Dreamweavers event.\n', fieldType: 'TEXT' },
-
-    // story
-    { section: 'story', fieldKey: 'title', fieldValue: 'Our Story', fieldType: 'TEXT' },
-    { section: 'story', fieldKey: 'subtitle', fieldValue: 'The Prelude', fieldType: 'TEXT' },
-    { section: 'story', fieldKey: 'intro', fieldValue: 'Every great romance is a narrative woven over time. Ours began with a serendipitous meeting and has evolved into a tapestry of shared adventures, quiet moments, and a profound commitment to one another.', fieldType: 'RICHTEXT' },
-
-    // qa
-    { section: 'qa', fieldKey: 'title', fieldValue: 'Questions & Answers', fieldType: 'TEXT' },
-
-    // wishes
-    { section: 'wishes', fieldKey: 'title', fieldValue: 'Wishes', fieldType: 'TEXT' },
-    { section: 'wishes', fieldKey: 'subtitle', fieldValue: 'Weave Your Blessing Into Our Archive', fieldType: 'TEXT' },
-
-    // moments
-    { section: 'moments', fieldKey: 'title', fieldValue: 'Moments', fieldType: 'TEXT' },
-    { section: 'moments', fieldKey: 'subtitle', fieldValue: 'The Journey Before the I Do—from childhood dreams to our first steps together.', fieldType: 'TEXT' },
-
-    // tea-ceremony
-    { section: 'tea-ceremony', fieldKey: 'title', fieldValue: 'The Tea Ceremony', fieldType: 'TEXT' },
-    { section: 'tea-ceremony', fieldKey: 'label', fieldValue: 'The Tradition', fieldType: 'TEXT' },
-  ];
+  // ── 1. Clone content (substitute hero/title + hero/dateDisplay) ─────
+  const templateContent = await db.weddingContent.findMany({
+    where: { weddingId: template.id },
+  });
 
   await db.weddingContent.createMany({
-    data: contentItems.map((item) => ({ weddingId, ...item })),
+    data: templateContent.map((item) => ({
+      weddingId,
+      section: item.section,
+      fieldKey: item.fieldKey,
+      fieldType: item.fieldType,
+      fieldValue: substituteTemplateValues(item.section, item.fieldKey, item.fieldValue, coupleName, dateDisplay),
+    })),
   });
 
-  // ── 2. Default schedule (4 events, matching seed standard) ──────────
-  const scheduleItems = [
-    { eventType: 'TEA_CEREMONY', title: 'Tea Ceremony', description: 'Traditional tea ceremony with both families', startTime: '10:00', endTime: '12:00', location: 'Bride\'s Residence', sortOrder: 1 },
-    { eventType: 'CEREMONY', title: 'Wedding Ceremony', description: 'Exchange of vows and rings', startTime: '16:00', endTime: '17:00', location: `${venueName} — Grand Ballroom`, sortOrder: 2 },
-    { eventType: 'RECEPTION', title: 'Cocktail Reception', description: 'Drinks and canapés by the poolside', startTime: '17:00', endTime: '18:00', location: `${venueName} — Poolside Terrace`, sortOrder: 3 },
-    { eventType: 'DINNER', title: 'Wedding Dinner', description: 'Celebration dinner', startTime: '18:00', endTime: '22:00', location: `${venueName} — Grand Ballroom`, sortOrder: 4 },
-  ];
+  // ── 2. Clone schedule ───────────────────────────────────────────────
+  const templateSchedule = await db.eventSchedule.findMany({
+    where: { weddingId: template.id },
+    orderBy: { sortOrder: 'asc' },
+  });
 
   await db.eventSchedule.createMany({
-    data: scheduleItems.map((item) => ({ weddingId, ...item })),
+    data: templateSchedule.map((item) => ({
+      weddingId,
+      eventType: item.eventType,
+      title: item.title,
+      description: item.description,
+      startTime: item.startTime,
+      endTime: item.endTime,
+      location: item.location,
+      sortOrder: item.sortOrder,
+    })),
   });
 
-  // ── 3. Default FAQs (6 common questions, matching seed standard) ────
-  const faqs = [
-    { question: 'What is the dress code?', answer: 'The dress code is formal / black tie. We kindly request guests to avoid wearing white.', sortOrder: 1 },
-    { question: 'Can I bring a plus one?', answer: 'Your invitation will indicate whether a plus one is included. If you\'re unsure, please reach out to us.', sortOrder: 2 },
-    { question: 'Is parking available?', answer: 'Yes, complimentary valet parking is available at the venue. Self-parking is also available.', sortOrder: 3 },
-    { question: 'Are children welcome?', answer: 'We love your little ones! However, due to venue restrictions, this will be an adults-only celebration.', sortOrder: 4 },
-    { question: 'Can I take photos during the ceremony?', answer: 'We kindly request an unplugged ceremony. A professional photographer will capture every moment, and we\'ll share the photos with you afterwards.', sortOrder: 5 },
-    { question: 'Where can I stay nearby?', answer: 'We\'ve arranged special rates at the venue hotel and several nearby hotels. Please contact us for the booking links.', sortOrder: 6 },
-  ];
+  // ── 3. Clone FAQs ───────────────────────────────────────────────────
+  const templateFaqs = await db.fAQ.findMany({
+    where: { weddingId: template.id },
+    orderBy: { sortOrder: 'asc' },
+  });
 
   await db.fAQ.createMany({
-    data: faqs.map((item) => ({ weddingId, ...item })),
+    data: templateFaqs.map((item) => ({
+      weddingId,
+      question: item.question,
+      answer: item.answer,
+      sortOrder: item.sortOrder,
+      isActive: item.isActive,
+    })),
   });
 
-  // ── 4. Default story chapters (4 chapters, matching seed standard) ─
-  // Uses placeholder content the couple can customize. Images left NULL.
-  const stories = [
-    { title: 'How We Met', content: 'Share the story of how you first met — the place, the moment, the spark that started it all. Every great love story has a beginning, and this is yours to tell.', date: '', sortOrder: 1 },
-    { title: 'The First Date', content: 'Tell the story of your first date — where you went, what you talked about, and the moment you knew this was something special.', date: '', sortOrder: 2 },
-    { title: 'Adventures Together', content: 'Share the adventures you\'ve had together — the trips, the milestones, the quiet moments that made your journey unique.', date: '', sortOrder: 3 },
-    { title: 'The Proposal', content: 'Tell the story of the proposal — where it happened, how you felt, and the moment you said yes. Make it as romantic or as fun as the real thing.', date: '', sortOrder: 4 },
-  ];
+  // ── 4. Clone stories (including images) ─────────────────────────────
+  const templateStories = await db.storyItem.findMany({
+    where: { weddingId: template.id },
+    orderBy: { sortOrder: 'asc' },
+  });
 
   await db.storyItem.createMany({
-    data: stories.map((item) => ({ weddingId, ...item, imageUrl: null })),
+    data: templateStories.map((item) => ({
+      weddingId,
+      title: item.title,
+      content: item.content,
+      date: item.date,
+      imageUrl: item.imageUrl,
+      sortOrder: item.sortOrder,
+    })),
+  });
+
+  // ── 5. Clone media (including base64 images) ────────────────────────
+  const templateMedia = await db.weddingMedia.findMany({
+    where: { weddingId: template.id },
+    orderBy: { sortOrder: 'asc' },
+  });
+
+  await db.weddingMedia.createMany({
+    data: templateMedia.map((item) => ({
+      weddingId,
+      url: item.url,
+      thumbnailUrl: item.thumbnailUrl,
+      fileName: item.fileName,
+      fileType: item.fileType,
+      fileSize: item.fileSize,
+      category: item.category,
+      sortOrder: item.sortOrder,
+    })),
   });
 
   return {
-    content: contentItems.length,
-    schedule: scheduleItems.length,
-    faqs: faqs.length,
-    stories: stories.length,
+    content: templateContent.length,
+    schedule: templateSchedule.length,
+    faqs: templateFaqs.length,
+    stories: templateStories.length,
+    media: templateMedia.length,
   };
+}
+
+/**
+ * Substitute couple-specific values into template content fields.
+ * Only hero/title and hero/dateDisplay are substituted — everything else
+ * is copied verbatim so the couple can edit it themselves.
+ */
+function substituteTemplateValues(
+  section: string,
+  fieldKey: string,
+  originalValue: string,
+  coupleName: string,
+  dateDisplay: string,
+): string {
+  if (section === 'hero' && fieldKey === 'title') {
+    return coupleName;
+  }
+  if (section === 'hero' && fieldKey === 'dateDisplay') {
+    return dateDisplay;
+  }
+  return originalValue;
 }
