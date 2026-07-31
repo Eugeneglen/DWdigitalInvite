@@ -55,9 +55,10 @@ function formatDateDisplay(date: Date): string {
   return `${dayName}, ${dayNum}${suffix(dayNum)} ${monthName} ${year}`;
 }
 
-// Default tea ceremony image (same as seed.ts — a stable placeholder so
-// the guest site renders properly before the couple uploads their own)
-const DEFAULT_TEA_CEREMONY_IMAGE = 'https://lh3.googleusercontent.com/aida-public/AB6AXuA6SiJt49KQCmMAhF-X_tmX1Y1NKhTieT6ApO53PD9gYuvLO0e78WTxzg8BV7Wnhe6oJ6';
+// Default images (local files in public/wedding-images/ — stable placeholders
+// so the guest site renders properly before the couple uploads their own)
+const DEFAULT_TEA_CEREMONY_IMAGE = '/wedding-images/tea-ceremony.png';
+const DEFAULT_VENUE_IMAGE = '/wedding-images/ceremony-venue.png';
 
 /**
  * Seed default content, schedule, FAQs, and stories for a newly created wedding.
@@ -98,15 +99,16 @@ export async function seedDefaultWeddingContent(info: WeddingCreateInfo): Promis
     { section: 'schedule', fieldKey: 'title', fieldValue: 'The Day', fieldType: 'TEXT' },
     { section: 'schedule', fieldKey: 'subtitle', fieldValue: 'The Celebration', fieldType: 'TEXT' },
 
-    // getting-there (full default content, matching seed standard)
+    // getting-there (full default content, matching seeded eleanor-james-2027 standard exactly)
     { section: 'getting-there', fieldKey: 'title', fieldValue: 'Getting There', fieldType: 'TEXT' },
     { section: 'getting-there', fieldKey: 'subtitle', fieldValue: 'Find your way to our celebration', fieldType: 'TEXT' },
-    { section: 'getting-there', fieldKey: 'venueDescription', fieldValue: `${venueName} is a beautiful venue for our special day. We look forward to welcoming you there.`, fieldType: 'RICHTEXT' },
+    { section: 'getting-there', fieldKey: 'venueDescription', fieldValue: 'The Fullerton Hotel is a historic landmark in the heart of Singapore, blending colonial architecture with modern luxury.', fieldType: 'RICHTEXT' },
+    { section: 'getting-there', fieldKey: 'venueImage', fieldValue: DEFAULT_VENUE_IMAGE, fieldType: 'TEXT' },
     { section: 'getting-there', fieldKey: 'transitTitle', fieldValue: 'Public Transit', fieldType: 'TEXT' },
-    { section: 'getting-there', fieldKey: 'transitContent', fieldValue: 'MRT\nThe nearest MRT station is a short walk from the venue.\n\nBUS\nGuests may alight at the bus stop nearest to the venue. Please check local bus services for the most convenient route.\n\nFor detailed transit directions, please use Google Maps or contact us for assistance.', fieldType: 'RICHTEXT' },
+    { section: 'getting-there', fieldKey: 'transitContent', fieldValue: 'MRT\nOrchard Boulevard MRT Station (TE13)\n\nApproximately 4–5 minutes\' walk to the venue.\n\nOrchard MRT Station (NS22/TE14)\n\nApproximately 8–10 minutes\' walk to the venue.\n\nBUS\nGuests may alight at Bef Tomlinson Rd (09121) or Opp Four Seasons Hotel (09111), both of which are about a 2-minute walk from the venue.\n\nAvailable bus services: 7, 36, 36A, 36B, 77, 105, 106, 111, 123, 132, 174, and 174e.', fieldType: 'RICHTEXT' },
     { section: 'getting-there', fieldKey: 'carTitle', fieldValue: 'By Car', fieldType: 'TEXT' },
-    { section: 'getting-there', fieldKey: 'carContent', fieldValue: '\nFROM THE AIRPORT\nThe journey from the airport is approximately 25–30 minutes, subject to traffic conditions.\n\nFROM THE CITY\nThe venue is easily accessible via major roads. Please use GPS navigation for the most current route.', fieldType: 'RICHTEXT' },
-    { section: 'getting-there', fieldKey: 'parkingNote', fieldValue: 'PARKING\nValet parking may be available at the venue entrance. Alternatively, guests may utilise the venue\'s car park, subject to availability.\n\nKindly inform the concierge that you are attending the wedding event.\n', fieldType: 'TEXT' },
+    { section: 'getting-there', fieldKey: 'carContent', fieldValue: '\nFROM THE AIRPORT\nVia CTE / Orchard Road, the journey from Singapore Changi Airport is approximately 25–30 minutes, subject to traffic conditions.', fieldType: 'RICHTEXT' },
+    { section: 'getting-there', fieldKey: 'parkingNote', fieldValue: 'PARKING\nValet parking is available at the hotel entrance. Alternatively, guests may utilise the hotel\'s basement car park, subject to availability.\n\nKindly inform the concierge that you are attending the Dreamweavers event.\n', fieldType: 'TEXT' },
 
     // story
     { section: 'story', fieldKey: 'title', fieldValue: 'Our Story', fieldType: 'TEXT' },
