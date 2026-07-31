@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { normalizePlatformRole } from '@/lib/permissions';
 import {
   uploadFile,
   isMimeTypeAllowed,
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
 
     // Resolve the wedding ID for the current user
     let weddingId: string | null = null;
-    if (session.user.role === 'COUPLE') {
+    if (normalizePlatformRole(session.user.role) === 'COUPLE') {
       const wedding = await db.weddingAccount.findFirst({
         where: { ownerId: session.user.id },
         select: { id: true },
