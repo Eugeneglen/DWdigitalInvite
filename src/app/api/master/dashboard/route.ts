@@ -1,22 +1,51 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { hasPlatformPermission } from '@/lib/permissions';
 
 // GET /api/master/dashboard — business-focused operational dashboard
-// Returns: alerts, pipeline funnel, this-month stats, staff workload, activity feed
-export async function GET() {
+// Query params: ?period=mtd|ytd|custom & from=YYYY-MM-DD & to=YYYY-MM-DD
+// Returns: alerts, pipeline funnel, period stats, staff workload, activity feed
+export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:weddings:read'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // ── Parse period ─────────────────────────────────────────────────────
+    const { searchParams } = new URL(req.url);
+    const period = searchParams.get('period') || 'mtd';
+    const fromParam = searchParams.get('from');
+    const toParam = searchParams.get('to');
+
     const now = new Date();
+    let periodStart: Date;
+    let periodEnd: Date = now;
+    let prevPeriodStart: Date;
+    let prevPeriodEnd: Date;
+
+    if (period === 'ytd') {
+      periodStart = new Date(now.getFullYear(), 0, 1); // Jan 1 this year
+      prevPeriodStart = new Date(now.getFullYear() - 1, 0, 1); // Jan 1 last year
+      prevPeriodEnd = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()); // same MTD last year
+    } else if (period === 'custom' && fromParam && toParam) {
+      periodStart = new Date(fromParam);
+      periodEnd = new Date(toParam);
+      // For custom, previous period = same length immediately before
+      const periodLength = periodEnd.getTime() - periodStart.getTime();
+      prevPeriodStart = new Date(periodStart.getTime() - periodLength);
+      prevPeriodEnd = new Date(periodStart.getTime() - 1);
+    } else {
+      // MTD (default)
+      periodStart = new Date(now.getFullYear(), now.getMonth(), 1); // 1st of this month
+      prevPeriodStart = new Date(now.getFullYear(), now.getMonth() - 1, 1); // 1st of last month
+      prevPeriodEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59); // last day of last month
+    }
+
     const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
 
     // ── 1. ALERTS ────────────────────────────────────────────────────────
 
@@ -85,27 +114,27 @@ export async function GET() {
       pipeline[row.accountStatus as keyof typeof pipeline] = row._count.accountStatus;
     }
 
-    // ── 3. THIS MONTH STATS (vs last month) ──────────────────────────────
+    // ── 3. PERIOD STATS (vs previous period) ──────────────────────────────
 
-    const newWeddingsThisMonth = await db.weddingAccount.count({
-      where: { createdAt: { gte: thirtyDaysAgo } },
+    const newWeddingsThisPeriod = await db.weddingAccount.count({
+      where: { createdAt: { gte: periodStart, lte: periodEnd } },
     });
-    const newWeddingsLastMonth = await db.weddingAccount.count({
-      where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
+    const newWeddingsPrevPeriod = await db.weddingAccount.count({
+      where: { createdAt: { gte: prevPeriodStart, lte: prevPeriodEnd } },
     });
-    const weddingGrowthPct = newWeddingsLastMonth > 0
-      ? Math.round(((newWeddingsThisMonth - newWeddingsLastMonth) / newWeddingsLastMonth) * 100)
-      : newWeddingsThisMonth > 0 ? 100 : 0;
+    const weddingGrowthPct = newWeddingsPrevPeriod > 0
+      ? Math.round(((newWeddingsThisPeriod - newWeddingsPrevPeriod) / newWeddingsPrevPeriod) * 100)
+      : newWeddingsThisPeriod > 0 ? 100 : 0;
 
-    const rsvpsThisMonth = await db.rSVPSubmission.count({
-      where: { createdAt: { gte: thirtyDaysAgo } },
+    const rsvpsThisPeriod = await db.rSVPSubmission.count({
+      where: { createdAt: { gte: periodStart, lte: periodEnd } },
     });
-    const rsvpsLastMonth = await db.rSVPSubmission.count({
-      where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
+    const rsvpsPrevPeriod = await db.rSVPSubmission.count({
+      where: { createdAt: { gte: prevPeriodStart, lte: prevPeriodEnd } },
     });
-    const rsvpGrowthPct = rsvpsLastMonth > 0
-      ? Math.round(((rsvpsThisMonth - rsvpsLastMonth) / rsvpsLastMonth) * 100)
-      : rsvpsThisMonth > 0 ? 100 : 0;
+    const rsvpGrowthPct = rsvpsPrevPeriod > 0
+      ? Math.round(((rsvpsThisPeriod - rsvpsPrevPeriod) / rsvpsPrevPeriod) * 100)
+      : rsvpsThisPeriod > 0 ? 100 : 0;
 
     // ── 4. STAFF WORKLOAD ────────────────────────────────────────────────
 
@@ -171,13 +200,16 @@ export async function GET() {
       },
       // Pipeline
       pipeline,
-      // This month
-      thisMonth: {
-        newWeddings: newWeddingsThisMonth,
-        newWeddingsLastMonth,
+      // Period stats
+      periodStats: {
+        period,
+        periodStart: periodStart.toISOString(),
+        periodEnd: periodEnd.toISOString(),
+        newWeddings: newWeddingsThisPeriod,
+        newWeddingsPrev: newWeddingsPrevPeriod,
         weddingGrowthPct,
-        rsvps: rsvpsThisMonth,
-        rsvpsLastMonth,
+        rsvps: rsvpsThisPeriod,
+        rsvpsPrev: rsvpsPrevPeriod,
         rsvpGrowthPct,
       },
       // Staff workload

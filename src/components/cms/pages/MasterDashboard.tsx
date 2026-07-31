@@ -28,7 +28,17 @@ interface DashboardData {
     incompleteDrafts: { slug: string; coupleName: string; contentCount: number }[];
   };
   pipeline: { ONBOARDING: number; ACTIVE: number; COMPLETED: number; EXPIRED: number; SUSPENDED: number };
-  thisMonth: { newWeddings: number; newWeddingsLastMonth: number; weddingGrowthPct: number; rsvps: number; rsvpsLastMonth: number; rsvpGrowthPct: number };
+  periodStats: {
+    period: string;
+    periodStart: string;
+    periodEnd: string;
+    newWeddings: number;
+    newWeddingsPrev: number;
+    weddingGrowthPct: number;
+    rsvps: number;
+    rsvpsPrev: number;
+    rsvpGrowthPct: number;
+  };
   staffWorkload: { id: string; name: string; email: string; role: string; consultantWeddings: number; coordinatorWeddings: number; totalWeddings: number; lastLoginAt: string | null }[];
   activityFeed: { id: string; action: string; entity: string; entityId: string | null; details: string | null; createdAt: string; userName: string; userEmail: string | null }[];
 }
@@ -120,11 +130,20 @@ function AlertCard({ icon: Icon, title, items, emptyMsg, color }: {
 export default function MasterDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState('mtd');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [showCustom, setShowCustom] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
+      setLoading(true);
       try {
-        const res = await fetch('/api/master/dashboard?XTransformPort=3000');
+        let url = `/api/master/dashboard?period=${period}&XTransformPort=3000`;
+        if (period === 'custom' && customFrom && customTo) {
+          url += `&from=${customFrom}&to=${customTo}`;
+        }
+        const res = await fetch(url);
         if (res.ok) setData(await res.json());
       } catch {
         // silently fail
@@ -133,7 +152,7 @@ export default function MasterDashboard() {
       }
     }
     fetchData();
-  }, []);
+  }, [period, customFrom, customTo]);
 
   if (loading) {
     return (
@@ -163,26 +182,76 @@ export default function MasterDashboard() {
         <StatCard label="Total Wishes" value={data.totalWishes} icon={MessageSquareHeart} color="text-amber-500" bg="bg-amber-50" />
       </div>
 
-      {/* ── This Month ────────────────────────────────────────────────── */}
+      {/* ── Period Selector + Stats ───────────────────────────────────── */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Period Stats</h3>
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1">
+            <Button
+              variant={period === 'mtd' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => { setPeriod('mtd'); setShowCustom(false); }}
+            >MTD</Button>
+            <Button
+              variant={period === 'ytd' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => { setPeriod('ytd'); setShowCustom(false); }}
+            >YTD</Button>
+            <Button
+              variant={period === 'custom' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setShowCustom(!showCustom)}
+            >Custom</Button>
+          </div>
+        </div>
+      </div>
+
+      {showCustom && (
+        <div className="flex items-center gap-2 bg-slate-50 rounded-lg p-3">
+          <input
+            type="date"
+            value={customFrom}
+            onChange={(e) => { setCustomFrom(e.target.value); setPeriod('custom'); }}
+            className="text-sm border border-slate-200 rounded px-2 py-1"
+            placeholder="From"
+          />
+          <span className="text-slate-400 text-sm">to</span>
+          <input
+            type="date"
+            value={customTo}
+            onChange={(e) => { setCustomTo(e.target.value); setPeriod('custom'); }}
+            className="text-sm border border-slate-200 rounded px-2 py-1"
+            placeholder="To"
+          />
+          {customFrom && customTo && (
+            <Button size="sm" onClick={() => setPeriod('custom')}>Apply</Button>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardContent className="flex items-center justify-between p-5">
             <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wider">New Weddings This Month</p>
-              <p className="text-2xl font-bold text-slate-900 mt-1">{data.thisMonth.newWeddings}</p>
-              <p className="text-xs text-slate-400 mt-1">Last month: {data.thisMonth.newWeddingsLastMonth}</p>
+              <p className="text-xs text-slate-500 uppercase tracking-wider">
+                New Weddings ({period === 'mtd' ? 'MTD' : period === 'ytd' ? 'YTD' : 'Custom'})
+              </p>
+              <p className="text-2xl font-bold text-slate-900 mt-1">{data.periodStats.newWeddings}</p>
+              <p className="text-xs text-slate-400 mt-1">Previous: {data.periodStats.newWeddingsPrev}</p>
             </div>
-            <GrowthIndicator pct={data.thisMonth.weddingGrowthPct} />
+            <GrowthIndicator pct={data.periodStats.weddingGrowthPct} />
           </CardContent>
         </Card>
         <Card>
           <CardContent className="flex items-center justify-between p-5">
             <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wider">RSVPs This Month</p>
-              <p className="text-2xl font-bold text-slate-900 mt-1">{data.thisMonth.rsvps}</p>
-              <p className="text-xs text-slate-400 mt-1">Last month: {data.thisMonth.rsvpsLastMonth}</p>
+              <p className="text-xs text-slate-500 uppercase tracking-wider">
+                RSVPs ({period === 'mtd' ? 'MTD' : period === 'ytd' ? 'YTD' : 'Custom'})
+              </p>
+              <p className="text-2xl font-bold text-slate-900 mt-1">{data.periodStats.rsvps}</p>
+              <p className="text-xs text-slate-400 mt-1">Previous: {data.periodStats.rsvpsPrev}</p>
             </div>
-            <GrowthIndicator pct={data.thisMonth.rsvpGrowthPct} />
+            <GrowthIndicator pct={data.periodStats.rsvpGrowthPct} />
           </CardContent>
         </Card>
       </div>

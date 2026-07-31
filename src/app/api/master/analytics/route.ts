@@ -5,7 +5,7 @@ import { db } from '@/lib/db';
 import { hasPlatformPermission } from '@/lib/permissions';
 
 // GET /api/master/analytics — business intelligence analytics
-// Query params: ?range=30|90|365 (days, default 30)
+// Query params: ?period=mtd|ytd|custom & from=YYYY-MM-DD & to=YYYY-MM-DD & range=30|90|365 (legacy)
 // Returns: revenue/packaging, growth, staff performance, couple engagement, RSVP analytics
 export async function GET(req: NextRequest) {
   try {
@@ -15,11 +15,30 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const rangeDays = parseInt(searchParams.get('range') || '30');
-    const rangeDaysSafe = Math.min(Math.max(rangeDays, 1), 365); // clamp 1-365
+    const period = searchParams.get('period') || 'mtd';
+    const fromParam = searchParams.get('from');
+    const toParam = searchParams.get('to');
 
     const now = new Date();
-    const rangeStart = new Date(now.getTime() - rangeDaysSafe * 24 * 60 * 60 * 1000);
+    let rangeStart: Date;
+    let rangeEnd: Date = now;
+
+    if (period === 'ytd') {
+      rangeStart = new Date(now.getFullYear(), 0, 1);
+    } else if (period === 'custom' && fromParam && toParam) {
+      rangeStart = new Date(fromParam);
+      rangeEnd = new Date(toParam);
+    } else if (period === 'range') {
+      // Legacy: ?period=range&range=30
+      const rangeDays = parseInt(searchParams.get('range') || '30');
+      const rangeDaysSafe = Math.min(Math.max(Number.isNaN(rangeDays) ? 30 : rangeDays, 1), 365);
+      rangeStart = new Date(now.getTime() - rangeDaysSafe * 24 * 60 * 60 * 1000);
+    } else {
+      // MTD (default)
+      rangeStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+
+    const rangeDaysSafe = Math.max(Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / (24 * 60 * 60 * 1000)), 1);
 
     // ── 1. REVENUE & PACKAGING ───────────────────────────────────────────
 
@@ -198,6 +217,9 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       range: rangeDaysSafe,
+      period,
+      periodStart: rangeStart.toISOString(),
+      periodEnd: rangeEnd.toISOString(),
       // Revenue & Packaging
       planDistribution,
       monthlyTrend,

@@ -83,13 +83,20 @@ function EmptyChartState({ message }: { message: string }) {
 export default function MasterAnalytics() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [range, setRange] = useState('30');
+  const [period, setPeriod] = useState('mtd');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [showCustom, setShowCustom] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/master/analytics?range=${range}&XTransformPort=3000`);
+        let url = `/api/master/analytics?period=${period}&XTransformPort=3000`;
+        if (period === 'custom' && customFrom && customTo) {
+          url += `&from=${customFrom}&to=${customTo}`;
+        }
+        const res = await fetch(url);
         if (res.ok) setData(await res.json());
       } catch {
         // silently fail
@@ -98,7 +105,7 @@ export default function MasterAnalytics() {
       }
     }
     fetchData();
-  }, [range]);
+  }, [period, customFrom, customTo]);
 
   if (loading) {
     return (
@@ -127,23 +134,51 @@ export default function MasterAnalytics() {
 
   return (
     <div className="space-y-6">
-      {/* ── Header + Date Range ───────────────────────────────────────── */}
+      {/* ── Header + Period Selector ──────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">Analytics</h2>
           <p className="text-sm text-slate-500 mt-1">Business performance insights</p>
         </div>
-        <Select value={range} onValueChange={setRange}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="30">Last 30 days</SelectItem>
-            <SelectItem value="90">Last 90 days</SelectItem>
-            <SelectItem value="365">Last 365 days</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={period === 'mtd' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => { setPeriod('mtd'); setShowCustom(false); }}
+          >MTD</Button>
+          <Button
+            variant={period === 'ytd' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => { setPeriod('ytd'); setShowCustom(false); }}
+          >YTD</Button>
+          <Button
+            variant={period === 'custom' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setShowCustom(!showCustom)}
+          >Custom</Button>
+        </div>
       </div>
+
+      {showCustom && (
+        <div className="flex items-center gap-2 bg-slate-50 rounded-lg p-3">
+          <input
+            type="date"
+            value={customFrom}
+            onChange={(e) => { setCustomFrom(e.target.value); setPeriod('custom'); }}
+            className="text-sm border border-slate-200 rounded px-2 py-1"
+          />
+          <span className="text-slate-400 text-sm">to</span>
+          <input
+            type="date"
+            value={customTo}
+            onChange={(e) => { setCustomTo(e.target.value); setPeriod('custom'); }}
+            className="text-sm border border-slate-200 rounded px-2 py-1"
+          />
+          {customFrom && customTo && (
+            <Button size="sm" onClick={() => setPeriod('custom')}>Apply</Button>
+          )}
+        </div>
+      )}
 
       {/* ── Summary KPIs ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
