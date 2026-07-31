@@ -1,4 +1,5 @@
 import { getServerSession } from '@/lib/auth';
+import { normalizePlatformRole } from '@/lib/permissions';
 
 export async function GET() {
   try {
@@ -13,7 +14,7 @@ export async function GET() {
 
     // Look up the wedding account owned by this user (for couple users)
     let weddingId: string | undefined;
-    if (session.user.role === 'COUPLE') {
+    if (normalizePlatformRole(session.user.role) === 'COUPLE') {
       const { db } = await import('@/lib/db');
       const wedding = await db.weddingAccount.findFirst({
         where: { ownerId: session.user.id },

@@ -4,14 +4,24 @@ import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod/v4';
+import { hasPlatformPermission, normalizePlatformRole } from '@/lib/permissions';
 
 // ── Schemas ───────────────────────────────────────────────────────────────
+// Accept both legacy (ADMIN_1, ADMIN_2, ADMIN_3, ACCOUNT_MANAGER) and new
+// (ACCOUNT_MANAGER_1, ACCOUNT_MANAGER_2, SUPPORT, COUPLE) role vocabulary.
+
+const ROLE_VALUES = [
+  'SUPER_ADMIN',
+  'ACCOUNT_MANAGER_1', 'ACCOUNT_MANAGER_2', 'SUPPORT', 'COUPLE',
+  // Legacy values (still accepted for backward compatibility)
+  'ADMIN_1', 'ADMIN_2', 'ADMIN_3', 'ACCOUNT_MANAGER',
+] as const;
 
 const createUserSchema = z.object({
   email: z.email('Invalid email address'),
   name: z.string().min(2, 'Name must be at least 2 characters'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  role: z.enum(['SUPER_ADMIN', 'ADMIN_1', 'ADMIN_2', 'ADMIN_3']),
+  role: z.enum(ROLE_VALUES),
   isActive: z.boolean().optional().default(true),
 });
 
@@ -20,22 +30,16 @@ const updateUserSchema = z.object({
   email: z.email('Invalid email address').optional(),
   name: z.string().min(2, 'Name must be at least 2 characters').optional(),
   password: z.string().min(8, 'Password must be at least 8 characters').optional(),
-  role: z.enum(['SUPER_ADMIN', 'ADMIN_1', 'ADMIN_2', 'ADMIN_3']).optional(),
+  role: z.enum(ROLE_VALUES).optional(),
   isActive: z.boolean().optional(),
 });
-
-// ── Helpers ──────────────────────────────────────────────────────────────
-
-function isAuthorized(role?: string): boolean {
-  return role === 'SUPER_ADMIN' || role?.startsWith('ADMIN');
-}
 
 // ── GET ───────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || !isAuthorized(session.user.role)) {
+    if (!session?.user || !hasPlatformPermission(session.user.role, 'platform:weddings:read')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -79,12 +83,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || !isAuthorized(session.user.role)) {
+    if (!session?.user || !hasPlatformPermission(session.user.role, 'platform:users:manage')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only SUPER_ADMIN can create users
-    if (session.user.role !== 'SUPER_ADMIN') {
+    // Only SUPER_ADMIN can create users (defense-in-depth escalation gate)
+    if (normalizePlatformRole(session.user.role) !== 'SUPER_ADMIN') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -149,7 +153,8 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || !isAuthorized(session.user.role)) {
+    // Base access: anyone who can read weddings can update user details (name/email/password)
+    if (!session?.user || !hasPlatformPermission(session.user.role, 'platform:weddings:read')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -176,9 +181,9 @@ export async function PUT(req: NextRequest) {
       updateData.passwordHash = await bcrypt.hash(updates.password, 12);
     }
     if (updates.role !== undefined) {
-      // Only SUPER_ADMIN can change roles. ADMIN_* users cannot escalate
-      // themselves or others to SUPER_ADMIN.
-      if (session.user.role !== 'SUPER_ADMIN') {
+      // Only SUPER_ADMIN can change roles (defense-in-depth escalation gate).
+      // ACCOUNT_MANAGER_* users cannot escalate themselves or others.
+      if (normalizePlatformRole(session.user.role) !== 'SUPER_ADMIN') {
         return NextResponse.json({ error: 'Only Super Admins can change user roles' }, { status: 403 });
       }
       updateData.role = updates.role;
@@ -224,12 +229,12 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || !isAuthorized(session.user.role)) {
+    if (!session?.user || !hasPlatformPermission(session.user.role, 'platform:users:manage')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only SUPER_ADMIN can delete users
-    if (session.user.role !== 'SUPER_ADMIN') {
+    // Only SUPER_ADMIN can delete users (defense-in-depth escalation gate)
+    if (normalizePlatformRole(session.user.role) !== 'SUPER_ADMIN') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { encode } from 'next-auth/jwt';
 import { db } from '@/lib/db';
 import { resolveSecret } from '@/lib/auth';
+import { normalizePlatformRole } from '@/lib/permissions';
 
 export async function POST(request: Request) {
   try {
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
 
     // Access expiry check — if the user is a COUPLE, check if their wedding
     // account has expired. If so, block login with a clear message.
-    if (user.role === 'COUPLE') {
+    if (normalizePlatformRole(user.role) === 'COUPLE') {
       const wedding = await db.weddingAccount.findFirst({
         where: { ownerId: user.id },
         select: { accountStatus: true, accessExpiryDate: true },
