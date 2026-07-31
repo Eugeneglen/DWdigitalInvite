@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Loader2, Check, Copy, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
+import { Loader2, Check, Copy, ChevronLeft, ChevronRight, Sparkles, CalendarIcon } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import {
   Dialog,
   DialogContent,
@@ -401,7 +407,33 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Wedding Date *</Label>
-                  <Input type="date" value={form.weddingDate ? form.weddingDate.split('T')[0] : ''} onChange={(e) => setForm({ ...form, weddingDate: e.target.value })} className="border-charcoal-ink/10" />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-start text-left font-normal border-charcoal-ink/10 h-9"
+                      >
+                        <CalendarIcon className="mr-2 size-4 text-charcoal-ink/50" />
+                        {form.weddingDate ? formatDateDisplay(form.weddingDate) : <span className="text-charcoal-ink/30">Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={form.weddingDate ? new Date(form.weddingDate.split('T')[0] + 'T00:00:00') : undefined}
+                        onSelect={(date) => {
+                          if (date) {
+                            const y = date.getFullYear();
+                            const m = String(date.getMonth() + 1).padStart(2, '0');
+                            const d = String(date.getDate()).padStart(2, '0');
+                            setForm({ ...form, weddingDate: `${y}-${m}-${d}` });
+                          }
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Wedding Time</Label>
