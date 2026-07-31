@@ -193,7 +193,7 @@ export default function CoupleTeam() {
   };
 
   const canManage = members.some(
-    (m) => m.userId === session?.user?.id && (m.role === 'COUPLE' || m.role === 'CONSULTANT_1')
+    (m) => m.userId === session?.user?.id && (m.role === 'COUPLE' || m.role === 'CONSULTANT_1' || m.role === 'SUPER_ADMIN_1' || m.role === 'SUPER_ADMIN_2')
   );
 
   if (loading) {

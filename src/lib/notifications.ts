@@ -82,7 +82,7 @@ export async function notifyAdmins(
 ) {
   const admins = await db.user.findMany({
     where: {
-      role: { in: ['SUPER_ADMIN', 'ACCOUNT_MANAGER'] },
+      role: { in: ['SUPER_ADMIN_1', 'SUPER_ADMIN_2', 'CONSULTANT_1', 'CONSULTANT_2'] },
       isActive: true,
     },
     select: { id: true },

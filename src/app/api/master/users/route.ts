@@ -7,14 +7,19 @@ import { z } from 'zod/v4';
 import { hasPlatformPermission, normalizePlatformRole } from '@/lib/permissions';
 
 // ── Schemas ───────────────────────────────────────────────────────────────
-// Accept both legacy (ADMIN_1, ADMIN_2, ADMIN_3, ACCOUNT_MANAGER) and new
-// (ACCOUNT_MANAGER_1, ACCOUNT_MANAGER_2, SUPPORT, COUPLE) role vocabulary.
+// Accept the new DB-driven vocabulary (SUPER_ADMIN_1, CONSULTANT_1, etc.)
+// plus legacy values for backward compatibility.
 
 const ROLE_VALUES = [
-  'SUPER_ADMIN',
-  'ACCOUNT_MANAGER_1', 'ACCOUNT_MANAGER_2', 'SUPPORT', 'COUPLE',
+  // New DB-driven vocabulary
+  'SUPER_ADMIN_1', 'SUPER_ADMIN_2',
+  'CONSULTANT_1', 'CONSULTANT_2',
+  'COORDINATOR_1',
+  'SUPPORT_1', 'SUPPORT_2',
+  'COUPLE',
   // Legacy values (still accepted for backward compatibility)
-  'ADMIN_1', 'ADMIN_2', 'ADMIN_3', 'ACCOUNT_MANAGER',
+  'SUPER_ADMIN', 'ACCOUNT_MANAGER', 'ACCOUNT_MANAGER_1', 'ACCOUNT_MANAGER_2',
+  'SUPPORT', 'ADMIN_1', 'ADMIN_2', 'ADMIN_3',
 ] as const;
 
 const createUserSchema = z.object({

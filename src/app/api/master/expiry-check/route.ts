@@ -74,7 +74,7 @@ export async function GET() {
 
     // Create notifications for super admins (if not already created)
     const admins = await db.user.findMany({
-      where: { role: 'SUPER_ADMIN', isActive: true },
+      where: { role: { in: ['SUPER_ADMIN_1', 'SUPER_ADMIN_2'] }, isActive: true },
       select: { id: true },
     });
 

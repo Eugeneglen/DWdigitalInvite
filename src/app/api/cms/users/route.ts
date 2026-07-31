@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
         email,
         passwordHash: hashedPw,
         name,
-        role: role || 'ADMIN_1',
+        role: role || 'CONSULTANT_1',
       },
       include: {
         ownedWeddings: {
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
       action: 'user.create',
       resource: 'User',
       resourceId: newUser.id,
-      details: { email, name, role: role || 'ADMIN_1' },
+      details: { email, name, role: role || 'CONSULTANT_1' },
       request,
     });
 
