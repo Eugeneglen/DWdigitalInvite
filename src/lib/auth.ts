@@ -172,9 +172,25 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
+        // On fresh login — set from the user object
         token.id = user.id!;
         token.role = user.role;
         token.mustChangePassword = user.mustChangePassword;
+      } else if (token.id) {
+        // On session refresh — re-read mustChangePassword from DB
+        // This ensures the flag is always current, even if the JWT is stale
+        try {
+          const dbUser = await db.user.findUnique({
+            where: { id: token.id },
+            select: { mustChangePassword: true, role: true },
+          });
+          if (dbUser) {
+            token.mustChangePassword = dbUser.mustChangePassword;
+            token.role = dbUser.role;
+          }
+        } catch {
+          // DB read failed — keep the existing token values
+        }
       }
       return token;
     },
