@@ -2,12 +2,11 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  Users, MessageSquareHeart, Eye, BarChart3, Loader2,
+  Users, MessageSquareHeart, BarChart3, Loader2,
   UserPlus, Link2, AlertCircle,
 } from 'lucide-react';
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -31,7 +30,6 @@ interface AnalyticsData {
     responseRate: number;
   };
   wishesCount: number;
-  rsvpTimeline: { date: string; count: number }[];
   groupBreakdown: {
     group: string;
     total: number;
@@ -264,27 +262,6 @@ export default function CoupleAnalytics() {
       ].filter((d) => d.value > 0)
     : [];
 
-  // ── Timeline data (last 30 days, fallback to 90) ─────────────
-  const now = new Date();
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(now.getDate() - 30);
-  const thirtyDaysStr = thirtyDaysAgo.toISOString().slice(0, 10);
-
-  const recentTimeline = data?.rsvpTimeline.filter(
-    (d) => d.date >= thirtyDaysStr
-  );
-  const timelineData =
-    (recentTimeline && recentTimeline.length > 0
-      ? recentTimeline
-      : data?.rsvpTimeline ?? []
-    ).map((d) => ({
-      ...d,
-      date: new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-      }),
-    }));
-
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -344,21 +321,13 @@ export default function CoupleAnalytics() {
                 value={data.wishesCount}
                 icon={MessageSquareHeart}
               />
-              <KPICard
-                label="Page Views"
-                value="—"
-                icon={Eye}
-                subtitle="Coming soon"
-                accent="text-charcoal-ink/30"
-              />
             </>
           )
         )}
       </div>
 
-      {/* Charts Row: RSVP Donut + Response Timeline */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* RSVP Breakdown — Donut */}
+      {/* RSVP Breakdown — Donut (timeline chart removed in Phase 6 — not actionable) */}
+      <div className="grid grid-cols-1 gap-4">
         <Card className="border-charcoal-ink/5 rounded-xl bg-white shadow-none">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold text-charcoal-ink">
@@ -402,65 +371,6 @@ export default function CoupleAnalytics() {
                   />
                   <Tooltip content={<CustomPieTooltip />} />
                 </PieChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Response Timeline — Bar */}
-        <Card className="border-charcoal-ink/5 rounded-xl bg-white shadow-none">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-charcoal-ink">
-              RSVP Response Timeline
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-[260px] w-full rounded-lg" />
-            ) : timelineData.length === 0 ? (
-              <div className="flex items-center justify-center h-[260px] text-charcoal-ink/30 text-sm">
-                No RSVP submissions yet
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart
-                  data={timelineData}
-                  margin={{ top: 5, right: 10, left: -10, bottom: 0 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="#f5f0e8"
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fontSize: 10, fill: '#94a3b8' }}
-                    tickLine={false}
-                    axisLine={{ stroke: '#f5f0e8' }}
-                  />
-                  <YAxis
-                    allowDecimals={false}
-                    tick={{ fontSize: 10, fill: '#94a3b8' }}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: '8px',
-                      border: '1px solid rgba(0,0,0,0.06)',
-                      fontSize: '12px',
-                    }}
-                    labelStyle={{ color: '#5a5245' }}
-                    cursor={{ fill: 'rgba(212,175,55,0.08)' }}
-                  />
-                  <Bar
-                    dataKey="count"
-                    name="RSVPs"
-                    fill={GOLD}
-                    radius={[4, 4, 0, 0]}
-                    maxBarSize={24}
-                  />
-                </BarChart>
               </ResponsiveContainer>
             )}
           </CardContent>
