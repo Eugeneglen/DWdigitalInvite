@@ -55,6 +55,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
 # Copy package.json (needed for prisma db seed command)
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 
+# Reinstall tsx + esbuild for musl (Alpine) — the builder's glibc binaries won't work here
+RUN npm install tsx esbuild --no-save
+
 USER nextjs
 
 EXPOSE 3000
@@ -64,4 +67,6 @@ ENV HOSTNAME="0.0.0.0"
 # Run db push (create/migrate schema) → seed all data → start server
 # All seed scripts are idempotent (use upsert), safe to run on every deploy
 # Order matters: seed.ts creates the wedding → seed-roles creates permissions → seed-content-templates creates template from wedding
-CMD ["sh", "-c", "./node_modules/.bin/prisma db push && ./node_modules/.bin/prisma db seed && ./node_modules/.bin/tsx scripts/seed-roles.ts && ./node_modules/.bin/tsx scripts/seed-content-templates.ts && node .next/standalone/server.js"]
+# NOTE: We call tsx directly (not 'prisma db seed') because prisma can't find tsx in PATH on Alpine
+# NOTE: tsx + esbuild are installed in the runner stage to get musl-compatible binaries (builder uses glibc)
+CMD ["sh", "-c", "./node_modules/.bin/prisma db push && ./node_modules/.bin/tsx prisma/seed.ts && ./node_modules/.bin/tsx scripts/seed-roles.ts && ./node_modules/.bin/tsx scripts/seed-content-templates.ts && node .next/standalone/server.js"]
