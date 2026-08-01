@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import MirrorImageUpload from '@/components/cms/couple/MirrorImageUpload';
 import { isDarkBackground, getAutoTextColor } from '@/lib/contrast';
+import { useImageAutoContrast } from '@/hooks/useImageAutoContrast';
 import { toast } from '@/hooks/use-toast';
 import { useCMSStore } from '@/store/useCMSStore';
 import { Card, CardContent } from '@/components/ui/card';
@@ -2461,6 +2462,12 @@ function PreviewPanel({ data }: { data: TemplateData }) {
   const heroImageUrl = getField('hero', 'heroImageUrl', '/wedding-images/hero-portrait.png');
   const bannerUrl = getField('hero', 'bannerUrl', '/wedding-images/banner-bg.png');
 
+  // Auto-contrast: sample the banner image pixels to pick readable text colour.
+  // Same hook the gold standard uses — dynamically picks dark text for bright
+  // images and light text for dark images. Eliminates the need for a hardcoded
+  // dark gradient overlay.
+  const { textColor: bannerTextColor, subtitleColor: bannerSubtitleColor, textShadow: bannerTextShadow } = useImageAutoContrast(bannerUrl);
+
   // ── Tea ceremony content ───────────────────────────────────────────────
   const teaCeremonyImage = getField('hero', 'teaCeremonyImage', '/wedding-images/tea-ceremony.png');
   const teaCeremonyLabel = getField('hero', 'teaCeremonyLabel', 'The Tradition');
@@ -2568,21 +2575,17 @@ function PreviewPanel({ data }: { data: TemplateData }) {
   // Mirrors src/components/wedding/SectionBanner.tsx: full-bleed banner
   // image with h1 title overlaid (NO subtitle on banner — subtitle is
   // rendered as an intro paragraph inside each section instead).
-  // Uses light cream gradient + dark text (matching gold standard's
-  // auto-contrast behavior for bright banner images).
+  // Uses useImageAutoContrast for dynamic text colour (same as gold standard
+  // SectionBanner.tsx). No gradient overlay — the hook picks readable text.
   const renderSectionBanner = (title: string) => (
     <div
       className="relative w-full bg-cover bg-center flex items-center justify-center"
       style={{ backgroundImage: `url('${bannerUrl}')`, height: '420px' }}
     >
-      <div
-        className="absolute inset-0"
-        style={{ background: 'linear-gradient(to bottom, rgba(252,249,242,0.3), rgba(252,249,242,0.1) 50%, rgba(252,249,242,0.6))' }}
-      />
       <div className="relative z-10 text-center px-6">
         <h1
           className="text-[44px] md:text-[72px] leading-[1.05] tracking-tight font-bold drop-shadow-sm"
-          style={{ fontFamily: headingFont, color: '#1A1A1A' }}
+          style={{ fontFamily: headingFont, color: bannerTextColor, textShadow: bannerTextShadow }}
         >
           {title}
         </h1>
@@ -2597,25 +2600,23 @@ function PreviewPanel({ data }: { data: TemplateData }) {
         style={{ backgroundColor: bg, color: text, fontFamily: bodyFont }}
       >
         {/* ===== TOP BANNER (full-bleed background image with couple name) ===== */}
+        {/* No gradient overlay — uses useImageAutoContrast to pick text colour */}
+        {/* that matches the image brightness (same as gold standard HomePage). */}
         <div
-          className="relative w-full h-[260px] bg-cover bg-center flex items-center justify-center"
-          style={{ backgroundImage: `url('${bannerUrl}')` }}
+          className="relative w-full bg-cover bg-center flex items-center justify-center"
+          style={{ backgroundImage: `url('${bannerUrl}')`, height: '420px' }}
         >
-          <div
-            className="absolute inset-0"
-            style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.15), rgba(0,0,0,0.5))' }}
-          />
           <div className="relative z-10 text-center px-6">
             <h1
-              className="text-4xl md:text-6xl leading-[1.05] tracking-tight font-bold drop-shadow-sm"
-              style={{ fontFamily: headingFont, color: '#FFF8E7' }}
+              className="text-[44px] md:text-[72px] leading-[1.05] tracking-tight font-bold drop-shadow-sm"
+              style={{ fontFamily: headingFont, color: bannerTextColor, textShadow: bannerTextShadow }}
             >
               {heroTitle}
             </h1>
             {heroSubtitle && (
               <p
-                className="mt-2 text-xs md:text-sm italic tracking-wide"
-                style={{ color: '#FFF8E7' }}
+                className="mt-2 text-sm md:text-base italic tracking-wide"
+                style={{ color: bannerSubtitleColor }}
               >
                 {heroSubtitle}
               </p>
