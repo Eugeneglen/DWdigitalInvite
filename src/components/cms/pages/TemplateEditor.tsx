@@ -2625,15 +2625,13 @@ function PreviewPanel({ data }: { data: TemplateData }) {
         </div>
 
         {/* ===== HERO PORTRAIT (full-bleed image + date + description + countdown) ===== */}
+        {/* No gradient overlay — matches gold standard HomePage which renders the */}
+        {/* raw hero image with cream text (hero images are always dark portraits). */}
         <div className="relative w-full overflow-hidden" style={{ height: '520px' }}>
           <img
             src={heroImageUrl}
             alt="Hero Wedding Portrait"
             className="absolute inset-0 w-full h-full object-cover object-center"
-          />
-          <div
-            className="absolute inset-0"
-            style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.6) 100%)' }}
           />
           <div className="relative z-10 h-full w-full px-8 pb-12 flex flex-col items-center justify-end text-center">
             {/* Date badge */}
