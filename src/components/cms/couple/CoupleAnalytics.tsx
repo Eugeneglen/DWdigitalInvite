@@ -33,6 +33,21 @@ interface AnalyticsData {
     pending: number;
     responseRate: number;
   }[];
+  // ── Phase 4 new fields (additive) ───────────────────────────
+  nonResponders?: Array<{
+    id: string;
+    name: string;
+    groupName: string;
+    email: string | null;
+    phone: string | null;
+  }>;
+  dietaryGuests?: Array<{
+    id: string;
+    name: string;
+    groupName: string;
+    dietaryNotes: string;
+    rsvpStatus: string;
+  }>;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────
@@ -452,6 +467,142 @@ export default function CoupleAnalytics() {
                           }`}
                         >
                           {row.responseRate}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Phase 4: Non-Responders List ─────────────────────────── */}
+      <Card className="border-charcoal-ink/5 rounded-xl bg-white shadow-none">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold text-charcoal-ink">
+              Non-Responders
+            </CardTitle>
+            {!loading && data && (
+              <span className="text-xs text-charcoal-ink/40">
+                {data.nonResponders?.length ?? 0} guest{(data.nonResponders?.length ?? 0) !== 1 ? 's' : ''} pending
+              </span>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full rounded" />
+              ))}
+            </div>
+          ) : !data || !data.nonResponders || data.nonResponders.length === 0 ? (
+            <div className="flex items-center justify-center py-10 text-charcoal-ink/30 text-sm">
+              All guests have responded!
+            </div>
+          ) : (
+            <div className="max-h-80 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-white">
+                  <tr className="border-b border-champagne-silk">
+                    <th className="text-left py-2.5 pr-3 text-[11px] font-medium text-charcoal-ink/40 uppercase tracking-wider">
+                      Name
+                    </th>
+                    <th className="text-left py-2.5 px-3 text-[11px] font-medium text-charcoal-ink/40 uppercase tracking-wider">
+                      Group
+                    </th>
+                    <th className="text-left py-2.5 px-3 text-[11px] font-medium text-charcoal-ink/40 uppercase tracking-wider">
+                      Contact
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-champagne-silk/50">
+                  {data.nonResponders.map((g) => (
+                    <tr key={g.id} className="hover:bg-cinematic-gold/[0.03] transition-colors">
+                      <td className="py-2.5 pr-3 font-medium text-charcoal-ink text-xs">
+                        {g.name}
+                      </td>
+                      <td className="py-2.5 px-3 text-xs text-charcoal-ink/60">
+                        {g.groupName}
+                      </td>
+                      <td className="py-2.5 px-3 text-xs text-charcoal-ink/50">
+                        {g.email || g.phone || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Phase 4: Dietary Requirements List ────────────────────── */}
+      <Card className="border-charcoal-ink/5 rounded-xl bg-white shadow-none">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold text-charcoal-ink">
+              Dietary Requirements
+            </CardTitle>
+            {!loading && data && (
+              <span className="text-xs text-charcoal-ink/40">
+                {data.dietaryGuests?.length ?? 0} guest{(data.dietaryGuests?.length ?? 0) !== 1 ? 's' : ''} with special needs
+              </span>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full rounded" />
+              ))}
+            </div>
+          ) : !data || !data.dietaryGuests || data.dietaryGuests.length === 0 ? (
+            <div className="flex items-center justify-center py-10 text-charcoal-ink/30 text-sm">
+              No special dietary requirements noted
+            </div>
+          ) : (
+            <div className="max-h-80 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-white">
+                  <tr className="border-b border-champagne-silk">
+                    <th className="text-left py-2.5 pr-3 text-[11px] font-medium text-charcoal-ink/40 uppercase tracking-wider">
+                      Name
+                    </th>
+                    <th className="text-left py-2.5 px-3 text-[11px] font-medium text-charcoal-ink/40 uppercase tracking-wider">
+                      Group
+                    </th>
+                    <th className="text-left py-2.5 px-3 text-[11px] font-medium text-charcoal-ink/40 uppercase tracking-wider">
+                      Dietary
+                    </th>
+                    <th className="text-right py-2.5 pl-3 text-[11px] font-medium text-charcoal-ink/40 uppercase tracking-wider">
+                      RSVP
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-champagne-silk/50">
+                  {data.dietaryGuests.map((g) => (
+                    <tr key={g.id} className="hover:bg-cinematic-gold/[0.03] transition-colors">
+                      <td className="py-2.5 pr-3 font-medium text-charcoal-ink text-xs">
+                        {g.name}
+                      </td>
+                      <td className="py-2.5 px-3 text-xs text-charcoal-ink/60">
+                        {g.groupName}
+                      </td>
+                      <td className="py-2.5 px-3 text-xs text-violet-700 font-medium">
+                        {g.dietaryNotes}
+                      </td>
+                      <td className="py-2.5 pl-3 text-right">
+                        <span className={`text-xs font-semibold ${
+                          g.rsvpStatus === 'ATTENDING' ? 'text-emerald-600'
+                            : g.rsvpStatus === 'DECLINED' ? 'text-red-500'
+                            : 'text-amber-600'
+                        }`}>
+                          {g.rsvpStatus}
                         </span>
                       </td>
                     </tr>
