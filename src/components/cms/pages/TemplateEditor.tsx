@@ -4,8 +4,11 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   ArrowLeft, Save, Loader2, Home as HomeIcon, Palette, Calendar,
   BookOpen, HelpCircle, MapPin, Camera, MessageSquareHeart,
-  Eye, EyeOff, Upload, X, Plus, Trash2, Pencil, Clock,
+  Eye, EyeOff, X, Plus, Trash2, Pencil, Clock,
+  ImagePlus, Check, Sparkles, Type, Heart, CalendarDays,
 } from 'lucide-react';
+import MirrorImageUpload from '@/components/cms/couple/MirrorImageUpload';
+import { isDarkBackground, getAutoTextColor } from '@/lib/contrast';
 import { toast } from '@/hooks/use-toast';
 import { useCMSStore } from '@/store/useCMSStore';
 import { Card, CardContent } from '@/components/ui/card';
@@ -83,7 +86,7 @@ interface TemplateData {
   theme: Theme;
 }
 
-type Section = 'home' | 'design' | 'schedule' | 'story' | 'faqs' | 'getting-there' | 'moments' | 'wishes' | 'preview';
+type Section = 'details' | 'home' | 'design' | 'schedule' | 'story' | 'faqs' | 'getting-there' | 'moments' | 'wishes' | 'preview';
 
 // ── Field configs (same pattern as couple CMS) ─────────────────────────────
 
@@ -154,172 +157,163 @@ const EVENT_TYPES = [
   { value: 'CUSTOM', label: 'Custom', color: 'bg-slate-100 text-slate-700' },
 ];
 
-const PRESET_COLORS = [
-  '#FDF8F0', '#FFFFFF', '#FFF0F0', '#0F172A', '#FAF5EF',
-  '#F5F5DC', '#F0F8FF', '#FFF8DC', '#F8F4E3', '#FDF2F8',
-  '#F0FDF4', '#FFFBEB',
+const THEME_PRESETS: { id: string; name: string; description: string; isDefault?: boolean; colors: Theme['colors']; fonts: Theme['fonts'] }[] = [
+  {
+    id: 'classic-elegance',
+    name: 'Classic Elegance',
+    description: 'Warm ivory backdrop with cinematic gold accents and timeless Playfair Display headings.',
+    isDefault: true,
+    colors: { bg: '#FDF8F0', text: '#2C2C2C', accent: '#D4AF37', secondary: '#8B7355', muted: '#A09888' },
+    fonts: { heading: 'Playfair Display', body: 'Lato' },
+  },
+  {
+    id: 'midnight-gold',
+    name: 'Midnight Gold',
+    description: 'Deep charcoal canvas illuminated by champagne-gold type. Modern, dramatic, opulent.',
+    colors: { bg: '#0F172A', text: '#F5E6C8', accent: '#D4AF37', secondary: '#C9A961', muted: '#8B8472' },
+    fonts: { heading: 'Cinzel', body: 'Montserrat' },
+  },
+  {
+    id: 'blush-romance',
+    name: 'Blush Romance',
+    description: 'Soft blush cream with rose-gold accents and flowing Cormorant Garamond script.',
+    colors: { bg: '#FFF8F0', text: '#4A2C2A', accent: '#C77B8C', secondary: '#B0886D', muted: '#A89888' },
+    fonts: { heading: 'Cormorant Garamond', body: 'Lora' },
+  },
+  {
+    id: 'garden-sage',
+    name: 'Garden Sage',
+    description: 'Natural parchment with sage and terracotta tones. Earthy, botanical, calm.',
+    colors: { bg: '#F5F0E8', text: '#2D3A2E', accent: '#7A8B6F', secondary: '#B0886D', muted: '#9AA095' },
+    fonts: { heading: 'EB Garamond', body: 'Source Sans 3' },
+  },
+  {
+    id: 'royal-burgundy',
+    name: 'Royal Burgundy',
+    description: 'Ivory with deep burgundy and antique brass. Regal, traditional, ceremonial.',
+    colors: { bg: '#FCF9F2', text: '#3C1F1F', accent: '#7A1F2B', secondary: '#8B6F3A', muted: '#A89888' },
+    fonts: { heading: 'Bodoni Moda', body: 'EB Garamond' },
+  },
+  {
+    id: 'modern-noir',
+    name: 'Modern Noir',
+    description: 'Crisp white with stark black type and a single gold accent. Minimal, editorial.',
+    colors: { bg: '#FFFFFF', text: '#1A1A1A', accent: '#D4AF37', secondary: '#6B6B6B', muted: '#A0A0A0' },
+    fonts: { heading: 'DM Serif Display', body: 'Inter' },
+  },
 ];
 
-const FONTS = [
-  'Playfair Display', 'Cormorant Garamond', 'Lora', 'DM Serif Display',
-  'Cinzel', 'Prata', 'Spectral', 'Bodoni Moda', 'Italiana',
-  'EB Garamond', 'Libre Baskerville', 'Merriweather',
-  'Inter', 'Lato', 'Montserrat', 'Raleway', 'Poppins',
-  'Nunito', 'Source Sans 3', 'Work Sans', 'Josefin Sans',
-  'Quicksand', 'Great Vibes', 'Dancing Script',
+const COLOR_PRESETS: { value: string; label: string }[] = [
+  { value: '#FCF9F2', label: 'Paper Cream' },
+  { value: '#FDF6EC', label: 'Warm Ivory' },
+  { value: '#F5F0E8', label: 'Linen' },
+  { value: '#FAF3E0', label: 'Champagne' },
+  { value: '#F0EDE8', label: 'Stone' },
+  { value: '#EDE8E0', label: 'Sand' },
+  { value: '#F7F1E8', label: 'Parchment' },
+  { value: '#FFF8F0', label: 'Blush Cream' },
+  { value: '#F5EFE6', label: 'Oat' },
+  { value: '#EDEDEB', label: 'Silver Mist' },
+  { value: '#2C2C2C', label: 'Dark Charcoal' },
+  { value: '#1A1A1A', label: 'Deep Black' },
 ];
 
-// ── ImageUpload component (inline) ─────────────────────────────────────────
-// Single-image upload control that stores a base64 data URL in template JSON.
-// Mirrors the visual pattern of the couple CMS MirrorImageUpload but writes
-// its value into in-memory state rather than calling any API.
-
-interface ImageUploadProps {
-  value: string | null;
-  onChange: (value: string | null) => void;
-  label?: string;
-  aspectClass?: string;
-  maxWidth?: string;
-}
-
-function ImageUpload({ value, onChange, label, aspectClass = 'aspect-[4/3]', maxWidth }: ImageUploadProps) {
-  const [dragOver, setDragOver] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  const handleFile = async (file: File) => {
-    if (!file.type.startsWith('image/')) return;
-    setUploading(true);
-    try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      onChange(dataUrl);
-    } catch {
-      // silently fail — user can try again
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const openPicker = () => {
-    if (!uploading) fileRef.current?.click();
-  };
-
-  return (
-    <div className="space-y-2">
-      {label && (
-        <div className="flex items-baseline justify-between gap-2">
-          <p className="text-xs font-semibold text-charcoal-ink/70 uppercase tracking-wider">{label}</p>
-          {value && !uploading && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => onChange(null)}
-              className="h-7 text-[11px] gap-1.5 text-charcoal-ink/50 hover:text-red-500 hover:bg-red-50"
-            >
-              <X className="size-3" />
-              Remove
-            </Button>
-          )}
-        </div>
-      )}
-      <div
-        className={`relative ${aspectClass} ${maxWidth ? '' : 'w-full'} rounded-lg overflow-hidden border-2 transition-colors duration-200 ${
-          value
-            ? 'border-charcoal-ink/10'
-            : dragOver
-              ? 'border-cinematic-gold bg-cinematic-gold/5'
-              : 'border-dashed border-charcoal-ink/15 hover:border-cinematic-gold/60 hover:bg-cinematic-gold/5'
-        } cursor-pointer`}
-        style={maxWidth ? { maxWidth, marginInline: 'auto' } : undefined}
-        onClick={openPicker}
-        onDragOver={(e) => { e.preventDefault(); if (!uploading) setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOver(false);
-          if (uploading) return;
-          const file = e.dataTransfer.files?.[0];
-          if (file) handleFile(file);
-        }}
-      >
-        {value ? (
-          <>
-            <img src={value} alt={label || 'Preview'} className="w-full h-full object-cover" />
-            {uploading && (
-              <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
-                <Loader2 className="size-6 animate-spin text-cinematic-gold" />
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-4 text-center">
-            {uploading ? (
-              <Loader2 className="size-7 animate-spin text-cinematic-gold" />
-            ) : (
-              <>
-                <div className="flex items-center justify-center h-11 w-11 rounded-full bg-cinematic-gold/10">
-                  <Camera className="size-5 text-cinematic-gold" />
-                </div>
-                <p className="text-xs font-medium text-charcoal-ink/60">Drag &amp; drop, or</p>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="h-8 text-xs gap-1.5 bg-charcoal-ink text-paper-cream hover:bg-charcoal-ink/90"
-                >
-                  <Upload className="size-3.5" />
-                  Upload Image
-                </Button>
-                <p className="text-[10px] text-charcoal-ink/30 mt-1">Sample image · stored in template JSON</p>
-              </>
-            )}
-          </div>
-        )}
-      </div>
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) handleFile(file);
-          e.target.value = '';
-        }}
-      />
-    </div>
-  );
-}
+const FONT_OPTIONS: { value: string; category: string }[] = [
+  // ── Elegant Serif ────────────────────────────────────────
+  { value: 'Playfair Display', category: 'Elegant Serif' },
+  { value: 'Cormorant Garamond', category: 'Elegant Serif' },
+  { value: 'EB Garamond', category: 'Elegant Serif' },
+  { value: 'Lora', category: 'Elegant Serif' },
+  { value: 'Spectral', category: 'Elegant Serif' },
+  { value: 'Libre Baskerville', category: 'Elegant Serif' },
+  { value: 'Merriweather', category: 'Elegant Serif' },
+  { value: 'DM Serif Display', category: 'Elegant Serif' },
+  { value: 'Bodoni Moda', category: 'Elegant Serif' },
+  { value: 'Philosopher', category: 'Elegant Serif' },
+  // ── Display Serif ────────────────────────────────────────
+  { value: 'Cinzel', category: 'Display Serif' },
+  { value: 'Cinzel Decorative', category: 'Display Serif' },
+  { value: 'Prata', category: 'Display Serif' },
+  { value: 'Italiana', category: 'Display Serif' },
+  { value: 'Arizonia', category: 'Display Serif' },
+  // ── Modern Sans ─────────────────────────────────────────
+  { value: 'Montserrat', category: 'Modern Sans' },
+  { value: 'Raleway', category: 'Modern Sans' },
+  { value: 'Poppins', category: 'Modern Sans' },
+  { value: 'Lato', category: 'Modern Sans' },
+  { value: 'Quicksand', category: 'Modern Sans' },
+  { value: 'Nunito', category: 'Modern Sans' },
+  { value: 'Work Sans', category: 'Modern Sans' },
+  { value: 'Josefin Sans', category: 'Modern Sans' },
+  // ── Script & Calligraphy ─────────────────────────────────
+  { value: 'Great Vibes', category: 'Script & Calligraphy' },
+  { value: 'Alex Brush', category: 'Script & Calligraphy' },
+  { value: 'Allura', category: 'Script & Calligraphy' },
+  { value: 'Parisienne', category: 'Script & Calligraphy' },
+  { value: 'Tangerine', category: 'Script & Calligraphy' },
+  { value: 'Sacramento', category: 'Script & Calligraphy' },
+  { value: 'Petit Formal Script', category: 'Script & Calligraphy' },
+  { value: 'Cookie', category: 'Script & Calligraphy' },
+  // ── Handwritten ─────────────────────────────────────────
+  { value: 'Dancing Script', category: 'Handwritten' },
+  { value: 'Kaushan Script', category: 'Handwritten' },
+  { value: 'Caveat', category: 'Handwritten' },
+  { value: 'Amatic SC', category: 'Handwritten' },
+  { value: 'Satisfy', category: 'Handwritten' },
+  { value: 'Pacifico', category: 'Handwritten' },
+  { value: 'Lobster', category: 'Handwritten' },
+  { value: 'Yellowtail', category: 'Handwritten' },
+];
+const FONT_CATEGORIES = [...new Set(FONT_OPTIONS.map((f) => f.category))];
 
 // ── SimpleImageGallery component ───────────────────────────────────────────
-// A lightweight gallery that stores images as data URLs in the template's
-// media JSON array. Supports add (file upload) and remove.
+// A gallery that stores images as data URLs in the template's media JSON array.
+// Visual parity with the couple CMS MirrorImageGallery (click-to-preview Dialog,
+// drag-drop anywhere on the grid, file name display, count badge in header,
+// max-image enforcement, hover-to-delete with confirm) but writes its value
+// into in-memory template state via onAdd/onRemove rather than calling any API.
+
 interface SimpleImageGalleryProps {
   media: MediaItem[];
   onAdd: (url: string) => void;
   onRemove: (index: number) => void;
   maxImages: number;
   aspectClass: string;
+  label: string;
+  helperText?: string;
 }
 
-function SimpleImageGallery({ media, onAdd, onRemove, maxImages, aspectClass }: SimpleImageGalleryProps) {
+function SimpleImageGallery({ media, onAdd, onRemove, maxImages, aspectClass, label, helperText }: SimpleImageGalleryProps) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<number | null>(null);
+
+  const canAddMore = media.length < maxImages;
 
   function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
-    Array.from(files).forEach((file) => {
-      if (!file.type.startsWith('image/')) return;
+    const remaining = maxImages - media.length;
+    if (remaining <= 0) return;
+    const toRead = Array.from(files).filter((f) => f.type.startsWith('image/')).slice(0, remaining);
+    if (toRead.length === 0) return;
+    setUploading(true);
+    let done = 0;
+    const finish = () => { done++; if (done === toRead.length) setUploading(false); };
+    toRead.forEach((file) => {
       const reader = new FileReader();
-      reader.onload = () => {
-        onAdd(reader.result as string);
-      };
+      reader.onload = () => { onAdd(reader.result as string); finish(); };
+      reader.onerror = finish;
       reader.readAsDataURL(file);
     });
+  }
+
+  function handleRemove(idx: number) {
+    if (!confirm('Delete this image? This action cannot be undone.')) return;
+    setDeleting(idx);
+    onRemove(idx);
+    setTimeout(() => setDeleting(null), 300);
   }
 
   return (
@@ -330,36 +324,296 @@ function SimpleImageGallery({ media, onAdd, onRemove, maxImages, aspectClass }: 
         accept="image/*"
         multiple
         className="hidden"
-        onChange={(e) => handleFiles(e.target.files)}
+        onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }}
       />
-      {media.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {media.map((item, idx) => (
-            <div key={idx} className={`relative group ${aspectClass} rounded-lg overflow-hidden border border-charcoal-ink/10`}>
-              <img src={item.url} alt={item.fileName} className="w-full h-full object-cover" />
+
+      {/* Header — label + count badge + Add Image button (mirrors MirrorImageGallery) */}
+      <div className="flex items-baseline justify-between gap-2">
+        <div>
+          <p className="text-xs font-semibold text-charcoal-ink/70 uppercase tracking-wider">
+            {label} <span className="text-charcoal-ink/40 font-normal">({media.length}/{maxImages})</span>
+          </p>
+          {helperText && <p className="text-[11px] text-charcoal-ink/40 mt-0.5">{helperText}</p>}
+        </div>
+        {canAddMore && (
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            className="h-8 text-xs gap-1.5 bg-charcoal-ink text-paper-cream hover:bg-charcoal-ink/90 shrink-0"
+          >
+            {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <ImagePlus className="size-3.5" />}
+            Add Image
+          </Button>
+        )}
+      </div>
+
+      {/* Grid — drag-drop anywhere */}
+      <div
+        className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 rounded-lg p-1 transition-colors ${dragOver ? 'bg-cinematic-gold/5' : ''}`}
+        onDragOver={(e) => { e.preventDefault(); if (canAddMore) setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => { e.preventDefault(); setDragOver(false); if (canAddMore) handleFiles(e.dataTransfer.files); }}
+      >
+        {media.map((item, idx) => (
+          <Card key={idx} className="border-charcoal-ink/5 shadow-none overflow-hidden group hover:border-champagne-silk transition-colors duration-200">
+            <div
+              className={`relative ${aspectClass} bg-charcoal-ink/5 cursor-pointer`}
+              onClick={() => setPreviewUrl(item.url)}
+            >
+              <img src={item.url} alt={item.fileName} className="w-full h-full object-cover" loading="lazy" />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors duration-200 flex items-center justify-center gap-2">
+                <Eye className="size-5 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+              </div>
               <button
                 type="button"
-                onClick={() => onRemove(idx)}
-                className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={(e) => { e.stopPropagation(); handleRemove(idx); }}
+                disabled={deleting === idx}
+                className="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/50 text-white hover:bg-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                title="Delete image"
               >
-                <X className="size-3.5" />
+                {deleting === idx ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
               </button>
+            </div>
+            <div className="p-2 space-y-1.5">
+              <p className="text-[11px] font-medium text-charcoal-ink/60 truncate" title={item.fileName}>
+                {item.fileName}
+              </p>
+            </div>
+          </Card>
+        ))}
+
+        {/* Empty state OR add-more tile */}
+        {canAddMore && media.length === 0 && (
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            className={`col-span-full ${aspectClass} min-h-[200px] rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-2 p-6 text-center transition-colors ${
+              dragOver
+                ? 'border-cinematic-gold bg-cinematic-gold/5'
+                : 'border-charcoal-ink/15 hover:border-cinematic-gold/60 hover:bg-cinematic-gold/5'
+            }`}
+          >
+            {uploading ? (
+              <Loader2 className="size-7 animate-spin text-cinematic-gold" />
+            ) : (
+              <>
+                <div className="flex items-center justify-center h-11 w-11 rounded-full bg-cinematic-gold/10">
+                  <ImagePlus className="size-5 text-cinematic-gold" />
+                </div>
+                <p className="text-sm font-medium text-charcoal-ink/70">Drag &amp; drop images, or</p>
+                <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-medium bg-charcoal-ink text-paper-cream">
+                  <ImagePlus className="size-3.5" /> Add Images
+                </span>
+                <p className="text-[11px] text-charcoal-ink/40 mt-1">Up to {maxImages} · Mirrors guest-site framing</p>
+              </>
+            )}
+          </button>
+        )}
+      </div>
+
+      {/* Preview Dialog */}
+      <Dialog open={!!previewUrl} onOpenChange={() => setPreviewUrl(null)}>
+        <DialogContent className="sm:max-w-2xl p-2">
+          <DialogHeader>
+            <DialogTitle className="sr-only">Image Preview</DialogTitle>
+          </DialogHeader>
+          {previewUrl && (
+            <img src={previewUrl} alt="Preview" className="w-full rounded-lg" />
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ── TemplateColorPicker ────────────────────────────────────────────────────
+// Controlled version of the couple CMS BackgroundColorPicker. Mirrors its UX
+// (12 named presets, auto-text-contrast preview bar, reset-to-default, custom
+// colour input) but writes its value into in-memory template state via onChange
+// rather than calling any API. Used for all 5 theme colour slots.
+
+interface TemplateColorPickerProps {
+  value: string;
+  onChange: (value: string) => void;
+  label: string;
+  defaultColor?: string;
+}
+
+function TemplateColorPicker({ value, onChange, label, defaultColor }: TemplateColorPickerProps) {
+  const isDark = isDarkBackground(value);
+  const autoText = getAutoTextColor(value);
+  const isActive = (preset: string) => value.toUpperCase() === preset.toUpperCase();
+
+  return (
+    <div className="space-y-2.5">
+      <div className="flex items-center gap-2">
+        <Palette className="size-4 text-cinematic-gold" />
+        <Label className="text-xs font-medium text-charcoal-ink/50 uppercase tracking-wider">{label}</Label>
+      </div>
+      {/* Current colour preview bar */}
+      <div
+        className="relative h-11 rounded-md border border-charcoal-ink/10 overflow-hidden transition-colors duration-300"
+        style={{ backgroundColor: value }}
+      >
+        <div
+          className="absolute inset-0 flex items-center justify-center text-xs font-medium opacity-70 transition-colors duration-300"
+          style={{ color: autoText }}
+        >
+          {value.toUpperCase()}
+          <span className="ml-2 opacity-70">— {isDark ? 'Dark' : 'Light'}</span>
+        </div>
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          title="Pick a custom colour"
+        />
+      </div>
+      {/* Preset swatches grid */}
+      <div className="grid grid-cols-6 gap-1.5">
+        {COLOR_PRESETS.map((preset) => (
+          <button
+            key={preset.value}
+            type="button"
+            onClick={() => onChange(preset.value)}
+            className={`group relative h-8 rounded-md border transition-all duration-150 ${
+              isActive(preset.value)
+                ? 'border-cinematic-gold ring-2 ring-cinematic-gold/30 scale-105'
+                : 'border-charcoal-ink/10 hover:border-cinematic-gold/50 hover:scale-105'
+            }`}
+            style={{ backgroundColor: preset.value }}
+            title={preset.label}
+            aria-label={preset.label}
+          >
+            {isActive(preset.value) && (
+              <div
+                className="absolute inset-0 flex items-center justify-center"
+                style={{ color: isDarkBackground(preset.value) ? '#E8E0D0' : '#1A1A1A' }}
+              >
+                <Check className="size-3" strokeWidth={3} />
+              </div>
+            )}
+            <span
+              className="absolute -top-7 left-1/2 -translate-x-1/2 text-[10px] font-medium px-1.5 py-0.5 rounded bg-charcoal-ink text-paper-cream opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10"
+            >
+              {preset.label}
+            </span>
+          </button>
+        ))}
+      </div>
+      {defaultColor && value.toUpperCase() !== defaultColor.toUpperCase() && (
+        <button
+          type="button"
+          onClick={() => onChange(defaultColor)}
+          className="text-[11px] text-charcoal-ink/40 hover:text-cinematic-gold transition-colors"
+        >
+          Reset to default ({defaultColor})
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── TemplateFontPicker ─────────────────────────────────────────────────────
+// Controlled version of the couple CMS FontPicker. Mirrors its UX (38
+// categorised fonts, scrollable list with sticky category headers, live
+// preview, selected highlight + checkmark) but writes its value into
+// in-memory template state via onChange rather than calling any API.
+
+interface TemplateFontPickerProps {
+  value: string;
+  onChange: (value: string) => void;
+  label: string;
+  previewText: string;
+}
+
+function TemplateFontPicker({ value, onChange, label, previewText }: TemplateFontPickerProps) {
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (listRef.current) {
+      const el = listRef.current.querySelector(`[data-font="${value}"]`);
+      if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [value]);
+
+  return (
+    <div className="space-y-2.5">
+      <div className="flex items-center gap-2">
+        <Type className="size-4 text-cinematic-gold" />
+        <Label className="text-xs font-medium text-charcoal-ink/50 uppercase tracking-wider">{label}</Label>
+      </div>
+      {/* Preview */}
+      <div className="min-w-0">
+        <p
+          className="text-lg text-charcoal-ink leading-snug truncate"
+          style={{ fontFamily: `'${value}', serif` }}
+        >
+          {previewText}
+        </p>
+        <p
+          className="text-[11px] text-charcoal-ink/40 mt-0.5 italic truncate"
+          style={{ fontFamily: `'${value}', serif` }}
+        >
+          Together with their families
+        </p>
+      </div>
+      {/* Scrollable font list */}
+      <div>
+        <Label className="text-xs font-medium text-charcoal-ink/50 uppercase tracking-wider mb-2 block">
+          Choose Font
+        </Label>
+        <div
+          ref={listRef}
+          className="max-h-[220px] overflow-y-auto rounded-lg border border-charcoal-ink/10 bg-white/50"
+          style={{ scrollbarWidth: 'thin', scrollbarColor: '#D4AF37 transparent' }}
+        >
+          {FONT_CATEGORIES.map((category) => (
+            <div key={category}>
+              <div className="sticky top-0 z-10 bg-paper-cream/95 backdrop-blur-sm px-3 py-1.5">
+                <span className="text-[10px] text-cinematic-gold/70 font-semibold uppercase tracking-widest">
+                  {category}
+                </span>
+              </div>
+              {FONT_OPTIONS.filter((f) => f.category === category).map((font) => {
+                const isSelected = font.value === value;
+                return (
+                  <button
+                    key={font.value}
+                    type="button"
+                    data-font={font.value}
+                    onClick={() => onChange(font.value)}
+                    className={`w-full text-left transition-colors duration-150 ${
+                      isSelected
+                        ? 'bg-cinematic-gold/10 border-l-2 border-cinematic-gold'
+                        : 'border-l-2 border-transparent hover:bg-charcoal-ink/[0.03]'
+                    }`}
+                  >
+                    <div className="px-3 py-1.5">
+                      <p
+                        className="text-base text-charcoal-ink leading-snug truncate"
+                        style={{ fontFamily: `'${font.value}', serif` }}
+                      >
+                        Eleanor & James
+                      </p>
+                      <div className="flex items-center justify-between mt-0.5">
+                        <span className={`text-[10px] ${isSelected ? 'text-cinematic-gold font-semibold' : 'text-charcoal-ink/35'}`}>
+                          {font.value}
+                        </span>
+                        {isSelected && <Check className="size-3 text-cinematic-gold" strokeWidth={3} />}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           ))}
         </div>
-      )}
-      {media.length < maxImages && (
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          className={`w-full ${aspectClass} max-h-32 border-2 border-dashed border-charcoal-ink/15 rounded-lg flex flex-col items-center justify-center gap-2 hover:border-cinematic-gold/50 hover:bg-cinematic-gold/5 transition-colors`}
-        >
-          <div className="w-8 h-8 rounded-full bg-charcoal-ink/5 flex items-center justify-center">
-            <Upload className="size-4 text-charcoal-ink/30" />
-          </div>
-          <span className="text-xs text-charcoal-ink/40">Click to upload ({media.length}/{maxImages})</span>
-        </button>
-      )}
+      </div>
     </div>
   );
 }
@@ -677,6 +931,29 @@ export default function TemplateEditor() {
     setDirty(true);
   }
 
+  function applyThemePreset(preset: typeof THEME_PRESETS[number]) {
+    if (!data) return;
+    setData({
+      ...data,
+      theme: { colors: { ...preset.colors }, fonts: { ...preset.fonts } },
+    });
+    setDirty(true);
+  }
+
+  // Determine which preset is currently applied (by matching all 5 colors + 2 fonts)
+  const appliedPresetId = (() => {
+    if (!data) return null;
+    return THEME_PRESETS.find((t) =>
+      t.colors.bg.toUpperCase() === data.theme.colors.bg.toUpperCase() &&
+      t.colors.text.toUpperCase() === data.theme.colors.text.toUpperCase() &&
+      t.colors.accent.toUpperCase() === data.theme.colors.accent.toUpperCase() &&
+      t.colors.secondary.toUpperCase() === data.theme.colors.secondary.toUpperCase() &&
+      t.colors.muted.toUpperCase() === data.theme.colors.muted.toUpperCase() &&
+      t.fonts.heading === data.theme.fonts.heading &&
+      t.fonts.body === data.theme.fonts.body,
+    )?.id ?? null;
+  })();
+
   // ── Save ───────────────────────────────────────────────────────────────
 
   async function handleSave() {
@@ -728,6 +1005,7 @@ export default function TemplateEditor() {
   }
 
   const sections: { key: Section; label: string; icon: React.ElementType }[] = [
+    { key: 'details', label: 'Details', icon: Heart },
     { key: 'home', label: 'Home', icon: HomeIcon },
     { key: 'design', label: 'Design', icon: Palette },
     { key: 'schedule', label: 'Schedule', icon: Calendar },
@@ -792,6 +1070,149 @@ export default function TemplateEditor() {
         })}
       </div>
 
+      {/* ── DETAILS SECTION ─────────────────────────────────────────────── */}
+      {activeSection === 'details' && (
+        <div className="space-y-6 max-w-3xl">
+          {/* Page header */}
+          <div className="flex items-center gap-2">
+            <Heart className="size-5 text-cinematic-gold" />
+            <div>
+              <h3 className="text-lg font-semibold text-charcoal-ink">Couple Details</h3>
+              <p className="text-xs text-charcoal-ink/50">Placeholder couple identity, date, and venue — cloned into new weddings created from this template.</p>
+            </div>
+          </div>
+
+          <Separator className="bg-champagne-silk" />
+
+          {/* Couple Names */}
+          <Card className="border-charcoal-ink/5 shadow-none">
+            <CardContent className="p-6 space-y-5">
+              <h4 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider flex items-center gap-2">
+                <Heart className="size-4 text-cinematic-gold" />
+                Couple Names
+              </h4>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                  Couple Display Name
+                </Label>
+                <Input
+                  value={getContentField('details', 'coupleName')}
+                  onChange={(e) => setContentField('details', 'coupleName', e.target.value)}
+                  placeholder="e.g. Eleanor & James"
+                  className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                />
+                <p className="text-[11px] text-charcoal-ink/40">Shown across the guest site as the main couple identity.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                    Bride&rsquo;s First Name
+                  </Label>
+                  <Input
+                    value={getContentField('details', 'brideName')}
+                    onChange={(e) => setContentField('details', 'brideName', e.target.value)}
+                    placeholder="Eleanor"
+                    className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                    Groom&rsquo;s First Name
+                  </Label>
+                  <Input
+                    value={getContentField('details', 'groomName')}
+                    onChange={(e) => setContentField('details', 'groomName', e.target.value)}
+                    placeholder="James"
+                    className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Date & Time */}
+          <Card className="border-charcoal-ink/5 shadow-none">
+            <CardContent className="p-6 space-y-5">
+              <h4 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider flex items-center gap-2">
+                <CalendarDays className="size-4 text-cinematic-gold" />
+                Date &amp; Time
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                    Wedding Date
+                  </Label>
+                  <Input
+                    type="date"
+                    value={getContentField('details', 'weddingDate')}
+                    onChange={(e) => setContentField('details', 'weddingDate', e.target.value)}
+                    className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                  />
+                  <p className="text-[11px] text-charcoal-ink/40">Used for the countdown timer and schedule.</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                    Wedding Time
+                  </Label>
+                  <Input
+                    type="time"
+                    value={getContentField('details', 'weddingTime')}
+                    onChange={(e) => setContentField('details', 'weddingTime', e.target.value)}
+                    className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                  />
+                  <p className="text-[11px] text-charcoal-ink/40">Ceremony start time.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Venue */}
+          <Card className="border-charcoal-ink/5 shadow-none">
+            <CardContent className="p-6 space-y-5">
+              <h4 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider flex items-center gap-2">
+                <MapPin className="size-4 text-cinematic-gold" />
+                Venue Information
+              </h4>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                  Venue Name
+                </Label>
+                <Input
+                  value={getContentField('details', 'venue')}
+                  onChange={(e) => setContentField('details', 'venue', e.target.value)}
+                  placeholder="e.g. The Fullerton Hotel"
+                  className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                  Venue Address
+                </Label>
+                <Textarea
+                  value={getContentField('details', 'venueAddress')}
+                  onChange={(e) => setContentField('details', 'venueAddress', e.target.value)}
+                  placeholder="Full venue address"
+                  rows={3}
+                  className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20 resize-none"
+                />
+                <p className="text-[11px] text-charcoal-ink/40">Shown on the Getting There section.</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                  Google Maps URL
+                </Label>
+                <Input
+                  value={getContentField('details', 'googleMapsUrl')}
+                  onChange={(e) => setContentField('details', 'googleMapsUrl', e.target.value)}
+                  placeholder="https://maps.google.com/..."
+                  className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* ── HOME SECTION ────────────────────────────────────────────────── */}
       {activeSection === 'home' && (
         <div className="space-y-6 max-w-3xl">
@@ -801,18 +1222,16 @@ export default function TemplateEditor() {
               <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Hero Visual</h3>
               <p className="text-xs text-charcoal-ink/40">Full-bleed hero image shown at the top of the guest site.</p>
               {HERO_VISUAL_FIELDS.map((field) => (
-                <div key={field.key} className="space-y-1.5">
-                  <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
-                    {field.label}
-                  </Label>
-                  <ImageUpload
-                    value={getContentField('hero', field.key) || null}
-                    onChange={(v) => setContentField('hero', field.key, v || '', 'IMAGE_URL')}
-                    label={field.label}
-                    aspectClass={field.aspect}
-                    maxWidth={field.maxWidth}
-                  />
-                </div>
+                <MirrorImageUpload
+                  key={field.key}
+                  value={getContentField('hero', field.key) || ''}
+                  onChange={(v) => setContentField('hero', field.key, v, 'IMAGE_URL')}
+                  onRemove={() => setContentField('hero', field.key, '', 'IMAGE_URL')}
+                  label={field.label}
+                  helperText="Mirrors guest-site framing"
+                  aspectClass={field.aspect}
+                  maxWidth={field.maxWidth}
+                />
               ))}
               {/* Hero Video URL */}
               <div className="space-y-1.5">
@@ -859,35 +1278,40 @@ export default function TemplateEditor() {
             <CardContent className="p-6 space-y-5">
               <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Hero Content</h3>
               {HOME_FIELDS.map((field) => (
-                <div key={field.key} className="space-y-1.5">
-                  <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
-                    {field.label}
-                  </Label>
-                  {field.type === 'image' ? (
-                    <ImageUpload
-                      value={getContentField('hero', field.key) || null}
-                      onChange={(v) => setContentField('hero', field.key, v || '', 'IMAGE_URL')}
-                      label="Tea Ceremony Image"
-                      aspectClass="aspect-[2/3]"
-                      maxWidth="240px"
-                    />
-                  ) : field.type === 'textarea' ? (
-                    <Textarea
-                      value={getContentField('hero', field.key)}
-                      onChange={(e) => setContentField('hero', field.key, e.target.value, 'RICHTEXT')}
-                      placeholder={field.placeholder}
-                      className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
-                      rows={3}
-                    />
-                  ) : (
-                    <Input
-                      value={getContentField('hero', field.key)}
-                      onChange={(e) => setContentField('hero', field.key, e.target.value)}
-                      placeholder={field.placeholder}
-                      className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
-                    />
-                  )}
-                </div>
+                field.type === 'image' ? (
+                  <MirrorImageUpload
+                    key={field.key}
+                    value={getContentField('hero', field.key) || ''}
+                    onChange={(v) => setContentField('hero', field.key, v, 'IMAGE_URL')}
+                    onRemove={() => setContentField('hero', field.key, '', 'IMAGE_URL')}
+                    label="Tea Ceremony Image"
+                    helperText="2:3 portrait · mirrors guest-site framing"
+                    aspectClass="aspect-[2/3]"
+                    maxWidth="240px"
+                  />
+                ) : (
+                  <div key={field.key} className="space-y-1.5">
+                    <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                      {field.label}
+                    </Label>
+                    {field.type === 'textarea' ? (
+                      <Textarea
+                        value={getContentField('hero', field.key)}
+                        onChange={(e) => setContentField('hero', field.key, e.target.value, 'RICHTEXT')}
+                        placeholder={field.placeholder}
+                        className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                        rows={3}
+                      />
+                    ) : (
+                      <Input
+                        value={getContentField('hero', field.key)}
+                        onChange={(e) => setContentField('hero', field.key, e.target.value)}
+                        placeholder={field.placeholder}
+                        className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                      />
+                    )}
+                  </div>
+                )
               ))}
             </CardContent>
           </Card>
@@ -915,90 +1339,176 @@ export default function TemplateEditor() {
 
       {/* ── DESIGN SECTION ──────────────────────────────────────────────── */}
       {activeSection === 'design' && (
-        <div className="space-y-6 max-w-3xl">
-          {/* Colors */}
+        <div className="space-y-6 max-w-4xl">
+          {/* Page header */}
+          <div className="flex items-center gap-2">
+            <Palette className="size-5 text-cinematic-gold" />
+            <div>
+              <h3 className="text-lg font-semibold text-charcoal-ink">Design</h3>
+              <p className="text-xs text-charcoal-ink/50">Browse curated themes, then fine-tune colours and fonts.</p>
+            </div>
+          </div>
+
+          <Separator className="bg-champagne-silk" />
+
+          {/* Preset theme cards grid (mirrors CoupleDesign) */}
+          <div>
+            <Label className="text-xs font-medium text-charcoal-ink/50 uppercase tracking-wider mb-3 block">
+              Choose a Theme ({THEME_PRESETS.length} available)
+            </Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {THEME_PRESETS.map((t) => {
+                const isApplied = appliedPresetId === t.id;
+                return (
+                  <div
+                    key={t.id}
+                    className={`relative rounded-lg border-2 p-4 transition-all ${
+                      isApplied
+                        ? 'border-cinematic-gold bg-cinematic-gold/5'
+                        : 'border-charcoal-ink/10 hover:border-champagne-silk'
+                    }`}
+                  >
+                    {/* Applied badge */}
+                    {isApplied && (
+                      <div className="absolute -top-2 -right-2 flex items-center gap-1 rounded-full bg-cinematic-gold px-2 py-0.5 text-[10px] font-semibold text-charcoal-ink">
+                        <Check className="size-2.5" />
+                        Applied
+                      </div>
+                    )}
+                    {/* Color palette preview */}
+                    <div className="flex gap-1.5 mb-3">
+                      {[t.colors.bg, t.colors.text, t.colors.accent, t.colors.secondary, t.colors.muted].map((c, i) => (
+                        <div
+                          key={i}
+                          className="h-8 flex-1 rounded border border-charcoal-ink/10"
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+                    </div>
+                    {/* Template info */}
+                    <h4 className="text-sm font-semibold text-charcoal-ink">{t.name}</h4>
+                    {t.isDefault && (
+                      <span className="inline-block text-[10px] text-cinematic-gold uppercase tracking-wider mt-0.5">Default</span>
+                    )}
+                    <p className="text-[11px] text-charcoal-ink/50 mt-1 leading-relaxed line-clamp-2">{t.description}</p>
+                    <p className="text-[10px] text-charcoal-ink/40 mt-2">
+                      <span className="font-medium">Fonts:</span> {t.fonts.heading} / {t.fonts.body}
+                    </p>
+                    {/* Apply button */}
+                    <Button
+                      type="button"
+                      onClick={() => applyThemePreset(t)}
+                      disabled={isApplied}
+                      variant={isApplied ? 'outline' : 'default'}
+                      className="w-full mt-3 h-8 text-xs font-medium rounded-md bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 disabled:opacity-60"
+                    >
+                      {isApplied ? (
+                        <>
+                          <Check className="size-3 mr-1" />
+                          Applied
+                        </>
+                      ) : (
+                        'Apply Theme'
+                      )}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <Separator className="bg-champagne-silk" />
+
+          {/* Colours — one TemplateColorPicker per slot (bg / text / accent / secondary / muted) */}
           <Card className="border-charcoal-ink/5 shadow-none">
             <CardContent className="p-6 space-y-5">
-              <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Theme Colors</h3>
-              <div className="grid grid-cols-5 gap-4">
-                {(['bg', 'text', 'accent', 'secondary', 'muted'] as const).map((key) => (
-                  <div key={key} className="space-y-2">
-                    <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50 capitalize">
-                      {key === 'bg' ? 'Background' : key === 'text' ? 'Text' : key}
-                    </Label>
-                    <input
-                      type="color"
-                      value={data.theme.colors[key]}
-                      onChange={(e) => updateThemeColor(key, e.target.value)}
-                      className="w-full h-12 rounded-lg border border-charcoal-ink/10 cursor-pointer"
-                    />
-                  </div>
-                ))}
-              </div>
-              {/* Preset swatches */}
-              <div>
-                <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50 mb-2 block">
-                  Preset Backgrounds
-                </Label>
-                <div className="flex flex-wrap gap-2">
-                  {PRESET_COLORS.map((color) => (
-                    <button
-                      key={color}
-                      onClick={() => updateThemeColor('bg', color)}
-                      className="w-8 h-8 rounded-full border-2 border-charcoal-ink/10 hover:border-cinematic-gold transition-colors"
-                      style={{ backgroundColor: color }}
-                      title={color}
-                    />
-                  ))}
-                </div>
+              <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Theme Colours</h3>
+              <p className="text-xs text-charcoal-ink/40">Each colour slot shows a live preview with auto-contrast detection, 12 named presets, and a custom colour picker.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                <TemplateColorPicker
+                  label="Background"
+                  value={data.theme.colors.bg}
+                  onChange={(v) => updateThemeColor('bg', v)}
+                  defaultColor="#FDF8F0"
+                />
+                <TemplateColorPicker
+                  label="Text"
+                  value={data.theme.colors.text}
+                  onChange={(v) => updateThemeColor('text', v)}
+                  defaultColor="#2C2C2C"
+                />
+                <TemplateColorPicker
+                  label="Accent"
+                  value={data.theme.colors.accent}
+                  onChange={(v) => updateThemeColor('accent', v)}
+                  defaultColor="#D4AF37"
+                />
+                <TemplateColorPicker
+                  label="Secondary"
+                  value={data.theme.colors.secondary}
+                  onChange={(v) => updateThemeColor('secondary', v)}
+                  defaultColor="#8B7355"
+                />
+                <TemplateColorPicker
+                  label="Muted"
+                  value={data.theme.colors.muted}
+                  onChange={(v) => updateThemeColor('muted', v)}
+                  defaultColor="#A09888"
+                />
               </div>
             </CardContent>
           </Card>
 
-          {/* Fonts */}
+          {/* Typography — TemplateFontPicker for heading + body (mirrors FontPicker) */}
           <Card className="border-charcoal-ink/5 shadow-none">
             <CardContent className="p-6 space-y-5">
               <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Typography</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
-                    Heading Font
-                  </Label>
-                  <Select value={data.theme.fonts.heading} onValueChange={(v) => updateThemeFont('heading', v)}>
-                    <SelectTrigger className="border-charcoal-ink/10">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-60">
-                      {FONTS.map((f) => (
-                        <SelectItem key={f} value={f} style={{ fontFamily: `'${f}', serif` }}>{f}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-charcoal-ink/60" style={{ fontFamily: `'${data.theme.fonts.heading}', serif`, fontSize: '20px' }}>
-                    Eleanor &amp; James
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
-                    Body Font
-                  </Label>
-                  <Select value={data.theme.fonts.body} onValueChange={(v) => updateThemeFont('body', v)}>
-                    <SelectTrigger className="border-charcoal-ink/10">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-60">
-                      {FONTS.map((f) => (
-                        <SelectItem key={f} value={f} style={{ fontFamily: `'${f}', sans-serif` }}>{f}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-charcoal-ink/60" style={{ fontFamily: `'${data.theme.fonts.body}', sans-serif` }}>
-                    Together with their families
-                  </p>
-                </div>
+              <p className="text-xs text-charcoal-ink/40">39 categorised fonts with live preview. Click a font to apply it instantly to the template.</p>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <TemplateFontPicker
+                  label="Heading Font"
+                  value={data.theme.fonts.heading}
+                  onChange={(v) => updateThemeFont('heading', v)}
+                  previewText="Eleanor & James"
+                />
+                <TemplateFontPicker
+                  label="Body Font"
+                  value={data.theme.fonts.body}
+                  onChange={(v) => updateThemeFont('body', v)}
+                  previewText="Together with their families"
+                />
               </div>
             </CardContent>
           </Card>
+
+          {/* Current theme summary (mirrors CoupleDesign summary card) */}
+          <div className="bg-paper-cream rounded-lg p-4 space-y-2">
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="size-3.5 text-cinematic-gold" />
+              <p className="text-xs font-medium text-charcoal-ink/70 uppercase tracking-wider">Current Theme</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <span className="text-charcoal-ink/50">Background:</span>{' '}
+                <span className="font-mono text-charcoal-ink">{data.theme.colors.bg}</span>
+              </div>
+              <div>
+                <span className="text-charcoal-ink/50">Text:</span>{' '}
+                <span className="font-mono text-charcoal-ink">{data.theme.colors.text}</span>
+              </div>
+              <div>
+                <span className="text-charcoal-ink/50">Accent:</span>{' '}
+                <span className="font-mono text-charcoal-ink">{data.theme.colors.accent}</span>
+              </div>
+              <div>
+                <span className="text-charcoal-ink/50">Heading Font:</span>{' '}
+                <span className="text-charcoal-ink">{data.theme.fonts.heading}</span>
+              </div>
+            </div>
+            <p className="text-[11px] text-charcoal-ink/40 mt-2">
+              Changes are saved when you click &quot;Save Template&quot;. Use the Preview tab to see the full guest-site rendering.
+            </p>
+          </div>
         </div>
       )}
 
@@ -1060,29 +1570,28 @@ export default function TemplateEditor() {
 
           {/* Schedule Images Gallery */}
           <Card className="border-charcoal-ink/5 shadow-none">
-            <CardContent className="p-6 space-y-4">
-              <div>
-                <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Schedule Images</h3>
-                <p className="text-xs text-charcoal-ink/40 mt-1">4:3 crop mirrors the guest-site schedule images. Up to 3 images.</p>
-              </div>
+            <CardContent className="p-6">
               <SimpleImageGallery
                 media={data.media.filter((m) => m.category === 'schedule')}
                 onAdd={(url) => addMediaItem('schedule', url)}
                 onRemove={(idx) => removeMediaItem('schedule', idx)}
                 maxImages={3}
                 aspectClass="aspect-[4/3]"
+                label="Schedule Images"
+                helperText="4:3 crop mirrors the guest-site schedule images. Up to 3 images."
               />
             </CardContent>
           </Card>
 
           {/* Venue Image */}
           <Card className="border-charcoal-ink/5 shadow-none">
-            <CardContent className="p-6 space-y-3">
-              <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Venue Image</h3>
-              <ImageUpload
-                value={getContentField('getting-there', 'venueImage') || null}
-                onChange={(v) => setContentField('getting-there', 'venueImage', v || '', 'IMAGE_URL')}
+            <CardContent className="p-6">
+              <MirrorImageUpload
+                value={getContentField('getting-there', 'venueImage') || ''}
+                onChange={(v) => setContentField('getting-there', 'venueImage', v, 'IMAGE_URL')}
+                onRemove={() => setContentField('getting-there', 'venueImage', '', 'IMAGE_URL')}
                 label="Venue Image"
+                helperText="4:3 · mirrors guest-site framing"
                 aspectClass="aspect-[4/3]"
                 maxWidth="320px"
               />
@@ -1173,10 +1682,12 @@ export default function TemplateEditor() {
                         </div>
                       </div>
                       <div className="flex flex-col md:flex-row gap-4 items-start">
-                        <ImageUpload
-                          value={item.imageUrl}
+                        <MirrorImageUpload
+                          value={item.imageUrl || ''}
                           onChange={(v) => setStoryImage(idx, v)}
-                          label="Image"
+                          onRemove={() => setStoryImage(idx, null)}
+                          label="Chapter Image"
+                          helperText="16:9 · mirrors guest-site framing"
                           aspectClass="aspect-[16/9]"
                           maxWidth="280px"
                         />
@@ -1193,17 +1704,15 @@ export default function TemplateEditor() {
 
           {/* Story Hero Images Gallery */}
           <Card className="border-charcoal-ink/5 shadow-none">
-            <CardContent className="p-6 space-y-4">
-              <div>
-                <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Story Hero Images</h3>
-                <p className="text-xs text-charcoal-ink/40 mt-1">16:9 banner images at the top of the guest story page. Up to 3 images.</p>
-              </div>
+            <CardContent className="p-6">
               <SimpleImageGallery
                 media={data.media.filter((m) => m.category === 'story')}
                 onAdd={(url) => addMediaItem('story', url)}
                 onRemove={(idx) => removeMediaItem('story', idx)}
                 maxImages={3}
                 aspectClass="aspect-[16/9]"
+                label="Story Hero Images"
+                helperText="16:9 banner images at the top of the guest story page. Up to 3 images."
               />
             </CardContent>
           </Card>
@@ -1412,35 +1921,40 @@ export default function TemplateEditor() {
             <CardContent className="p-6 space-y-5">
               <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Getting There Content</h3>
               {GETTING_THERE_FIELDS.map((field) => (
-                <div key={field.key} className="space-y-1.5">
-                  <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
-                    {field.label}
-                  </Label>
-                  {field.type === 'image' ? (
-                    <ImageUpload
-                      value={getContentField('getting-there', field.key) || null}
-                      onChange={(v) => setContentField('getting-there', field.key, v || '', 'IMAGE_URL')}
-                      label="Venue Image"
-                      aspectClass="aspect-[4/3]"
-                      maxWidth="360px"
-                    />
-                  ) : field.type === 'textarea' ? (
-                    <Textarea
-                      value={getContentField('getting-there', field.key)}
-                      onChange={(e) => setContentField('getting-there', field.key, e.target.value, 'RICHTEXT')}
-                      placeholder={field.placeholder}
-                      className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
-                      rows={4}
-                    />
-                  ) : (
-                    <Input
-                      value={getContentField('getting-there', field.key)}
-                      onChange={(e) => setContentField('getting-there', field.key, e.target.value)}
-                      placeholder={field.placeholder}
-                      className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
-                    />
-                  )}
-                </div>
+                field.type === 'image' ? (
+                  <MirrorImageUpload
+                    key={field.key}
+                    value={getContentField('getting-there', field.key) || ''}
+                    onChange={(v) => setContentField('getting-there', field.key, v, 'IMAGE_URL')}
+                    onRemove={() => setContentField('getting-there', field.key, '', 'IMAGE_URL')}
+                    label="Venue Image"
+                    helperText="4:3 · mirrors guest-site framing"
+                    aspectClass="aspect-[4/3]"
+                    maxWidth="360px"
+                  />
+                ) : (
+                  <div key={field.key} className="space-y-1.5">
+                    <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                      {field.label}
+                    </Label>
+                    {field.type === 'textarea' ? (
+                      <Textarea
+                        value={getContentField('getting-there', field.key)}
+                        onChange={(e) => setContentField('getting-there', field.key, e.target.value, 'RICHTEXT')}
+                        placeholder={field.placeholder}
+                        className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                        rows={4}
+                      />
+                    ) : (
+                      <Input
+                        value={getContentField('getting-there', field.key)}
+                        onChange={(e) => setContentField('getting-there', field.key, e.target.value)}
+                        placeholder={field.placeholder}
+                        className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                      />
+                    )}
+                  </div>
+                )
               ))}
             </CardContent>
           </Card>
@@ -1482,22 +1996,19 @@ export default function TemplateEditor() {
           <Separator className="bg-champagne-silk" />
 
           {/* Image gallery */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Gallery Images</h3>
-                <p className="text-xs text-charcoal-ink/40 mt-0.5">{momentsImages().length} image(s) · 3:4 portrait · mirrors guest-site framing</p>
-              </div>
-            </div>
-
-            <SimpleImageGallery
-              media={momentsImages()}
-              onAdd={(url) => addMomentsImage(url, `moments-${Date.now()}.png`)}
-              onRemove={(idx) => removeMomentsImage(idx)}
-              maxImages={20}
-              aspectClass="aspect-[3/4]"
-            />
-          </div>
+          <Card className="border-charcoal-ink/5 shadow-none">
+            <CardContent className="p-6">
+              <SimpleImageGallery
+                media={momentsImages()}
+                onAdd={(url) => addMomentsImage(url, `moments-${Date.now()}.png`)}
+                onRemove={(idx) => removeMomentsImage(idx)}
+                maxImages={20}
+                aspectClass="aspect-[3/4]"
+                label="Gallery Images"
+                helperText="3:4 portrait · mirrors guest-site framing"
+              />
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -1659,59 +2170,6 @@ export default function TemplateEditor() {
         </DialogContent>
       </Dialog>
     </div>
-  );
-}
-
-// ── MomentsAddButton (file-input trigger for the moments gallery) ──────────
-
-function MomentsAddButton({ onAdd }: { onAdd: (dataUrl: string, fileName: string) => void }) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-
-  const handleFiles = async (files: FileList | null) => {
-    if (!files) return;
-    setUploading(true);
-    try {
-      for (const file of Array.from(files)) {
-        if (!file.type.startsWith('image/')) continue;
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = (e) => resolve(e.target?.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-        onAdd(dataUrl, file.name || 'image');
-      }
-    } catch {
-      // silently fail
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  return (
-    <>
-      <Button
-        size="sm"
-        onClick={() => fileRef.current?.click()}
-        disabled={uploading}
-        className="bg-slate-900 text-white hover:bg-slate-800"
-      >
-        {uploading ? <Loader2 className="size-3.5 mr-1.5 animate-spin" /> : <Plus className="size-3.5 mr-1.5" />}
-        Add Image
-      </Button>
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        multiple
-        className="hidden"
-        onChange={(e) => {
-          handleFiles(e.target.files);
-          e.target.value = '';
-        }}
-      />
-    </>
   );
 }
 
