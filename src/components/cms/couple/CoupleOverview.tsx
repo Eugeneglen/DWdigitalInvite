@@ -106,16 +106,6 @@ const CHECKLIST_PAGE_MAP: Record<string, CoupleCMSPage> = {
   features: 'features',
 };
 
-const ACTION_STYLES: Record<string, string> = {
-  CREATE: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  UPDATE: 'bg-sky-100 text-sky-700 border-sky-200',
-  DELETE: 'bg-red-100 text-red-700 border-red-200',
-};
-
-function getActionStyle(action: string): string {
-  return ACTION_STYLES[action] ?? 'bg-gray-100 text-gray-600 border-gray-200';
-}
-
 const CONTENT_SECTION_LABELS = [
   { key: 'hero', label: 'Hero' },
   { key: 'schedule', label: 'Schedule' },
@@ -231,7 +221,7 @@ export default function CoupleOverview() {
   }
 
   // ── Derived Values ─────────────────────────────────────────────────────
-  const { daysUntil, isPast, coupleName, guests, rsvps, wishes, content, checklist, recentActivity } = data;
+  const { daysUntil, isPast, coupleName, guests, rsvps, wishes, content, checklist } = data;
 
   // Phase 1: mode-aware KPIs
   const confidence = data.guestListConfidence ?? 'RELIABLE';
@@ -341,7 +331,7 @@ export default function CoupleOverview() {
   // and infer section status from filledSections count (ordered by common priority)
   const filledSectionKeys = CONTENT_SECTION_LABELS.slice(0, content.filledSections).map((s) => s.key);
 
-  const activityItems = recentActivity.slice(0, 8);
+  // activityItems removed — replaced by recentGuestActivity in Phase 3
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
@@ -794,58 +784,63 @@ export default function CoupleOverview() {
         </CardContent>
       </Card>
 
-      {/* 5. Recent Activity Card (full width) */}
+      {/* 5. Recent Guest Activity Card (replaces audit log — shows guest-initiated actions) */}
       <Card>
         <CardHeader className="pb-0">
           <CardTitle className="text-sm font-semibold text-charcoal-ink">
-            Recent Activity
+            Recent Guest Activity
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {activityItems.length === 0 ? (
-            <p className="text-sm text-charcoal-ink/40 py-4 text-center">
-              No recent activity yet
-            </p>
-          ) : (
-            <div className="max-h-96 overflow-y-auto space-y-0">
-              {activityItems.map((item, idx) => (
-                <div
-                  key={item.id}
-                  className={`flex items-start gap-3 py-3 ${
-                    idx < activityItems.length - 1 ? 'border-b border-charcoal-ink/5' : ''
-                  }`}
-                >
-                  {/* Action badge */}
-                  <Badge
-                    variant="outline"
-                    className={`shrink-0 text-[10px] mt-0.5 ${getActionStyle(item.action)}`}
+          {(() => {
+            const guestActivity = data.recentGuestActivity ?? [];
+            if (guestActivity.length === 0) {
+              return (
+                <p className="text-sm text-charcoal-ink/40 py-4 text-center">
+                  No guest activity yet
+                </p>
+              );
+            }
+            return (
+              <div className="max-h-96 overflow-y-auto space-y-0">
+                {guestActivity.map((item, idx) => (
+                  <div
+                    key={item.id}
+                    className={`flex items-start gap-3 py-3 ${
+                      idx < guestActivity.length - 1 ? 'border-b border-charcoal-ink/5' : ''
+                    }`}
                   >
-                    {item.action}
-                  </Badge>
-
-                  {/* Details */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-sm font-medium text-charcoal-ink truncate">
-                        {item.entity}
-                      </span>
-                      {item.details && (
-                        <>
-                          <span className="text-charcoal-ink/20 text-xs">·</span>
-                          <span className="text-sm text-charcoal-ink/50 truncate">
-                            {item.details}
-                          </span>
-                        </>
+                    {/* Type icon */}
+                    <div className={`flex items-center justify-center size-8 rounded-full shrink-0 ${
+                      item.type === 'rsvp' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500'
+                    }`}>
+                      {item.type === 'rsvp' ? (
+                        <Mail className="size-4" />
+                      ) : (
+                        <MessageSquareHeart className="size-4" />
                       )}
                     </div>
-                    <p className="text-xs text-charcoal-ink/35 mt-0.5">
-                      {item.userName} · {formatTimeAgo(item.createdAt)}
-                    </p>
+
+                    {/* Details */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-sm font-medium text-charcoal-ink truncate">
+                          {item.name}
+                        </span>
+                        <span className="text-charcoal-ink/20 text-xs">·</span>
+                        <span className="text-sm text-charcoal-ink/50 truncate">
+                          {item.action}
+                        </span>
+                      </div>
+                      <p className="text-xs text-charcoal-ink/35 mt-0.5">
+                        {formatTimeAgo(item.createdAt)}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
     </div>
