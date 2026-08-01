@@ -123,7 +123,7 @@ const GETTING_THERE_FIELDS: { key: string; label: string; type: 'text' | 'textar
 
 const MOMENTS_FIELDS: { key: string; label: string; type: 'text' | 'textarea'; placeholder?: string }[] = [
   { key: 'title', label: 'Section Title', type: 'text', placeholder: 'Moments' },
-  { key: 'subtitle', label: 'Section Subtitle', type: 'textarea', placeholder: 'The Journey Before the I Do...' },
+  { key: 'subtitle', label: 'Section Subtitle', type: 'text', placeholder: 'The Journey Before the I Do...' },
 ];
 
 const WISHES_FIELDS: { key: string; label: string; type: 'text' | 'textarea'; placeholder?: string }[] = [
@@ -149,11 +149,11 @@ const SCHEDULE_FIELDS: { key: string; label: string; type: 'text' | 'textarea'; 
 ];
 
 const EVENT_TYPES = [
-  { value: 'TEA_CEREMONY', label: 'Tea Ceremony', color: 'bg-amber-100 text-amber-700' },
-  { value: 'CEREMONY', label: 'Ceremony', color: 'bg-rose-100 text-rose-700' },
-  { value: 'RECEPTION', label: 'Reception', color: 'bg-emerald-100 text-emerald-700' },
-  { value: 'DINNER', label: 'Dinner', color: 'bg-violet-100 text-violet-700' },
-  { value: 'CUSTOM', label: 'Custom', color: 'bg-slate-100 text-slate-700' },
+  { value: 'TEA_CEREMONY', label: 'Ceremony Section', color: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { value: 'CEREMONY', label: 'Ceremony', color: 'bg-rose-50 text-rose-700 border-rose-200' },
+  { value: 'RECEPTION', label: 'Reception', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  { value: 'DINNER', label: 'Dinner', color: 'bg-violet-50 text-violet-700 border-violet-200' },
+  { value: 'CUSTOM', label: 'Custom', color: 'bg-slate-50 text-slate-700 border-slate-200' },
 ];
 
 const THEME_PRESETS: { id: string; name: string; description: string; isDefault?: boolean; colors: Theme['colors']; fonts: Theme['fonts'] }[] = [
@@ -1126,7 +1126,7 @@ export default function TemplateEditor() {
 
       {/* ── DETAILS SECTION ─────────────────────────────────────────────── */}
       {activeSection === 'details' && (
-        <div className="space-y-6 max-w-3xl">
+        <div className="space-y-6 max-w-5xl">
           {/* Page header */}
           <div className="flex items-center gap-2">
             <Heart className="size-5 text-cinematic-gold" />
@@ -1272,7 +1272,18 @@ export default function TemplateEditor() {
 
       {/* ── HOME SECTION ────────────────────────────────────────────────── */}
       {activeSection === 'home' && (
-        <div className="space-y-6 max-w-3xl">
+        <div className="space-y-6 max-w-5xl">
+          {/* Page header */}
+          <div className="flex items-center gap-2">
+            <HomeIcon className="size-5 text-cinematic-gold" />
+            <div>
+              <h3 className="text-lg font-semibold text-charcoal-ink">Home Section</h3>
+              <p className="text-xs text-charcoal-ink/50">Hero visual, banner, ambient animations, and narrative content shown at the top of the guest site.</p>
+            </div>
+          </div>
+
+          <Separator className="bg-champagne-silk" />
+
           {/* Hero Visual + Banner */}
           <Card className="border-charcoal-ink/5 shadow-none">
             <CardContent className="p-6 space-y-5">
@@ -1432,7 +1443,7 @@ export default function TemplateEditor() {
 
       {/* ── DESIGN SECTION ──────────────────────────────────────────────── */}
       {activeSection === 'design' && (
-        <div className="space-y-6 max-w-4xl">
+        <div className="space-y-6 max-w-5xl">
           {/* Page header */}
           <div className="flex items-center gap-2">
             <Palette className="size-5 text-cinematic-gold" />
@@ -1617,7 +1628,18 @@ export default function TemplateEditor() {
 
       {/* ── SCHEDULE SECTION ────────────────────────────────────────────── */}
       {activeSection === 'schedule' && (
-        <div className="space-y-6 max-w-3xl">
+        <div className="space-y-6 max-w-5xl">
+          {/* Page header */}
+          <div className="flex items-center gap-2">
+            <Calendar className="size-5 text-cinematic-gold" />
+            <div>
+              <h3 className="text-lg font-semibold text-charcoal-ink">Event Schedule</h3>
+              <p className="text-xs text-charcoal-ink/50">Section text, timeline of events, schedule images, and venue information.</p>
+            </div>
+          </div>
+
+          <Separator className="bg-champagne-silk" />
+
           {/* Schedule Section Text (moved from Home tab per P2-17) */}
           <Card className="border-charcoal-ink/5 shadow-none">
             <CardContent className="p-6 space-y-5">
@@ -1666,7 +1688,7 @@ export default function TemplateEditor() {
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <Badge className={`text-xs ${eventType.color}`}>{eventType.label}</Badge>
+                          <Badge variant="outline" className={`text-xs border ${eventType.color}`}>{eventType.label}</Badge>
                           <span className="text-sm font-medium text-charcoal-ink">{item.title}</span>
                         </div>
                         <div className="flex items-center gap-3 text-xs text-charcoal-ink/50">
@@ -1755,7 +1777,18 @@ export default function TemplateEditor() {
 
       {/* ── STORY SECTION ──────────────────────────────────────────────── */}
       {activeSection === 'story' && (
-        <div className="space-y-6 max-w-3xl">
+        <div className="space-y-6 max-w-5xl">
+          {/* Page header */}
+          <div className="flex items-center gap-2">
+            <BookOpen className="size-5 text-cinematic-gold" />
+            <div>
+              <h3 className="text-lg font-semibold text-charcoal-ink">Our Love Story</h3>
+              <p className="text-xs text-charcoal-ink/50">Section text, chapter timeline, hero images, tidbits, and honeymoon voting.</p>
+            </div>
+          </div>
+
+          <Separator className="bg-champagne-silk" />
+
           {/* Section text */}
           <Card className="border-charcoal-ink/5 shadow-none">
             <CardContent className="p-6 space-y-5">
@@ -1988,7 +2021,18 @@ export default function TemplateEditor() {
 
       {/* ── FAQs SECTION ───────────────────────────────────────────────── */}
       {activeSection === 'faqs' && (
-        <div className="space-y-6 max-w-3xl">
+        <div className="space-y-6 max-w-5xl">
+          {/* Page header */}
+          <div className="flex items-center gap-2">
+            <HelpCircle className="size-5 text-cinematic-gold" />
+            <div>
+              <h3 className="text-lg font-semibold text-charcoal-ink">Questions &amp; Answers</h3>
+              <p className="text-xs text-charcoal-ink/50">Section text and the list of frequently asked questions shown to guests.</p>
+            </div>
+          </div>
+
+          <Separator className="bg-champagne-silk" />
+
           {/* Section text */}
           <Card className="border-charcoal-ink/5 shadow-none">
             <CardContent className="p-6 space-y-5">
@@ -2084,7 +2128,7 @@ export default function TemplateEditor() {
 
       {/* ── GETTING THERE SECTION ──────────────────────────────────────── */}
       {activeSection === 'getting-there' && (
-        <div className="space-y-6 max-w-3xl">
+        <div className="space-y-6 max-w-5xl">
           {/* Page header */}
           <div className="flex items-center gap-2">
             <MapPin className="size-5 text-cinematic-gold" />
@@ -2132,7 +2176,18 @@ export default function TemplateEditor() {
 
       {/* ── MOMENTS SECTION ────────────────────────────────────────────── */}
       {activeSection === 'moments' && (
-        <div className="space-y-6 max-w-3xl">
+        <div className="space-y-6 max-w-5xl">
+          {/* Page header */}
+          <div className="flex items-center gap-2">
+            <Camera className="size-5 text-cinematic-gold" />
+            <div>
+              <h3 className="text-lg font-semibold text-charcoal-ink">Moments</h3>
+              <p className="text-xs text-charcoal-ink/50">Section text and the gallery of 3:4 portrait photos displayed on the guest site.</p>
+            </div>
+          </div>
+
+          <Separator className="bg-champagne-silk" />
+
           <Card className="border-charcoal-ink/5 shadow-none">
             <CardContent className="p-6 space-y-5">
               <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Moments Section Text</h3>
@@ -2186,7 +2241,18 @@ export default function TemplateEditor() {
 
       {/* ── WISHES SECTION ────────────────────────────────────────────── */}
       {activeSection === 'wishes' && (
-        <div className="space-y-6 max-w-3xl">
+        <div className="space-y-6 max-w-5xl">
+          {/* Page header */}
+          <div className="flex items-center gap-2">
+            <MessageSquareHeart className="size-5 text-cinematic-gold" />
+            <div>
+              <h3 className="text-lg font-semibold text-charcoal-ink">Wishes &amp; Blessings</h3>
+              <p className="text-xs text-charcoal-ink/50">Customise the text guests see on the wishes/blessings section of the guest site.</p>
+            </div>
+          </div>
+
+          <Separator className="bg-champagne-silk" />
+
           <Card className="border-charcoal-ink/5 shadow-none">
             <CardContent className="p-6 space-y-5">
               <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Wishes Section Text</h3>
@@ -2214,7 +2280,7 @@ export default function TemplateEditor() {
 
       {/* ── PREVIEW SECTION ────────────────────────────────────────────── */}
       {activeSection === 'preview' && (
-        <div className="space-y-4 max-w-3xl">
+        <div className="space-y-4 max-w-5xl">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Live Preview</h3>
@@ -2243,8 +2309,12 @@ export default function TemplateEditor() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wider text-charcoal-ink/50">Title</Label>
+              <Label className="text-xs uppercase tracking-wider text-charcoal-ink/50">Title <span className="text-red-500">*</span></Label>
               <Input value={scheduleForm.title} onChange={(e) => setScheduleForm({ ...scheduleForm, title: e.target.value })} placeholder="Wedding Ceremony" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider text-charcoal-ink/50">Description</Label>
+              <Textarea value={scheduleForm.description || ''} onChange={(e) => setScheduleForm({ ...scheduleForm, description: e.target.value })} placeholder="Exchange of vows and rings" rows={2} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -2259,10 +2329,6 @@ export default function TemplateEditor() {
             <div className="space-y-1.5">
               <Label className="text-xs uppercase tracking-wider text-charcoal-ink/50">Location</Label>
               <Input value={scheduleForm.location || ''} onChange={(e) => setScheduleForm({ ...scheduleForm, location: e.target.value })} placeholder="The Fullerton Hotel — Grand Ballroom" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wider text-charcoal-ink/50">Description</Label>
-              <Textarea value={scheduleForm.description || ''} onChange={(e) => setScheduleForm({ ...scheduleForm, description: e.target.value })} placeholder="Exchange of vows and rings" rows={2} />
             </div>
           </div>
           <DialogFooter className="gap-2 pt-2">
@@ -2283,7 +2349,7 @@ export default function TemplateEditor() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wider text-charcoal-ink/50">Chapter Title</Label>
+              <Label className="text-xs uppercase tracking-wider text-charcoal-ink/50">Chapter Title <span className="text-red-500">*</span></Label>
               <Input value={storyForm.title} onChange={(e) => setStoryForm({ ...storyForm, title: e.target.value })} placeholder="How We Met" />
             </div>
             <div className="space-y-1.5">
@@ -2291,14 +2357,10 @@ export default function TemplateEditor() {
               <Input type="date" value={storyForm.date} onChange={(e) => setStoryForm({ ...storyForm, date: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wider text-charcoal-ink/50">Content</Label>
+              <Label className="text-xs uppercase tracking-wider text-charcoal-ink/50">Content <span className="text-red-500">*</span></Label>
               <Textarea value={storyForm.content} onChange={(e) => setStoryForm({ ...storyForm, content: e.target.value })} placeholder="The story of how it all began..." rows={4} />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wider text-charcoal-ink/50">Image URL</Label>
-              <Input value={storyForm.imageUrl} onChange={(e) => setStoryForm({ ...storyForm, imageUrl: e.target.value })} placeholder="/wedding-images/story-1.png" />
-              <p className="text-[11px] text-charcoal-ink/40">Paste a path or upload via the chapter card after saving.</p>
-            </div>
+            <p className="text-[11px] text-charcoal-ink/40">Add the chapter image via the inline upload on the chapter card after saving.</p>
           </div>
           <DialogFooter className="gap-2 pt-2">
             <Button variant="outline" onClick={() => setStoryDialogOpen(false)}>Cancel</Button>
@@ -2318,11 +2380,11 @@ export default function TemplateEditor() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wider text-charcoal-ink/50">Question</Label>
+              <Label className="text-xs uppercase tracking-wider text-charcoal-ink/50">Question <span className="text-red-500">*</span></Label>
               <Input value={faqForm.question} onChange={(e) => setFaqForm({ ...faqForm, question: e.target.value })} placeholder="What time should I arrive?" />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wider text-charcoal-ink/50">Answer</Label>
+              <Label className="text-xs uppercase tracking-wider text-charcoal-ink/50">Answer <span className="text-red-500">*</span></Label>
               <Textarea value={faqForm.answer} onChange={(e) => setFaqForm({ ...faqForm, answer: e.target.value })} placeholder="Please arrive 15 minutes before the ceremony..." rows={4} />
             </div>
             <div className="flex items-center gap-3 rounded-lg border border-charcoal-ink/10 p-3">
