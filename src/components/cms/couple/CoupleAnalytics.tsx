@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Users, MessageSquareHeart, Eye, BarChart3, Loader2,
+  UserPlus, Link2, AlertCircle,
 } from 'lucide-react';
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
@@ -11,6 +12,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import { toast } from '@/hooks/use-toast';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -47,6 +54,20 @@ interface AnalyticsData {
     groupName: string;
     dietaryNotes: string;
     rsvpStatus: string;
+  }>;
+  // ── Phase 5 new fields (additive) ───────────────────────────
+  unmatchedRsvps?: Array<{
+    id: string;
+    name: string;
+    partySize: number;
+    createdAt: string;
+    guests: Array<{ name: string; attendance: string; dietary: string | null }>;
+  }>;
+  allGuestsForMatch?: Array<{
+    id: string;
+    name: string;
+    groupName: string;
+    email: string | null;
   }>;
 }
 
@@ -152,23 +173,77 @@ export default function CoupleAnalytics() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Phase 5: state for unmatched RSVP actions
+  const [matchGuestId, setMatchGuestId] = useState<Record<string, string>>({});
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const fetchAnalytics = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/cms/analytics?XTransformPort=3000');
+      if (!res.ok) throw new Error(`Failed to load (${res.status})`);
+      const json = await res.json();
+      setData(json);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    async function fetchAnalytics() {
-      try {
-        setLoading(true);
-        const res = await fetch('/api/cms/analytics?XTransformPort=3000');
-        if (!res.ok) throw new Error(`Failed to load (${res.status})`);
-        const json = await res.json();
-        setData(json);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    }
     fetchAnalytics();
-  }, []);
+  }, [fetchAnalytics]);
+
+  // Phase 5: Match an RSVP to an existing guest
+  async function handleMatchRsvp(rsvpId: string) {
+    const guestId = matchGuestId[rsvpId];
+    if (!guestId) {
+      toast({ title: 'Select a guest', description: 'Choose a guest from the dropdown first.', variant: 'destructive' });
+      return;
+    }
+    try {
+      setActionLoading(rsvpId);
+      const res = await fetch('/api/cms/rsvps?XTransformPort=3000', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rsvpId, guestId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to match');
+      }
+      toast({ title: 'Matched', description: 'RSVP has been linked to the guest.' });
+      setMatchGuestId(prev => { const next = { ...prev }; delete next[rsvpId]; return next; });
+      await fetchAnalytics();
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to match RSVP', variant: 'destructive' });
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  // Phase 5: Create a new guest from an unmatched RSVP
+  async function handleAddAsGuest(rsvpId: string) {
+    try {
+      setActionLoading(rsvpId);
+      const res = await fetch('/api/cms/rsvps?XTransformPort=3000', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rsvpId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to create guest');
+      }
+      toast({ title: 'Guest Created', description: 'New guest added from RSVP and linked.' });
+      await fetchAnalytics();
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to create guest', variant: 'destructive' });
+    } finally {
+      setActionLoading(null);
+    }
+  }
 
   if (error) {
     return (
@@ -609,6 +684,126 @@ export default function CoupleAnalytics() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Phase 5: Unmatched RSVPs (submissions with no guestId link) ── */}
+      <Card className="border-charcoal-ink/5 rounded-xl bg-white shadow-none">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold text-charcoal-ink">
+              Unmatched RSVPs
+            </CardTitle>
+            {!loading && data && (
+              <span className="text-xs text-charcoal-ink/40">
+                {data.unmatchedRsvps?.length ?? 0} unmatched
+              </span>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full rounded" />
+              ))}
+            </div>
+          ) : !data || !data.unmatchedRsvps || data.unmatchedRsvps.length === 0 ? (
+            <div className="flex items-center justify-center py-10 text-charcoal-ink/30 text-sm">
+              All RSVPs are matched to guests
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {data.unmatchedRsvps.map((rsvp) => {
+                const rsvpStatus = rsvp.guests.length === 0 ? 'unknown'
+                  : rsvp.guests.every(g => g.attendance === 'yes') ? 'attending'
+                  : rsvp.guests.every(g => g.attendance === 'no') ? 'declined'
+                  : 'partial';
+                const statusColor = rsvpStatus === 'attending' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : rsvpStatus === 'declined' ? 'bg-red-50 text-red-600 border-red-200'
+                  : rsvpStatus === 'partial' ? 'bg-amber-50 text-amber-700 border-amber-200'
+                  : 'bg-gray-50 text-gray-600 border-gray-200';
+
+                return (
+                  <div key={rsvp.id} className="rounded-lg border border-charcoal-ink/10 p-4 space-y-3">
+                    {/* RSVP info row */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-charcoal-ink">{rsvp.name}</span>
+                          <Badge variant="outline" className={`text-[10px] ${statusColor}`}>
+                            {rsvpStatus}
+                          </Badge>
+                          <span className="text-xs text-charcoal-ink/40">
+                            {rsvp.partySize} guest{rsvp.partySize !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        {rsvp.guests.length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1.5">
+                            {rsvp.guests.map((g, i) => (
+                              <span key={i} className="text-[11px] text-charcoal-ink/50">
+                                {g.name}
+                                {g.dietary && <span className="text-violet-600 ml-1">({g.dietary})</span>}
+                                {i < rsvp.guests.length - 1 && <span className="text-charcoal-ink/20"> ·</span>}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Action row */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2 border-t border-charcoal-ink/5">
+                      {/* Match to existing guest */}
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <Select
+                          value={matchGuestId[rsvp.id] || ''}
+                          onValueChange={(v) => setMatchGuestId(prev => ({ ...prev, [rsvp.id]: v }))}
+                          disabled={actionLoading === rsvp.id}
+                        >
+                          <SelectTrigger className="h-8 text-xs flex-1 min-w-0">
+                            <SelectValue placeholder="Match to existing guest..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(data.allGuestsForMatch ?? []).map((g) => (
+                              <SelectItem key={g.id} value={g.id} className="text-xs">
+                                {g.name} <span className="text-charcoal-ink/40">({g.groupName})</span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleMatchRsvp(rsvp.id)}
+                          disabled={actionLoading === rsvp.id || !matchGuestId[rsvp.id]}
+                          className="h-8 text-xs gap-1.5 shrink-0 border-charcoal-ink/15"
+                        >
+                          {actionLoading === rsvp.id ? <Loader2 className="size-3 animate-spin" /> : <Link2 className="size-3" />}
+                          Match
+                        </Button>
+                      </div>
+
+                      {/* Divider */}
+                      <span className="hidden sm:block text-charcoal-ink/20 text-xs">or</span>
+
+                      {/* Add as new guest */}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleAddAsGuest(rsvp.id)}
+                        disabled={actionLoading === rsvp.id}
+                        className="h-8 text-xs gap-1.5 shrink-0 border-cinematic-gold/30 text-cinematic-gold hover:bg-cinematic-gold/5"
+                      >
+                        <UserPlus className="size-3" />
+                        Add as New Guest
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>

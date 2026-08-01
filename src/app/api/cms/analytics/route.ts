@@ -136,6 +136,41 @@ export async function GET() {
       }))
       .sort((a, b) => a.groupName.localeCompare(b.groupName) || a.name.localeCompare(b.name));
 
+    // ── Phase 5: Unmatched RSVPs (submissions with no guestId link) ─
+    const unmatchedRsvpRecords = await db.rSVPSubmission.findMany({
+      where: { weddingId, guestId: null },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        partySize: true,
+        createdAt: true,
+        guests: { select: { name: true, attendance: true, dietary: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    const unmatchedRsvps = unmatchedRsvpRecords.map((r) => ({
+      id: r.id,
+      name: `${r.firstName} ${r.lastName}`.trim(),
+      partySize: r.partySize,
+      createdAt: r.createdAt.toISOString(),
+      guests: r.guests.map((g) => ({
+        name: g.name,
+        attendance: g.attendance,
+        dietary: g.dietary,
+      })),
+    }));
+
+    // ── Phase 5: All guests (for the match dropdown) ────────────
+    const allGuestsForMatch = guests
+      .map((g) => ({
+        id: g.id,
+        name: g.name,
+        groupName: g.groupName || 'Ungrouped',
+        email: g.email,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
     return NextResponse.json({
       guestStats: {
         total,
@@ -151,6 +186,9 @@ export async function GET() {
       // ── Phase 4 new fields (additive) ───────────────────────────
       nonResponders,
       dietaryGuests,
+      // ── Phase 5 new fields (additive) ───────────────────────────
+      unmatchedRsvps,
+      allGuestsForMatch,
     });
   } catch (error) {
     console.error('Analytics error:', error);
