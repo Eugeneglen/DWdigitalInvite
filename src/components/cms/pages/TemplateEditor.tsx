@@ -2477,6 +2477,17 @@ function PreviewPanel({ data }: { data: TemplateData }) {
   const scheduleSubtitle = getField('schedule', 'subtitle', 'The Celebration');
   const storyTitle = getField('story', 'title', 'Our Story');
   const storySubtitle = getField('story', 'subtitle', 'A narrative woven through time, capturing the moments that led us here.');
+  // Tidbits + honeymoon data (read from template content JSON fields)
+  const tidbitsEnabled = getField('story', 'tidbitsEnabled') !== 'false';
+  const tidbitsTitle = getField('story', 'tidbitsTitle', 'Did You Know?');
+  const tidbits: { q: string; a: string }[] = (() => {
+    try { return JSON.parse(getField('story', 'tidbits') || '[]'); } catch { return []; }
+  })();
+  const honeymoonEnabled = getField('story', 'honeymoonEnabled') !== 'false';
+  const honeymoonEyebrow = getField('story', 'honeymoonEyebrow', 'Where should we go?');
+  const honeymoonDestinations: { name: string }[] = (() => {
+    try { return JSON.parse(getField('story', 'honeymoonDestinations') || '[]'); } catch { return []; }
+  })();
   const momentsTitle = getField('moments', 'title', 'Moments');
   const momentsSubtitle = getField('moments', 'subtitle', 'The Journey Before the I Do—from childhood dreams to our first steps together.');
   const qaTitle = getField('qa', 'title', 'Questions & Answers');
@@ -2489,10 +2500,33 @@ function PreviewPanel({ data }: { data: TemplateData }) {
   const secondary = theme.colors.secondary;
   const muted = theme.colors.muted;
   const headingFont = `'${theme.fonts.heading}', serif`;
-  const bodyFont = `'${theme.fonts.body}', sans-serif`;
+  // Gold standard's globals.css overrides .font-body-md to use Playfair Display
+  // (the heading font) regardless of theme.fonts.body. Match that behavior here
+  // so the preview accurately reflects what the guest site renders.
+  const bodyFont = `'${theme.fonts.heading}', serif`;
+  // Gold standard uses text-charcoal-ink/80 (dark gray at 80% opacity) for body text.
+  // The theme's `text` color (#2C2C2C for Classic Elegance) is the closest match.
+  const bodyTextColor = text;
 
   // ── Filtered media (moments gallery) ───────────────────────────────────
   const momentsMedia = media.filter((m) => m.category === 'moments');
+  const storyImages = media.filter((m) => m.category === 'story');
+  const scheduleImages = media.filter((m) => m.category === 'schedule');
+  // Venue data (for schedule venue section)
+  const venueImage = getField('getting-there', 'venueImage', '');
+  const venueDescription = getField('getting-there', 'venueDescription', '');
+  const venueName = getField('details', 'venue', '');
+
+  // Format raw 24-hour time string ("10:00", "16:00") to 12-hour ("10:00 AM", "4:00 PM")
+  const formatTime = (raw: string): string => {
+    if (!raw) return '';
+    const [h, m] = raw.split(':');
+    const hour = parseInt(h, 10);
+    if (isNaN(hour)) return raw;
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    return `${displayHour}:${m || '00'} ${period}`;
+  };
 
   // ── Countdown (prefers countdownDate ISO field, falls back to dateDisplay) ─
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, mins: 0, secs: 0 });
@@ -2532,31 +2566,26 @@ function PreviewPanel({ data }: { data: TemplateData }) {
 
   // ── Section banner (shared across schedule / story / moments / qa) ──────
   // Mirrors src/components/wedding/SectionBanner.tsx: full-bleed banner
-  // image with the section title (and optional subtitle) overlaid.
-  const renderSectionBanner = (title: string, subtitle?: string) => (
+  // image with h1 title overlaid (NO subtitle on banner — subtitle is
+  // rendered as an intro paragraph inside each section instead).
+  // Uses light cream gradient + dark text (matching gold standard's
+  // auto-contrast behavior for bright banner images).
+  const renderSectionBanner = (title: string) => (
     <div
-      className="relative w-full h-[200px] bg-cover bg-center flex items-center justify-center"
-      style={{ backgroundImage: `url('${bannerUrl}')` }}
+      className="relative w-full bg-cover bg-center flex items-center justify-center"
+      style={{ backgroundImage: `url('${bannerUrl}')`, height: '420px' }}
     >
       <div
         className="absolute inset-0"
-        style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.15), rgba(0,0,0,0.45))' }}
+        style={{ background: 'linear-gradient(to bottom, rgba(252,249,242,0.3), rgba(252,249,242,0.1) 50%, rgba(252,249,242,0.6))' }}
       />
       <div className="relative z-10 text-center px-6">
-        <h2
-          className="text-[30px] md:text-[40px] leading-[1.05] tracking-tight font-bold drop-shadow-sm"
-          style={{ fontFamily: headingFont, color: '#FFF8E7' }}
+        <h1
+          className="text-[44px] md:text-[72px] leading-[1.05] tracking-tight font-bold drop-shadow-sm"
+          style={{ fontFamily: headingFont, color: '#1A1A1A' }}
         >
           {title}
-        </h2>
-        {subtitle && (
-          <p
-            className="mt-2 text-[10px] md:text-xs uppercase tracking-[0.25em] font-semibold drop-shadow"
-            style={{ color: accent }}
-          >
-            {subtitle}
-          </p>
-        )}
+        </h1>
       </div>
     </div>
   );
@@ -2578,7 +2607,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
           />
           <div className="relative z-10 text-center px-6">
             <h1
-              className="text-[38px] md:text-[56px] leading-[1.05] tracking-tight font-bold drop-shadow-sm"
+              className="text-4xl md:text-6xl leading-[1.05] tracking-tight font-bold drop-shadow-sm"
               style={{ fontFamily: headingFont, color: '#FFF8E7' }}
             >
               {heroTitle}
@@ -2595,7 +2624,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
         </div>
 
         {/* ===== HERO PORTRAIT (full-bleed image + date + description + countdown) ===== */}
-        <div className="relative w-full h-[520px] overflow-hidden">
+        <div className="relative w-full overflow-hidden" style={{ height: '520px' }}>
           <img
             src={heroImageUrl}
             alt="Hero Wedding Portrait"
@@ -2656,35 +2685,35 @@ function PreviewPanel({ data }: { data: TemplateData }) {
           </div>
         </div>
 
-        {/* ===== TEA CEREMONY (image + label + title + body, side by side) ===== */}
+        {/* ===== TEA CEREMONY (image on top + label + title + body, vertical) ===== */}
         <section className="py-14 px-6 md:px-10 max-w-5xl mx-auto">
-          <div className="flex flex-col md:flex-row gap-8 md:gap-12 items-center">
-            <div className="w-full md:w-1/2 shrink-0">
-              <div className="aspect-[4/5] md:aspect-[3/4] w-full overflow-hidden rounded-lg shadow-xl">
+          <div className="flex flex-col items-center gap-8">
+            <div className="w-full max-w-2xl">
+              <div className="aspect-[4/5] w-full overflow-hidden rounded-lg shadow-xl group">
                 <img
                   src={teaCeremonyImage}
                   alt={teaCeremonyTitle}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                 />
               </div>
             </div>
-            <div className="w-full md:w-1/2 text-center md:text-left">
+            <div className="w-full max-w-2xl text-center">
               <span
                 className="block mb-2 text-[10px] md:text-xs uppercase tracking-[0.2em] font-semibold"
-                style={{ color: accent, fontFamily: bodyFont }}
+                style={{ color: accent, fontFamily: headingFont }}
               >
                 {teaCeremonyLabel}
               </span>
               <h3
-                className="text-2xl md:text-3xl font-semibold mb-4"
+                className="text-[48px] font-semibold mb-4 leading-[1.1]"
                 style={{ fontFamily: headingFont, color: text }}
               >
                 {teaCeremonyTitle}
               </h3>
               {teaCeremonyBody && (
                 <p
-                  className="text-sm md:text-base leading-relaxed max-w-xl"
-                  style={{ color: muted, fontFamily: bodyFont }}
+                  className="text-sm md:text-base leading-relaxed max-w-xl mx-auto"
+                  style={{ color: bodyTextColor, fontFamily: bodyFont }}
                 >
                   {teaCeremonyBody}
                 </p>
@@ -2696,35 +2725,58 @@ function PreviewPanel({ data }: { data: TemplateData }) {
         {/* ===== NARRATIVE (label + title + body, centered) ===== */}
         <section
           className="py-14 px-6 md:px-10 max-w-3xl mx-auto text-center"
-          style={{ borderTop: `1px solid ${muted}33` }}
         >
           <span
             className="block mb-3 text-[10px] md:text-xs uppercase tracking-[0.2em] font-semibold"
-            style={{ color: accent, fontFamily: bodyFont }}
+            style={{ color: accent, fontFamily: headingFont }}
           >
             {narrativeLabel}
           </span>
           <h3
-            className="text-2xl md:text-3xl font-semibold mb-4"
+            className="text-[48px] font-semibold mb-4 leading-[1.1]"
             style={{ fontFamily: headingFont, color: text }}
           >
             {narrativeTitle}
           </h3>
           <p
             className="text-sm md:text-base leading-relaxed max-w-2xl mx-auto"
-            style={{ color: muted, fontFamily: bodyFont }}
+            style={{ color: bodyTextColor, fontFamily: bodyFont }}
           >
             {narrativeBody}
           </p>
         </section>
 
         {/* ===== SCHEDULE (section banner + timeline of events) ===== */}
-        {renderSectionBanner(scheduleTitle, scheduleSubtitle)}
+        {renderSectionBanner(scheduleTitle)}
         <section className="py-14 px-6 md:px-10 max-w-3xl mx-auto">
+          {/* Schedule intro portraits (2 images side-by-side) */}
+          {scheduleImages.length > 0 && (
+            <div className="grid grid-cols-2 gap-4 mb-12">
+              {scheduleImages.slice(0, 2).map((img, idx) => (
+                <div key={idx} className="aspect-[4/5] overflow-hidden rounded-lg shadow-md">
+                  <img src={img.url} alt={`Schedule ${idx + 1}`} className="w-full h-full object-cover" />
+                </div>
+              ))}
+            </div>
+          )}
+          {/* Date line */}
+          {dateDisplay && (
+            <p className="text-center italic mb-12 text-sm md:text-base" style={{ color: bodyTextColor, fontFamily: bodyFont }}>
+              {dateDisplay}
+            </p>
+          )}
+          {scheduleSubtitle && (
+            <p
+              className="text-center italic max-w-2xl mx-auto mb-10 text-sm md:text-base"
+              style={{ color: bodyTextColor, fontFamily: bodyFont }}
+            >
+              {scheduleSubtitle}
+            </p>
+          )}
           {schedule.length === 0 ? (
             <p
               className="text-center text-sm italic py-10"
-              style={{ color: muted, fontFamily: bodyFont }}
+              style={{ color: bodyTextColor, fontFamily: bodyFont }}
             >
               No events scheduled.
             </p>
@@ -2732,7 +2784,6 @@ function PreviewPanel({ data }: { data: TemplateData }) {
             <div className="relative border-l pl-8 ml-2" style={{ borderColor: `${accent}55` }}>
               <div className="flex flex-col gap-10">
                 {schedule.map((item, idx) => {
-                  const eventType = EVENT_TYPES.find((t) => t.value === item.eventType);
                   return (
                     <div key={idx} className="relative">
                       <div
@@ -2749,19 +2800,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
                               fontFamily: bodyFont,
                             }}
                           >
-                            {item.startTime}
-                          </span>
-                        )}
-                        {eventType && (
-                          <span
-                            className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
-                            style={{
-                              backgroundColor: `${accent}22`,
-                              color: accent,
-                              fontFamily: bodyFont,
-                            }}
-                          >
-                            {eventType.label}
+                            {formatTime(item.startTime)}
                           </span>
                         )}
                       </div>
@@ -2774,7 +2813,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
                       {item.description && (
                         <p
                           className="text-sm mt-1 leading-relaxed"
-                          style={{ color: muted, fontFamily: bodyFont }}
+                          style={{ color: bodyTextColor, fontFamily: bodyFont }}
                         >
                           {item.description}
                         </p>
@@ -2798,15 +2837,49 @@ function PreviewPanel({ data }: { data: TemplateData }) {
               </div>
             </div>
           )}
+          
+          {/* Wedding Venue section */}
+          {(venueImage || venueDescription) && (
+            <div className="mt-16 pt-12 border-t" style={{ borderColor: `${muted}33` }}>
+              <span className="block mb-2 text-[10px] md:text-xs uppercase tracking-[0.2em] font-semibold text-center" style={{ color: accent, fontFamily: headingFont }}>
+                Wedding Venue
+              </span>
+              {venueName && (
+                <h3 className="text-[48px] font-semibold mb-6 text-center leading-[1.1]" style={{ fontFamily: headingFont, color: text }}>
+                  {venueName}
+                </h3>
+              )}
+              {venueImage && (
+                <div className="aspect-[4/3] w-full overflow-hidden rounded-lg shadow-xl mb-6">
+                  <img src={venueImage} alt={venueName || 'Venue'} className="w-full h-full object-cover" />
+                </div>
+              )}
+              {venueDescription && (
+                <p className="text-sm md:text-base leading-relaxed max-w-2xl mx-auto text-center" style={{ color: bodyTextColor, fontFamily: bodyFont }}>
+                  {venueDescription}
+                </p>
+              )}
+            </div>
+          )}
         </section>
 
         {/* ===== STORY (section banner + zigzag timeline of chapters) ===== */}
-        {renderSectionBanner(storyTitle, storySubtitle)}
+        {renderSectionBanner(storyTitle)}
         <section className="py-14 px-6 md:px-10 max-w-4xl mx-auto">
+          {/* Story hero image (16:9) */}
+          {storyImages.length > 0 && (
+            <div className="w-full aspect-[16/9] overflow-hidden rounded-lg shadow-xl mb-10">
+              <img
+                src={storyImages[0].url}
+                alt={storyTitle}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
           {storySubtitle && (
             <p
               className="text-center italic max-w-2xl mx-auto mb-10 text-sm md:text-base"
-              style={{ color: muted, fontFamily: bodyFont }}
+              style={{ color: bodyTextColor, fontFamily: bodyFont }}
             >
               {storySubtitle}
             </p>
@@ -2814,7 +2887,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
           {stories.length === 0 ? (
             <p
               className="text-center text-sm italic py-10"
-              style={{ color: muted, fontFamily: bodyFont }}
+              style={{ color: bodyTextColor, fontFamily: bodyFont }}
             >
               Our story coming soon.
             </p>
@@ -2863,7 +2936,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
                         </h4>
                         <p
                           className="text-sm italic leading-relaxed"
-                          style={{ color: muted, fontFamily: bodyFont }}
+                          style={{ color: bodyTextColor, fontFamily: bodyFont }}
                         >
                           {story.content}
                         </p>
@@ -2874,8 +2947,9 @@ function PreviewPanel({ data }: { data: TemplateData }) {
                         >
                           <div
                             className={`w-full overflow-hidden rounded-lg shadow-md ${
-                              isReversed ? 'max-w-[260px] aspect-[3/4]' : 'max-w-[300px] aspect-square'
+                              isReversed ? 'aspect-[3/4]' : 'aspect-square'
                             }`}
+                            style={isReversed ? { maxWidth: '260px' } : { maxWidth: '300px' }}
                           >
                             <img
                               src={story.imageUrl || ''}
@@ -2891,15 +2965,71 @@ function PreviewPanel({ data }: { data: TemplateData }) {
               </div>
             </div>
           )}
+          
+          {/* Tidbits section (Did You Know?) */}
+          {tidbitsEnabled && tidbits.length > 0 && (
+            <div className="mt-16 pt-12 border-t" style={{ borderColor: `${muted}33` }}>
+              <h3 className="text-[48px] font-semibold mb-4 text-center leading-[1.1]" style={{ fontFamily: headingFont, color: text }}>
+                {tidbitsTitle}
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+                {tidbits.map((t, idx) => (
+                  <div
+                    key={idx}
+                    className="p-6 rounded-lg backdrop-blur-sm"
+                    style={{ backgroundColor: `${bg}80`, border: `1px solid ${muted}22` }}
+                  >
+                    <p className="text-sm md:text-base font-medium mb-2" style={{ fontFamily: headingFont, color: text }}>
+                      {t.q}
+                    </p>
+                    <p className="text-sm leading-relaxed" style={{ color: bodyTextColor, fontFamily: bodyFont }}>
+                      {t.a}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Honeymoon voting section */}
+          {honeymoonEnabled && honeymoonDestinations.length > 0 && (
+            <div className="mt-16 pt-12 border-t" style={{ borderColor: `${muted}33` }}>
+              <span className="block mb-2 text-[10px] md:text-xs uppercase tracking-[0.2em] font-semibold text-center" style={{ color: accent, fontFamily: headingFont }}>
+                {honeymoonEyebrow}
+              </span>
+              <h3 className="text-[48px] font-semibold mb-8 text-center leading-[1.1]" style={{ fontFamily: headingFont, color: text }}>
+                Where Next?
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {honeymoonDestinations.map((d, idx) => (
+                  <div
+                    key={idx}
+                    className="p-6 rounded-lg text-center"
+                    style={{ backgroundColor: `${bg}80`, border: `1px solid ${muted}22` }}
+                  >
+                    <p className="text-lg md:text-xl font-medium" style={{ fontFamily: headingFont, color: text }}>
+                      {d.name}
+                    </p>
+                    <div
+                      className="mt-4 inline-block px-6 py-2 rounded-full text-xs font-semibold uppercase tracking-wider cursor-pointer"
+                      style={{ backgroundColor: accent, color: bg }}
+                    >
+                      Vote
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         {/* ===== MOMENTS (section banner + masonry gallery) ===== */}
-        {renderSectionBanner(momentsTitle, momentsSubtitle)}
+        {renderSectionBanner(momentsTitle)}
         <section className="py-14 px-6 md:px-10 max-w-5xl mx-auto">
           {momentsSubtitle && (
             <p
               className="text-center italic max-w-2xl mx-auto mb-10 text-sm md:text-base"
-              style={{ color: muted, fontFamily: bodyFont }}
+              style={{ color: bodyTextColor, fontFamily: bodyFont }}
             >
               {momentsSubtitle}
             </p>
@@ -2907,22 +3037,22 @@ function PreviewPanel({ data }: { data: TemplateData }) {
           {momentsMedia.length === 0 ? (
             <p
               className="text-center text-sm italic py-10"
-              style={{ color: muted, fontFamily: bodyFont }}
+              style={{ color: bodyTextColor, fontFamily: bodyFont }}
             >
               Photos coming soon.
             </p>
           ) : (
-            <div className="columns-1 sm:columns-2 lg:columns-3 gap-4">
+            <div className="columns-1 md:columns-2 lg:columns-3 xl:columns-4 gap-6">
               {momentsMedia.map((item, idx) => (
                 <div
                   key={idx}
-                  className="break-inside-avoid mb-4 overflow-hidden rounded-lg shadow-sm p-3"
+                  className="break-inside-avoid mb-6 overflow-hidden rounded-lg shadow-sm p-4 group"
                   style={{ backgroundColor: bg === '#FFFFFF' || bg === '#ffffff' ? '#FCF9F2' : `${bg}` }}
                 >
                   <img
                     src={item.url}
                     alt={item.fileName || `Moment ${idx + 1}`}
-                    className="w-full h-auto object-cover rounded"
+                    className="w-full h-auto object-cover rounded transition-transform duration-700 group-hover:scale-105"
                   />
                 </div>
               ))}
@@ -2931,12 +3061,12 @@ function PreviewPanel({ data }: { data: TemplateData }) {
         </section>
 
         {/* ===== FAQ (section banner + accordion list of Q&A) ===== */}
-        {renderSectionBanner(qaTitle, qaSubtitle)}
+        {renderSectionBanner(qaTitle)}
         <section className="py-14 px-6 md:px-10 max-w-3xl mx-auto">
           {qaSubtitle && (
             <p
               className="text-center italic max-w-2xl mx-auto mb-10 text-sm md:text-base"
-              style={{ color: muted, fontFamily: bodyFont }}
+              style={{ color: bodyTextColor, fontFamily: bodyFont }}
             >
               {qaSubtitle}
             </p>
@@ -2944,7 +3074,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
           {faqs.length === 0 ? (
             <p
               className="text-center text-sm italic py-10"
-              style={{ color: muted, fontFamily: bodyFont }}
+              style={{ color: bodyTextColor, fontFamily: bodyFont }}
             >
               No questions have been added yet.
             </p>
@@ -2989,7 +3119,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
                     >
                       <p
                         className="pb-5 text-sm md:text-base leading-relaxed"
-                        style={{ color: muted, fontFamily: bodyFont }}
+                        style={{ color: bodyTextColor, fontFamily: bodyFont }}
                       >
                         {faq.answer}
                       </p>
@@ -3001,16 +3131,55 @@ function PreviewPanel({ data }: { data: TemplateData }) {
           )}
         </section>
 
-        {/* ===== FOOTER (copyright text) ===== */}
-        <footer
-          className="py-8 px-6 text-center"
-          style={{ borderTop: `1px solid ${muted}33` }}
-        >
-          <p
-            className="text-[10px] uppercase tracking-[0.2em] font-semibold"
-            style={{ color: muted, fontFamily: bodyFont }}
+        {/* ===== QA CTA (Still have questions? Message the couple) ===== */}
+        <section className="py-14 px-6 md:px-10 max-w-3xl mx-auto text-center">
+          <span className="block mb-3 text-[10px] md:text-xs uppercase tracking-[0.2em] font-semibold" style={{ color: accent, fontFamily: headingFont }}>
+            Need More Help?
+          </span>
+          <h3 className="text-[48px] font-semibold mb-4 leading-[1.1]" style={{ fontFamily: headingFont, color: text }}>
+            Still have questions?
+          </h3>
+          <p className="text-sm md:text-base leading-relaxed max-w-xl mx-auto mb-8" style={{ color: bodyTextColor, fontFamily: bodyFont }}>
+            Reach out to the couple or their concierge for any additional information.
+          </p>
+          <a
+            href="mailto:concierge@dreamweavers.events"
+            className="inline-flex items-center gap-2 px-8 py-3 rounded-full text-sm font-semibold uppercase tracking-wider transition-colors"
+            style={{ backgroundColor: accent, color: bg }}
           >
-            © {new Date().getFullYear()} {heroTitle} · Template Preview · {data.name}
+            Message the Couple
+          </a>
+        </section>
+
+        {/* ===== FOOTER (links + copyright) ===== */}
+        <footer
+          className="py-12 px-6"
+          style={{ borderTop: `1px solid ${muted}33`, backgroundColor: bg }}
+        >
+          <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              {['Contact Concierge', 'Privacy Policy', 'Data Protection', 'Terms of Service'].map((link) => (
+                <span
+                  key={link}
+                  className="text-[10px] uppercase tracking-[0.2em] font-semibold cursor-pointer hover:opacity-70 transition-opacity"
+                  style={{ color: bodyTextColor, fontFamily: bodyFont }}
+                >
+                  {link}
+                </span>
+              ))}
+            </div>
+            <p
+              className="text-[10px] uppercase tracking-[0.2em] font-semibold"
+              style={{ color: bodyTextColor, fontFamily: bodyFont }}
+            >
+              © {new Date().getFullYear()} Dreamweavers Digital Heirlooms
+            </p>
+          </div>
+          <p
+            className="text-center text-[9px] uppercase tracking-[0.2em] mt-6 opacity-50"
+            style={{ color: bodyTextColor, fontFamily: bodyFont }}
+          >
+            Template Preview · {data.name}
           </p>
         </footer>
       </div>
