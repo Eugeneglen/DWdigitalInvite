@@ -260,24 +260,29 @@ export async function POST(req: NextRequest) {
       console.error('[master/weddings POST] Default content seed failed (non-blocking):', err);
     }
 
-    // Audit log
-    await db.auditLog.create({
-      data: {
-        userId: session.user.id,
-        weddingId: wedding.id,
-        action: 'CREATE',
-        entity: 'WeddingAccount',
-        entityId: wedding.id,
-        details: JSON.stringify({
-          coupleName: data.coupleName,
-          plan: data.plan,
-          jobNumber,
-          coupleEmail: data.coupleEmail,
-          slug,
-          features: enabledFeatures,
-        }),
-      },
-    });
+    // Audit log (non-blocking — wedding is already created, don't fail the
+    // entire request if the audit log fails for any reason)
+    try {
+      await db.auditLog.create({
+        data: {
+          userId: session.user.id,
+          weddingId: wedding.id,
+          action: 'CREATE',
+          entity: 'WeddingAccount',
+          entityId: wedding.id,
+          details: JSON.stringify({
+            coupleName: data.coupleName,
+            plan: data.plan,
+            jobNumber,
+            coupleEmail: data.coupleEmail,
+            slug,
+            features: enabledFeatures,
+          }),
+        },
+      });
+    } catch (auditErr) {
+      console.error('[master/weddings POST] Audit log creation failed (non-blocking):', auditErr);
+    }
 
     // Send onboarding email (queued if no email provider configured)
     try {
