@@ -90,11 +90,12 @@ type Section = 'details' | 'home' | 'design' | 'schedule' | 'story' | 'faqs' | '
 
 // ── Field configs (same pattern as couple CMS) ─────────────────────────────
 
-const HOME_FIELDS: { key: string; label: string; type: 'text' | 'textarea' | 'image'; placeholder?: string }[] = [
+const HOME_FIELDS: { key: string; label: string; type: 'text' | 'textarea' | 'image' | 'date'; placeholder?: string; helperText?: string }[] = [
   { key: 'title', label: 'Hero Title', type: 'text', placeholder: 'Couple Name' },
   { key: 'subtitle', label: 'Hero Subtitle', type: 'text', placeholder: 'Together with their families...' },
   { key: 'description', label: 'Hero Description', type: 'text', placeholder: 'We invite you to share...' },
   { key: 'dateDisplay', label: 'Date Display', type: 'text', placeholder: 'Saturday, 25th December 2027' },
+  { key: 'countdownDate', label: 'Countdown Date', type: 'date', helperText: 'ISO date used by the countdown timer. More reliable than Date Display.' },
   { key: 'narrativeLabel', label: 'Narrative Label', type: 'text', placeholder: 'The Prelude' },
   { key: 'narrativeTitle', label: 'Narrative Title', type: 'text', placeholder: 'Our Story Begins Here' },
   { key: 'narrativeBody', label: 'Narrative Body', type: 'textarea', placeholder: 'Every great romance...' },
@@ -110,11 +111,9 @@ const HERO_VISUAL_FIELDS: { key: string; label: string; aspect: string; maxWidth
   { key: 'bannerUrl', label: 'Banner Image', aspect: 'aspect-[21/9]', maxWidth: '480px', placeholder: '/wedding-images/banner-bg.png' },
 ];
 
-const GETTING_THERE_FIELDS: { key: string; label: string; type: 'text' | 'textarea' | 'image'; placeholder?: string }[] = [
+const GETTING_THERE_FIELDS: { key: string; label: string; type: 'text' | 'textarea'; placeholder?: string }[] = [
   { key: 'title', label: 'Section Title', type: 'text', placeholder: 'Getting There' },
   { key: 'subtitle', label: 'Section Subtitle', type: 'text', placeholder: 'Find your way to our celebration' },
-  { key: 'venueDescription', label: 'Venue Description', type: 'textarea', placeholder: 'The Fullerton Hotel is a historic landmark...' },
-  { key: 'venueImage', label: 'Venue Image', type: 'image', placeholder: '/wedding-images/ceremony-venue.png' },
   { key: 'transitTitle', label: 'Transit Title', type: 'text', placeholder: 'Public Transit' },
   { key: 'transitContent', label: 'Transit Directions', type: 'textarea', placeholder: 'MRT\nOrchard Boulevard MRT Station...' },
   { key: 'carTitle', label: 'Car Title', type: 'text', placeholder: 'By Car' },
@@ -623,6 +622,7 @@ function TemplateFontPicker({ value, onChange, label, previewText }: TemplateFon
 export default function TemplateEditor() {
   const { editingTemplateId, setPage } = useCMSStore();
   const [data, setData] = useState<TemplateData | null>(null);
+  const [baselineData, setBaselineData] = useState<TemplateData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeSection, setActiveSection] = useState<Section>('home');
@@ -661,7 +661,7 @@ export default function TemplateEditor() {
       const res = await fetch(`/api/master/content-templates/${editingTemplateId}?XTransformPort=3000`);
       if (!res.ok) throw new Error('Failed to load template');
       const json = await res.json();
-      setData({
+      const loaded: TemplateData = {
         id: json.id,
         name: json.name,
         description: json.description,
@@ -674,7 +674,9 @@ export default function TemplateEditor() {
           colors: { bg: '#FDF8F0', text: '#2C2C2C', accent: '#D4AF37', secondary: '#8B7355', muted: '#A09888' },
           fonts: { heading: 'Playfair Display', body: 'Lato' },
         },
-      });
+      };
+      setData(loaded);
+      setBaselineData(JSON.parse(JSON.stringify(loaded)));
     } catch {
       toast({ title: 'Error', description: 'Failed to load template', variant: 'destructive' });
     } finally {
@@ -977,6 +979,7 @@ export default function TemplateEditor() {
       });
       if (!res.ok) throw new Error('Failed to save');
       toast({ title: 'Template Saved', description: `${data.name} has been updated.` });
+      setBaselineData(JSON.parse(JSON.stringify(data)));
       setDirty(false);
     } catch {
       toast({ title: 'Error', description: 'Failed to save template', variant: 'destructive' });
@@ -984,6 +987,57 @@ export default function TemplateEditor() {
       setSaving(false);
     }
   }
+
+  function handleDiscard() {
+    if (!baselineData) return;
+    if (!confirm('Discard all unsaved changes? This cannot be undone.')) return;
+    setData(JSON.parse(JSON.stringify(baselineData)));
+    setDirty(false);
+  }
+
+  // ── Dirty tracking helpers (P2-14) ─────────────────────────────────────
+
+  function isContentFieldDirty(section: string, fieldKey: string): boolean {
+    if (!data || !baselineData) return false;
+    const current = data.content.find((c) => c.section === section && c.fieldKey === fieldKey);
+    const baseline = baselineData.content.find((c) => c.section === section && c.fieldKey === fieldKey);
+    if (!current && !baseline) return false;
+    if (!current || !baseline) return true;
+    return current.fieldValue !== baseline.fieldValue;
+  }
+
+  function isThemeDirty(): boolean {
+    if (!data || !baselineData) return false;
+    return JSON.stringify(data.theme) !== JSON.stringify(baselineData.theme);
+  }
+
+  function getDirtyCount(): number {
+    if (!data || !baselineData) return 0;
+    let count = 0;
+    // Content fields — changed or new
+    const baselineKeys = new Set(baselineData.content.map((c) => `${c.section}:${c.fieldKey}`));
+    for (const item of data.content) {
+      if (isContentFieldDirty(item.section, item.fieldKey)) count++;
+    }
+    // Deleted content fields
+    const currentKeys = new Set(data.content.map((c) => `${c.section}:${c.fieldKey}`));
+    for (const key of baselineKeys) {
+      if (!currentKeys.has(key)) count++;
+    }
+    // Schedule changes
+    if (JSON.stringify(data.schedule) !== JSON.stringify(baselineData.schedule)) count++;
+    // Story changes
+    if (JSON.stringify(data.stories) !== JSON.stringify(baselineData.stories)) count++;
+    // FAQ changes
+    if (JSON.stringify(data.faqs) !== JSON.stringify(baselineData.faqs)) count++;
+    // Media changes
+    if (JSON.stringify(data.media) !== JSON.stringify(baselineData.media)) count++;
+    // Theme changes
+    if (isThemeDirty()) count++;
+    return count;
+  }
+
+  const dirtyCount = getDirtyCount();
 
   function handleBack() {
     if (dirty && !confirm('You have unsaved changes. Leave anyway?')) return;
@@ -1043,7 +1097,7 @@ export default function TemplateEditor() {
             <Eye className="size-4 mr-1.5" />
             Preview
           </Button>
-          <Button onClick={handleSave} disabled={!dirty || saving} className="bg-slate-900 text-white hover:bg-slate-800">
+          <Button onClick={handleSave} disabled={!dirty || saving} className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90">
             {saving ? <><Loader2 className="size-4 mr-2 animate-spin" />Saving...</> : <><Save className="size-4 mr-2" />Save Template</>}
           </Button>
         </div>
@@ -1092,8 +1146,11 @@ export default function TemplateEditor() {
                 Couple Names
               </h4>
               <div className="space-y-1.5">
-                <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                <Label className="text-xs tracking-wider uppercase font-semibold text-charcoal-ink/50">
                   Couple Display Name
+                  {isContentFieldDirty('details', 'coupleName') && (
+                    <span className="inline-block size-1.5 rounded-full bg-cinematic-gold ml-1.5 align-middle" title="Modified" />
+                  )}
                 </Label>
                 <Input
                   value={getContentField('details', 'coupleName')}
@@ -1105,7 +1162,7 @@ export default function TemplateEditor() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                  <Label className="text-xs tracking-wider uppercase font-semibold text-charcoal-ink/50">
                     Bride&rsquo;s First Name
                   </Label>
                   <Input
@@ -1116,7 +1173,7 @@ export default function TemplateEditor() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                  <Label className="text-xs tracking-wider uppercase font-semibold text-charcoal-ink/50">
                     Groom&rsquo;s First Name
                   </Label>
                   <Input
@@ -1139,7 +1196,7 @@ export default function TemplateEditor() {
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                  <Label className="text-xs tracking-wider uppercase font-semibold text-charcoal-ink/50">
                     Wedding Date
                   </Label>
                   <Input
@@ -1151,7 +1208,7 @@ export default function TemplateEditor() {
                   <p className="text-[11px] text-charcoal-ink/40">Used for the countdown timer and schedule.</p>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                  <Label className="text-xs tracking-wider uppercase font-semibold text-charcoal-ink/50">
                     Wedding Time
                   </Label>
                   <Input
@@ -1174,7 +1231,7 @@ export default function TemplateEditor() {
                 Venue Information
               </h4>
               <div className="space-y-1.5">
-                <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                <Label className="text-xs tracking-wider uppercase font-semibold text-charcoal-ink/50">
                   Venue Name
                 </Label>
                 <Input
@@ -1185,7 +1242,7 @@ export default function TemplateEditor() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                <Label className="text-xs tracking-wider uppercase font-semibold text-charcoal-ink/50">
                   Venue Address
                 </Label>
                 <Textarea
@@ -1198,7 +1255,7 @@ export default function TemplateEditor() {
                 <p className="text-[11px] text-charcoal-ink/40">Shown on the Getting There section.</p>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                <Label className="text-xs tracking-wider uppercase font-semibold text-charcoal-ink/50">
                   Google Maps URL
                 </Label>
                 <Input
@@ -1235,7 +1292,7 @@ export default function TemplateEditor() {
               ))}
               {/* Hero Video URL */}
               <div className="space-y-1.5">
-                <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                <Label className="text-xs tracking-wider uppercase font-semibold text-charcoal-ink/50">
                   Hero Video URL (optional — overrides image)
                 </Label>
                 <Input
@@ -1248,6 +1305,8 @@ export default function TemplateEditor() {
               </div>
             </CardContent>
           </Card>
+
+          <Separator className="bg-champagne-silk" />
 
           {/* Ambient Animations */}
           <Card className="border-charcoal-ink/5 shadow-none">
@@ -1273,67 +1332,101 @@ export default function TemplateEditor() {
             </CardContent>
           </Card>
 
+          <Separator className="bg-champagne-silk" />
+
           {/* Hero Content */}
           <Card className="border-charcoal-ink/5 shadow-none">
             <CardContent className="p-6 space-y-5">
               <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Hero Content</h3>
-              {HOME_FIELDS.map((field) => (
-                field.type === 'image' ? (
-                  <MirrorImageUpload
-                    key={field.key}
-                    value={getContentField('hero', field.key) || ''}
-                    onChange={(v) => setContentField('hero', field.key, v, 'IMAGE_URL')}
-                    onRemove={() => setContentField('hero', field.key, '', 'IMAGE_URL')}
-                    label="Tea Ceremony Image"
-                    helperText="2:3 portrait · mirrors guest-site framing"
-                    aspectClass="aspect-[2/3]"
-                    maxWidth="240px"
-                  />
-                ) : (
-                  <div key={field.key} className="space-y-1.5">
-                    <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
-                      {field.label}
-                    </Label>
-                    {field.type === 'textarea' ? (
-                      <Textarea
-                        value={getContentField('hero', field.key)}
-                        onChange={(e) => setContentField('hero', field.key, e.target.value, 'RICHTEXT')}
-                        placeholder={field.placeholder}
-                        className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
-                        rows={3}
-                      />
-                    ) : (
-                      <Input
-                        value={getContentField('hero', field.key)}
-                        onChange={(e) => setContentField('hero', field.key, e.target.value)}
-                        placeholder={field.placeholder}
-                        className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
-                      />
+              {/* Non-tea-ceremony hero fields */}
+              {HOME_FIELDS.filter((f) => !f.key.startsWith('teaCeremony')).map((field) => (
+                <div key={field.key} className="space-y-1.5">
+                  <Label className="text-xs tracking-wider uppercase font-semibold text-charcoal-ink/50">
+                    {field.label}
+                    {isContentFieldDirty('hero', field.key) && (
+                      <span className="inline-block size-1.5 rounded-full bg-cinematic-gold ml-1.5 align-middle" title="Modified" />
                     )}
-                  </div>
-                )
+                  </Label>
+                  {field.type === 'textarea' ? (
+                    <Textarea
+                      value={getContentField('hero', field.key)}
+                      onChange={(e) => setContentField('hero', field.key, e.target.value, 'RICHTEXT')}
+                      placeholder={field.placeholder}
+                      className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                      rows={3}
+                    />
+                  ) : (
+                    <Input
+                      type={field.type === 'date' ? 'date' : 'text'}
+                      value={getContentField('hero', field.key)}
+                      onChange={(e) => setContentField('hero', field.key, e.target.value)}
+                      placeholder={field.placeholder}
+                      className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                    />
+                  )}
+                  {field.helperText && (
+                    <p className="text-[11px] text-charcoal-ink/40">{field.helperText}</p>
+                  )}
+                </div>
               ))}
+
+              {/* Tea Ceremony section — switch + dimmable fields */}
+              <Separator className="bg-champagne-silk" />
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-charcoal-ink">Tea Ceremony Section
+                    {isContentFieldDirty('hero', 'teaCeremonyEnabled') && (
+                      <span className="inline-block size-1.5 rounded-full bg-cinematic-gold ml-1.5 align-middle" title="Modified" />
+                    )}
+                  </p>
+                  <p className="text-xs text-charcoal-ink/40">Show the tea ceremony block on the guest site.</p>
+                </div>
+                <Switch
+                  checked={getContentField('hero', 'teaCeremonyEnabled') !== 'false'}
+                  onCheckedChange={(checked) => setContentField('hero', 'teaCeremonyEnabled', String(checked), 'TEXT')}
+                />
+              </div>
+              <div className={`space-y-5 transition-opacity duration-200 ${getContentField('hero', 'teaCeremonyEnabled') === 'false' ? 'opacity-40 pointer-events-none' : ''}`}>
+                {HOME_FIELDS.filter((f) => f.key.startsWith('teaCeremony')).map((field) => (
+                  field.type === 'image' ? (
+                    <MirrorImageUpload
+                      key={field.key}
+                      value={getContentField('hero', field.key) || ''}
+                      onChange={(v) => setContentField('hero', field.key, v, 'IMAGE_URL')}
+                      onRemove={() => setContentField('hero', field.key, '', 'IMAGE_URL')}
+                      label="Tea Ceremony Image"
+                      helperText="2:3 portrait · mirrors guest-site framing"
+                      aspectClass="aspect-[2/3]"
+                      maxWidth="240px"
+                    />
+                  ) : (
+                    <div key={field.key} className="space-y-1.5">
+                      <Label className="text-xs tracking-wider uppercase font-semibold text-charcoal-ink/50">
+                        {field.label}
+                      </Label>
+                      {field.type === 'textarea' ? (
+                        <Textarea
+                          value={getContentField('hero', field.key)}
+                          onChange={(e) => setContentField('hero', field.key, e.target.value, 'RICHTEXT')}
+                          placeholder={field.placeholder}
+                          className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                          rows={3}
+                        />
+                      ) : (
+                        <Input
+                          value={getContentField('hero', field.key)}
+                          onChange={(e) => setContentField('hero', field.key, e.target.value)}
+                          placeholder={field.placeholder}
+                          className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                        />
+                      )}
+                    </div>
+                  )
+                ))}
+              </div>
             </CardContent>
           </Card>
 
-          <Card className="border-charcoal-ink/5 shadow-none">
-            <CardContent className="p-6 space-y-5">
-              <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Schedule Section Text</h3>
-              {SCHEDULE_FIELDS.map((field) => (
-                <div key={field.key} className="space-y-1.5">
-                  <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
-                    {field.label}
-                  </Label>
-                  <Input
-                    value={getContentField('schedule', field.key)}
-                    onChange={(e) => setContentField('schedule', field.key, e.target.value)}
-                    placeholder={field.placeholder}
-                    className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
-                  />
-                </div>
-              ))}
-            </CardContent>
-          </Card>
         </div>
       )}
 
@@ -1422,7 +1515,12 @@ export default function TemplateEditor() {
           {/* Colours — one TemplateColorPicker per slot (bg / text / accent / secondary / muted) */}
           <Card className="border-charcoal-ink/5 shadow-none">
             <CardContent className="p-6 space-y-5">
-              <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Theme Colours</h3>
+              <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">
+                Theme Colours
+                {isThemeDirty() && (
+                  <span className="inline-block size-1.5 rounded-full bg-cinematic-gold ml-1.5 align-middle" title="Modified" />
+                )}
+              </h3>
               <p className="text-xs text-charcoal-ink/40">Each colour slot shows a live preview with auto-contrast detection, 12 named presets, and a custom colour picker.</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 <TemplateColorPicker
@@ -1462,7 +1560,12 @@ export default function TemplateEditor() {
           {/* Typography — TemplateFontPicker for heading + body (mirrors FontPicker) */}
           <Card className="border-charcoal-ink/5 shadow-none">
             <CardContent className="p-6 space-y-5">
-              <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Typography</h3>
+              <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">
+                Typography
+                {isThemeDirty() && (
+                  <span className="inline-block size-1.5 rounded-full bg-cinematic-gold ml-1.5 align-middle" title="Modified" />
+                )}
+              </h3>
               <p className="text-xs text-charcoal-ink/40">39 categorised fonts with live preview. Click a font to apply it instantly to the template.</p>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <TemplateFontPicker
@@ -1514,10 +1617,35 @@ export default function TemplateEditor() {
 
       {/* ── SCHEDULE SECTION ────────────────────────────────────────────── */}
       {activeSection === 'schedule' && (
-        <div className="space-y-4 max-w-3xl">
+        <div className="space-y-6 max-w-3xl">
+          {/* Schedule Section Text (moved from Home tab per P2-17) */}
+          <Card className="border-charcoal-ink/5 shadow-none">
+            <CardContent className="p-6 space-y-5">
+              <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Schedule Section Text</h3>
+              {SCHEDULE_FIELDS.map((field) => (
+                <div key={field.key} className="space-y-1.5">
+                  <Label className="text-xs tracking-wider uppercase font-semibold text-charcoal-ink/50">
+                    {field.label}
+                    {isContentFieldDirty('schedule', field.key) && (
+                      <span className="inline-block size-1.5 rounded-full bg-cinematic-gold ml-1.5 align-middle" title="Modified" />
+                    )}
+                  </Label>
+                  <Input
+                    value={getContentField('schedule', field.key)}
+                    onChange={(e) => setContentField('schedule', field.key, e.target.value)}
+                    placeholder={field.placeholder}
+                    className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                  />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Separator className="bg-champagne-silk" />
+
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Event Schedule</h3>
-            <Button size="sm" onClick={openAddSchedule} className="bg-slate-900 text-white hover:bg-slate-800">
+            <Button size="sm" onClick={openAddSchedule} className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90">
               <Plus className="size-3.5 mr-1.5" />
               Add Event
             </Button>
@@ -1569,6 +1697,7 @@ export default function TemplateEditor() {
           )}
 
           {/* Schedule Images Gallery */}
+          <Separator className="bg-champagne-silk" />
           <Card className="border-charcoal-ink/5 shadow-none">
             <CardContent className="p-6">
               <SimpleImageGallery
@@ -1583,18 +1712,42 @@ export default function TemplateEditor() {
             </CardContent>
           </Card>
 
-          {/* Venue Image */}
+          {/* Venue Information (moved from Getting There per P2-18) */}
+          <Separator className="bg-champagne-silk" />
           <Card className="border-charcoal-ink/5 shadow-none">
-            <CardContent className="p-6">
-              <MirrorImageUpload
-                value={getContentField('getting-there', 'venueImage') || ''}
-                onChange={(v) => setContentField('getting-there', 'venueImage', v, 'IMAGE_URL')}
-                onRemove={() => setContentField('getting-there', 'venueImage', '', 'IMAGE_URL')}
-                label="Venue Image"
-                helperText="4:3 · mirrors guest-site framing"
-                aspectClass="aspect-[4/3]"
-                maxWidth="320px"
-              />
+            <CardContent className="p-6 space-y-5">
+              <div className="flex items-center justify-between gap-4">
+                <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Venue Information
+                  {isContentFieldDirty('getting-there', 'venueEnabled') && (
+                    <span className="inline-block size-1.5 rounded-full bg-cinematic-gold ml-1.5 align-middle" title="Modified" />
+                  )}
+                </h3>
+                <Switch
+                  checked={getContentField('getting-there', 'venueEnabled') !== 'false'}
+                  onCheckedChange={(checked) => setContentField('getting-there', 'venueEnabled', String(checked), 'TEXT')}
+                />
+              </div>
+              <div className={`space-y-5 transition-opacity duration-200 ${getContentField('getting-there', 'venueEnabled') === 'false' ? 'opacity-40 pointer-events-none' : ''}`}>
+                <div className="space-y-1.5">
+                  <Label className="text-xs tracking-wider uppercase font-semibold text-charcoal-ink/50">Venue Description</Label>
+                  <Textarea
+                    value={getContentField('getting-there', 'venueDescription')}
+                    onChange={(e) => setContentField('getting-there', 'venueDescription', e.target.value, 'RICHTEXT')}
+                    placeholder="The Fullerton Hotel is a historic landmark..."
+                    className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                    rows={3}
+                  />
+                </div>
+                <MirrorImageUpload
+                  value={getContentField('getting-there', 'venueImage') || ''}
+                  onChange={(v) => setContentField('getting-there', 'venueImage', v, 'IMAGE_URL')}
+                  onRemove={() => setContentField('getting-there', 'venueImage', '', 'IMAGE_URL')}
+                  label="Venue Image"
+                  helperText="4:3 · mirrors guest-site framing"
+                  aspectClass="aspect-[4/3]"
+                  maxWidth="320px"
+                />
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -1608,7 +1761,7 @@ export default function TemplateEditor() {
             <CardContent className="p-6 space-y-5">
               <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Story Section Text</h3>
               <div className="space-y-1.5">
-                <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">Section Title</Label>
+                <Label className="text-xs tracking-wider uppercase font-semibold text-charcoal-ink/50">Section Title</Label>
                 <Input
                   value={getContentField('story', 'title')}
                   onChange={(e) => setContentField('story', 'title', e.target.value)}
@@ -1617,7 +1770,7 @@ export default function TemplateEditor() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">Section Subtitle</Label>
+                <Label className="text-xs tracking-wider uppercase font-semibold text-charcoal-ink/50">Section Subtitle</Label>
                 <Input
                   value={getContentField('story', 'subtitle')}
                   onChange={(e) => setContentField('story', 'subtitle', e.target.value)}
@@ -1633,7 +1786,7 @@ export default function TemplateEditor() {
           {/* Chapters timeline */}
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Chapters</h3>
-            <Button size="sm" onClick={openAddStory} className="bg-slate-900 text-white hover:bg-slate-800">
+            <Button size="sm" onClick={openAddStory} className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90">
               <Plus className="size-3.5 mr-1.5" />
               Add Chapter
             </Button>
@@ -1721,15 +1874,20 @@ export default function TemplateEditor() {
           <Card className="border-charcoal-ink/5 shadow-none">
             <CardContent className="p-6 space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Did You Know? (Tidbits)</h3>
+                <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Did You Know? (Tidbits)
+                  {isContentFieldDirty('story', 'tidbitsEnabled') && (
+                    <span className="inline-block size-1.5 rounded-full bg-cinematic-gold ml-1.5 align-middle" title="Modified" />
+                  )}
+                </h3>
                 <Switch
                   checked={getContentField('story', 'tidbitsEnabled') !== 'false'}
                   onCheckedChange={(checked) => setContentField('story', 'tidbitsEnabled', String(checked), 'TEXT')}
                 />
               </div>
+              <div className={`space-y-4 transition-opacity duration-200 ${getContentField('story', 'tidbitsEnabled') === 'false' ? 'opacity-40 pointer-events-none' : ''}`}>
               <p className="text-xs text-charcoal-ink/40">Fun facts about the couple displayed on the story page.</p>
               <div className="space-y-1.5">
-                <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">Tidbits Title</Label>
+                <Label className="text-xs tracking-wider uppercase font-semibold text-charcoal-ink/50">Tidbits Title</Label>
                 <Input
                   value={getContentField('story', 'tidbitsTitle')}
                   onChange={(e) => setContentField('story', 'tidbitsTitle', e.target.value)}
@@ -1767,6 +1925,7 @@ export default function TemplateEditor() {
                   <Plus className="size-3.5 mr-1" /> Add Tidbit
                 </Button>
               </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -1774,15 +1933,20 @@ export default function TemplateEditor() {
           <Card className="border-charcoal-ink/5 shadow-none">
             <CardContent className="p-6 space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Honeymoon Destinations</h3>
+                <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Honeymoon Destinations
+                  {isContentFieldDirty('story', 'honeymoonEnabled') && (
+                    <span className="inline-block size-1.5 rounded-full bg-cinematic-gold ml-1.5 align-middle" title="Modified" />
+                  )}
+                </h3>
                 <Switch
                   checked={getContentField('story', 'honeymoonEnabled') !== 'false'}
                   onCheckedChange={(checked) => setContentField('story', 'honeymoonEnabled', String(checked), 'TEXT')}
                 />
               </div>
+              <div className={`space-y-4 transition-opacity duration-200 ${getContentField('story', 'honeymoonEnabled') === 'false' ? 'opacity-40 pointer-events-none' : ''}`}>
               <p className="text-xs text-charcoal-ink/40">Destinations guests can vote on for the couple's honeymoon.</p>
               <div className="space-y-1.5">
-                <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">Honeymoon Section Eyebrow</Label>
+                <Label className="text-xs tracking-wider uppercase font-semibold text-charcoal-ink/50">Honeymoon Section Eyebrow</Label>
                 <Input
                   value={getContentField('story', 'honeymoonEyebrow')}
                   onChange={(e) => setContentField('story', 'honeymoonEyebrow', e.target.value)}
@@ -1816,6 +1980,7 @@ export default function TemplateEditor() {
                   <Plus className="size-3.5 mr-1" /> Add Destination
                 </Button>
               </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -1830,8 +1995,11 @@ export default function TemplateEditor() {
               <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Q&amp;A Section Text</h3>
               {QA_FIELDS.map((field) => (
                 <div key={field.key} className="space-y-1.5">
-                  <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                  <Label className="text-xs tracking-wider uppercase font-semibold text-charcoal-ink/50">
                     {field.label}
+                    {isContentFieldDirty('qa', field.key) && (
+                      <span className="inline-block size-1.5 rounded-full bg-cinematic-gold ml-1.5 align-middle" title="Modified" />
+                    )}
                   </Label>
                   <Input
                     value={getContentField('qa', field.key)}
@@ -1849,7 +2017,7 @@ export default function TemplateEditor() {
           {/* FAQ list */}
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Frequently Asked Questions</h3>
-            <Button size="sm" onClick={openAddFaq} className="bg-slate-900 text-white hover:bg-slate-800">
+            <Button size="sm" onClick={openAddFaq} className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90">
               <Plus className="size-3.5 mr-1.5" />
               Add Question
             </Button>
@@ -1917,44 +2085,45 @@ export default function TemplateEditor() {
       {/* ── GETTING THERE SECTION ──────────────────────────────────────── */}
       {activeSection === 'getting-there' && (
         <div className="space-y-6 max-w-3xl">
+          {/* Page header */}
+          <div className="flex items-center gap-2">
+            <MapPin className="size-5 text-cinematic-gold" />
+            <div>
+              <h3 className="text-lg font-semibold text-charcoal-ink">Getting There</h3>
+              <p className="text-xs text-charcoal-ink/50">Transit, driving, and parking directions. Venue image &amp; description are on the Schedule tab.</p>
+            </div>
+          </div>
+
+          <Separator className="bg-champagne-silk" />
+
           <Card className="border-charcoal-ink/5 shadow-none">
             <CardContent className="p-6 space-y-5">
-              <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Getting There Content</h3>
+              <h4 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Directions Content</h4>
               {GETTING_THERE_FIELDS.map((field) => (
-                field.type === 'image' ? (
-                  <MirrorImageUpload
-                    key={field.key}
-                    value={getContentField('getting-there', field.key) || ''}
-                    onChange={(v) => setContentField('getting-there', field.key, v, 'IMAGE_URL')}
-                    onRemove={() => setContentField('getting-there', field.key, '', 'IMAGE_URL')}
-                    label="Venue Image"
-                    helperText="4:3 · mirrors guest-site framing"
-                    aspectClass="aspect-[4/3]"
-                    maxWidth="360px"
-                  />
-                ) : (
-                  <div key={field.key} className="space-y-1.5">
-                    <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
-                      {field.label}
-                    </Label>
-                    {field.type === 'textarea' ? (
-                      <Textarea
-                        value={getContentField('getting-there', field.key)}
-                        onChange={(e) => setContentField('getting-there', field.key, e.target.value, 'RICHTEXT')}
-                        placeholder={field.placeholder}
-                        className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
-                        rows={4}
-                      />
-                    ) : (
-                      <Input
-                        value={getContentField('getting-there', field.key)}
-                        onChange={(e) => setContentField('getting-there', field.key, e.target.value)}
-                        placeholder={field.placeholder}
-                        className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
-                      />
+                <div key={field.key} className="space-y-1.5">
+                  <Label className="text-xs tracking-wider uppercase font-semibold text-charcoal-ink/50">
+                    {field.label}
+                    {isContentFieldDirty('getting-there', field.key) && (
+                      <span className="inline-block size-1.5 rounded-full bg-cinematic-gold ml-1.5 align-middle" title="Modified" />
                     )}
-                  </div>
-                )
+                  </Label>
+                  {field.type === 'textarea' ? (
+                    <Textarea
+                      value={getContentField('getting-there', field.key)}
+                      onChange={(e) => setContentField('getting-there', field.key, e.target.value, 'RICHTEXT')}
+                      placeholder={field.placeholder}
+                      className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                      rows={4}
+                    />
+                  ) : (
+                    <Input
+                      value={getContentField('getting-there', field.key)}
+                      onChange={(e) => setContentField('getting-there', field.key, e.target.value)}
+                      placeholder={field.placeholder}
+                      className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                    />
+                  )}
+                </div>
               ))}
             </CardContent>
           </Card>
@@ -1969,8 +2138,11 @@ export default function TemplateEditor() {
               <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Moments Section Text</h3>
               {MOMENTS_FIELDS.map((field) => (
                 <div key={field.key} className="space-y-1.5">
-                  <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                  <Label className="text-xs tracking-wider uppercase font-semibold text-charcoal-ink/50">
                     {field.label}
+                    {isContentFieldDirty('moments', field.key) && (
+                      <span className="inline-block size-1.5 rounded-full bg-cinematic-gold ml-1.5 align-middle" title="Modified" />
+                    )}
                   </Label>
                   {field.type === 'textarea' ? (
                     <Textarea
@@ -2021,8 +2193,11 @@ export default function TemplateEditor() {
               <p className="text-xs text-charcoal-ink/40">Customise the text guests see on the wishes/blessings section.</p>
               {WISHES_FIELDS.map((field) => (
                 <div key={field.key} className="space-y-1.5">
-                  <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                  <Label className="text-xs tracking-wider uppercase font-semibold text-charcoal-ink/50">
                     {field.label}
+                    {isContentFieldDirty('wishes', field.key) && (
+                      <span className="inline-block size-1.5 rounded-full bg-cinematic-gold ml-1.5 align-middle" title="Modified" />
+                    )}
                   </Label>
                   <Input
                     value={getContentField('wishes', field.key)}
@@ -2169,6 +2344,39 @@ export default function TemplateEditor() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Sticky bottom save bar (P2-15) ────────────────────────────────── */}
+      {dirty && (
+        <div className="sticky bottom-0 flex items-center justify-between gap-4 py-3 px-6 -mx-4 bg-white/95 backdrop-blur-md border-t border-charcoal-ink/10 z-20">
+          <div className="flex items-center gap-2">
+            <span className="size-2 rounded-full bg-cinematic-gold animate-pulse" />
+            <p className="text-sm text-charcoal-ink/70">
+              <span className="font-semibold text-charcoal-ink">{dirtyCount}</span> unsaved {dirtyCount === 1 ? 'change' : 'changes'}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={handleDiscard}
+              disabled={saving}
+              className="border-charcoal-ink/15 text-charcoal-ink/60 hover:text-charcoal-ink hover:bg-red-50 hover:border-red-200"
+            >
+              Discard
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={saving}
+              className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90"
+            >
+              {saving ? (
+                <><Loader2 className="size-4 mr-2 animate-spin" />Saving...</>
+              ) : (
+                <><Save className="size-4 mr-2" />Save Changes ({dirtyCount})</>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2187,6 +2395,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
   const heroSubtitle = getField('hero', 'subtitle', 'Together with their families');
   const heroDescription = getField('hero', 'description', 'Together with their families, request the pleasure of your company');
   const dateDisplay = getField('hero', 'dateDisplay', 'Saturday, 25th December 2027');
+  const countdownDate = getField('hero', 'countdownDate', '');
   const heroImageUrl = getField('hero', 'heroImageUrl', '/wedding-images/hero-portrait.png');
   const bannerUrl = getField('hero', 'bannerUrl', '/wedding-images/banner-bg.png');
 
@@ -2223,18 +2432,24 @@ function PreviewPanel({ data }: { data: TemplateData }) {
   // ── Filtered media (moments gallery) ───────────────────────────────────
   const momentsMedia = media.filter((m) => m.category === 'moments');
 
-  // ── Countdown (uses dateDisplay, falls back to a future date) ───────────
+  // ── Countdown (prefers countdownDate ISO field, falls back to dateDisplay) ─
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, mins: 0, secs: 0 });
   useEffect(() => {
-    const parseTarget = (dateStr: string): number => {
-      if (!dateStr) return Date.now() + 365 * 24 * 3600 * 1000;
-      // Strip ordinal suffixes (1st, 2nd, 3rd, 4th) so Date can parse it
-      const cleaned = dateStr.replace(/(\d+)(st|nd|rd|th)/gi, '$1');
-      const d = new Date(cleaned);
-      if (isNaN(d.getTime())) return Date.now() + 365 * 24 * 3600 * 1000;
-      return d.getTime();
+    const parseTarget = (isoDate: string, displayStr: string): number => {
+      // Prefer the ISO countdownDate field (YYYY-MM-DD) — reliable parse
+      if (isoDate) {
+        const d = new Date(isoDate + 'T00:00:00');
+        if (!isNaN(d.getTime())) return d.getTime();
+      }
+      // Fall back to dateDisplay (human-readable) — strip ordinal suffixes
+      if (displayStr) {
+        const cleaned = displayStr.replace(/(\d+)(st|nd|rd|th)/gi, '$1');
+        const d = new Date(cleaned);
+        if (!isNaN(d.getTime())) return d.getTime();
+      }
+      return Date.now() + 365 * 24 * 3600 * 1000;
     };
-    const target = parseTarget(dateDisplay);
+    const target = parseTarget(countdownDate, dateDisplay);
     const calc = () => {
       const now = Date.now();
       const diff = Math.max(0, target - now);
@@ -2248,7 +2463,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
     calc();
     const id = setInterval(calc, 1000);
     return () => clearInterval(id);
-  }, [dateDisplay]);
+  }, [countdownDate, dateDisplay]);
 
   // ── FAQ accordion state ────────────────────────────────────────────────
   const [openFaqIdx, setOpenFaqIdx] = useState<number | null>(0);
