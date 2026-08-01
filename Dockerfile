@@ -47,9 +47,13 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/standalone/.
 # Public directory — resolved from __dirname/public
 COPY --from=builder --chown=nextjs:nodejs /app/public ./.next/standalone/public
 
-# Prisma schema + CLI for runtime db push
+# Prisma schema + CLI for runtime db push + seed
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
+
+# Copy package.json (needed for prisma db seed command)
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 
 USER nextjs
 
@@ -57,4 +61,7 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["sh", "-c", "./node_modules/.bin/prisma db push && node .next/standalone/server.js"]
+# Run db push (create/migrate schema) → seed all data → start server
+# All seed scripts are idempotent (use upsert), safe to run on every deploy
+# Order matters: seed.ts creates the wedding → seed-roles creates permissions → seed-content-templates creates template from wedding
+CMD ["sh", "-c", "./node_modules/.bin/prisma db push && ./node_modules/.bin/prisma db seed && ./node_modules/.bin/tsx scripts/seed-roles.ts && ./node_modules/.bin/tsx scripts/seed-content-templates.ts && node .next/standalone/server.js"]
