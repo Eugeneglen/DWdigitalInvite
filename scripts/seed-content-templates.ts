@@ -204,7 +204,11 @@ async function main() {
   await db.$disconnect();
 }
 
-main().catch((e) => {
-  console.error('Seed failed:', e);
-  process.exit(1);
-});
+// Exit 0 on success, exit 1 on failure — keeps the Dockerfile CMD `&&` chain
+// honest (server only starts if seeding actually succeeded).
+main()
+  .then(() => process.exit(0))
+  .catch((e) => {
+    console.error('Seed failed:', e);
+    process.exit(1);
+  });

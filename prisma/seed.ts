@@ -424,11 +424,16 @@ async function seed() {
   console.log('RSVPs: 3 (Jerine Lim, Lim Eugene, Eugene Lim)');
   console.log('Wishes: 1 (Lim — "Cngrats")');
   console.log('Content sections: 9/9 (including getting-there)');
+
+  await db.$disconnect();
 }
 
+// Exit 0 on success, exit 1 on failure — so the Dockerfile CMD `&&` chain
+// stops (and the server does NOT start) when seeding genuinely fails, instead
+// of silently continuing with an empty database.
 seed()
+  .then(() => process.exit(0))
   .catch((e) => {
     console.error('Seed failed:', e);
     process.exit(1);
-  })
-  .finally(() => process.exit(0));
+  });
