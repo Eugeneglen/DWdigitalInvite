@@ -105,6 +105,106 @@ export async function GET() {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
+    // ── Phase 1: Guest list confidence + actionable KPIs ───────────────
+    // These are ADDITIVE — existing response fields remain unchanged.
+
+    // 1. Unmatched RSVPs (submissions with no guestId link)
+    const unmatchedRsvps = await db.rSVPSubmission.count({
+      where: { weddingId: wedding.id, guestId: null },
+    });
+
+    // 2. Confirmed headcount: attending guests + confirmed plus-ones
+    //    Per user decision: plus-one is "confirmed" only if the guest keyed in
+    //    the plus-one name via RSVP (plusOneName is not null/empty).
+    const attendingGuests = await db.guest.count({
+      where: { weddingId: wedding.id, rsvpStatus: 'ATTENDING' },
+    });
+    const confirmedPlusOnes = await db.guest.count({
+      where: {
+        weddingId: wedding.id,
+        rsvpStatus: 'ATTENDING',
+        plusOne: true,
+        AND: [
+          { plusOneName: { not: null } },
+          { plusOneName: { not: '' } },
+        ],
+      },
+    });
+    const confirmedHeadcount = attendingGuests + confirmedPlusOnes;
+
+    // 3. Dietary requirements count (guests with dietary notes)
+    const dietaryCount = await db.guest.count({
+      where: {
+        weddingId: wedding.id,
+        AND: [
+          { dietaryNotes: { not: null } },
+          { dietaryNotes: { not: '' } },
+        ],
+      },
+    });
+
+    // 4. Pending follow-ups (guests who haven't responded)
+    const pendingFollowUps = guestsByStatus.PENDING || 0;
+
+    // 5. New wishes this week (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const newWishesThisWeek = await db.wish.count({
+      where: { weddingId: wedding.id, createdAt: { gte: sevenDaysAgo } },
+    });
+
+    // 6. Guest list confidence assessment
+    //    EMPTY: no guests uploaded
+    //    INCOMPLETE: guests exist but list is too small OR more RSVPs than guests*1.2
+    //    RELIABLE: guests >= 10 AND rsvps <= guests * 1.2
+    let guestListConfidence: 'EMPTY' | 'INCOMPLETE' | 'RELIABLE';
+    if (totalGuests === 0) {
+      guestListConfidence = 'EMPTY';
+    } else if (totalGuests < 10 || totalRSVPs > totalGuests * 1.2) {
+      guestListConfidence = 'INCOMPLETE';
+    } else {
+      guestListConfidence = 'RELIABLE';
+    }
+
+    // 7. Recent guest activity (replaces audit log in Phase 3 — for now, additive)
+    //    Merges recent RSVP submissions + recent wishes, sorted by date.
+    const [recentRsvps, recentWishes] = await Promise.all([
+      db.rSVPSubmission.findMany({
+        where: { weddingId: wedding.id },
+        select: { id: true, firstName: true, lastName: true, partySize: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      }),
+      db.wish.findMany({
+        where: { weddingId: wedding.id },
+        select: { id: true, name: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      }),
+    ]);
+    const recentGuestActivity = [
+      ...recentRsvps.map((r) => ({
+        id: r.id,
+        type: 'rsvp' as const,
+        name: `${r.firstName} ${r.lastName}`.trim(),
+        action: `RSVP'd for ${r.partySize} guest${r.partySize !== 1 ? 's' : ''}`,
+        createdAt: r.createdAt.toISOString(),
+      })),
+      ...recentWishes.map((w) => ({
+        id: w.id,
+        type: 'wish' as const,
+        name: w.name,
+        action: 'sent a wish',
+        createdAt: w.createdAt.toISOString(),
+      })),
+    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 8);
+
+    // 8. RSVP deadline (from content section 'rsvp', fieldKey 'deadline')
+    const rsvpDeadlineContent = wedding.content.find(
+      (c) => c.section === 'rsvp' && c.fieldKey === 'deadline'
+    );
+    const rsvpDeadline = rsvpDeadlineContent?.fieldValue || null;
+
     return NextResponse.json({
       daysUntil,
       isPast,
@@ -134,6 +234,16 @@ export async function GET() {
         userName: log.user?.name || 'System',
       })),
       media: { total: wedding.media.length },
+      // ── Phase 1 new fields (additive) ───────────────────────────────
+      guestListConfidence,
+      unmatchedRsvps,
+      confirmedHeadcount,
+      confirmedPlusOnes,
+      dietaryCount,
+      pendingFollowUps,
+      newWishesThisWeek,
+      rsvpDeadline,
+      recentGuestActivity,
     });
   } catch (error) {
     console.error('Overview API error:', error);

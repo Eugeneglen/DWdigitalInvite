@@ -4,13 +4,16 @@ import React, { useEffect, useState } from 'react';
 import {
   Loader2,
   CalendarDays,
-  Users,
   Mail,
   MessageSquareHeart,
   CheckCircle2,
   Circle,
   Check,
   X,
+  BarChart3,
+  Utensils,
+  AlertCircle,
+  UserCheck,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -52,6 +55,22 @@ interface OverviewData {
     userName: string;
   }>;
   media: { total: number };
+  // ── Phase 1 new fields (additive) ───────────────────────────────────
+  guestListConfidence?: 'EMPTY' | 'INCOMPLETE' | 'RELIABLE';
+  unmatchedRsvps?: number;
+  confirmedHeadcount?: number;
+  confirmedPlusOnes?: number;
+  dietaryCount?: number;
+  pendingFollowUps?: number;
+  newWishesThisWeek?: number;
+  rsvpDeadline?: string | null;
+  recentGuestActivity?: Array<{
+    id: string;
+    type: 'rsvp' | 'wish';
+    name: string;
+    action: string;
+    createdAt: string;
+  }>;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -162,6 +181,16 @@ export default function CoupleOverview() {
   // ── Derived Values ─────────────────────────────────────────────────────
   const { daysUntil, isPast, coupleName, guests, rsvps, wishes, content, checklist, recentActivity } = data;
 
+  // Phase 1: mode-aware KPIs
+  const confidence = data.guestListConfidence ?? 'RELIABLE';
+  const isReliable = confidence === 'RELIABLE';
+  const confirmedHeadcount = data.confirmedHeadcount ?? 0;
+  const confirmedPlusOnes = data.confirmedPlusOnes ?? 0;
+  const dietaryCount = data.dietaryCount ?? 0;
+  const pendingFollowUps = data.pendingFollowUps ?? 0;
+  const newWishesThisWeek = data.newWishesThisWeek ?? 0;
+  const unmatchedRsvps = data.unmatchedRsvps ?? 0;
+
   // Split coupleName into bride & groom
   const nameParts = coupleName.split(/[\s&]+/).filter(Boolean);
   const brideName = nameParts[0] ?? '';
@@ -192,9 +221,41 @@ export default function CoupleOverview() {
         </p>
       </div>
 
-      {/* 2. Top Stats Row — 4 cards, 2x2 on mobile, 4-col on md+ */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* Days Left */}
+      {/* 2. Guest list confidence prompt (only for EMPTY/INCOMPLETE) */}
+      {!isReliable && (
+        <Card className={`border ${confidence === 'EMPTY' ? 'border-sky-200 bg-sky-50/50' : 'border-amber-200 bg-amber-50/50'}`}>
+          <CardContent className="p-4 flex items-start gap-3">
+            <AlertCircle className={`size-5 shrink-0 mt-0.5 ${confidence === 'EMPTY' ? 'text-sky-500' : 'text-amber-500'}`} />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-charcoal-ink">
+                {confidence === 'EMPTY'
+                  ? 'Add your guest list to track RSVPs'
+                  : 'Your guest list may be incomplete'}
+              </p>
+              <p className="text-xs text-charcoal-ink/50 mt-1">
+                {confidence === 'EMPTY'
+                  ? rsvps.total > 0
+                    ? `You've received ${rsvps.total} RSVP${rsvps.total !== 1 ? 's' : ''}. Add your full guest list to track response rate and follow up with non-responders.`
+                    : 'Add your full guest list to track RSVP response rate, send reminders, and manage dietary requirements.'
+                  : unmatchedRsvps > 0
+                    ? `${unmatchedRsvps} guest${unmatchedRsvps !== 1 ? 's' : ''} RSVPed who aren't on your list. Review and add them to track accurately.`
+                    : 'Your guest list has fewer than 10 guests. Add more to get accurate response rate tracking.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => setPage('guests')}
+                className="text-xs font-semibold text-cinematic-gold hover:text-cinematic-gold/80 mt-2 transition-colors"
+              >
+                Go to Guest List →
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 3. Snapshot KPIs — 6 cards, mode-aware (2x3 on mobile, 3x2 on md+) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        {/* KPI 1: Days until wedding (both modes) */}
         <Card className="py-0">
           <CardContent className="p-4 flex items-center gap-3">
             <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-cinematic-gold/10 text-cinematic-gold shrink-0">
@@ -214,64 +275,172 @@ export default function CoupleOverview() {
           </CardContent>
         </Card>
 
-        {/* Total Guests */}
-        <Card className="py-0">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-cinematic-gold/10 text-cinematic-gold shrink-0">
-              <Users className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
-                Total Guests
-              </p>
-              <div className="flex items-center gap-2">
-                <p className="text-xl font-bold text-charcoal-ink leading-tight">
-                  {guests.total}
+        {/* KPI 2: Mode-aware — Confirmed headcount (RELIABLE) or RSVPs received (EMPTY/INCOMPLETE) */}
+        {isReliable ? (
+          <Card className="py-0">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-emerald-50 text-emerald-600 shrink-0">
+                <UserCheck className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+                  Confirmed Headcount
                 </p>
-                {guests.totalWithPlusOne > 0 && (
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-cinematic-gold/30 text-cinematic-gold">
-                    {guests.totalWithPlusOne} with +1
-                  </Badge>
+                <p className="text-xl font-bold text-charcoal-ink leading-tight">
+                  {confirmedHeadcount}
+                </p>
+                {confirmedPlusOnes > 0 && (
+                  <p className="text-[11px] text-charcoal-ink/40">
+                    incl. {confirmedPlusOnes} plus-one{confirmedPlusOnes !== 1 ? 's' : ''}
+                  </p>
                 )}
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="py-0">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-cinematic-gold/10 text-cinematic-gold shrink-0">
+                <Mail className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+                  RSVPs Received
+                </p>
+                <p className="text-xl font-bold text-charcoal-ink leading-tight">
+                  {rsvps.total}
+                </p>
+                <p className="text-[11px] text-charcoal-ink/40">
+                  {confirmedHeadcount > 0 ? `${confirmedHeadcount} attending` : 'submissions'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* RSVPs Received */}
+        {/* KPI 3: Mode-aware — Response rate (RELIABLE) or Declined (EMPTY/INCOMPLETE) */}
+        {isReliable ? (
+          <Card className="py-0">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-cinematic-gold/10 text-cinematic-gold shrink-0">
+                <BarChart3 className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+                  Response Rate
+                </p>
+                <p className="text-xl font-bold text-charcoal-ink leading-tight">
+                  {responseRate}%
+                </p>
+                <p className="text-[11px] text-charcoal-ink/40">
+                  {guests.responded} of {guests.total} responded
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="py-0">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-red-50 text-red-500 shrink-0">
+                <X className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+                  Declined
+                </p>
+                <p className="text-xl font-bold text-charcoal-ink leading-tight">
+                  {guests.byStatus.DECLINED || 0}
+                </p>
+                <p className="text-[11px] text-charcoal-ink/40">
+                  {rsvps.total > 0 ? `of ${rsvps.total} RSVPs` : 'guests'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* KPI 4: Mode-aware — Pending follow-ups (RELIABLE) or Unmatched RSVPs (EMPTY/INCOMPLETE) */}
+        {isReliable ? (
+          <Card
+            className="py-0 cursor-pointer hover:border-cinematic-gold/30 transition-colors"
+            onClick={() => setPage('guests')}
+          >
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className={`flex items-center justify-center h-10 w-10 rounded-lg shrink-0 ${pendingFollowUps > 0 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                <Mail className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+                  Pending Follow-ups
+                </p>
+                <p className="text-xl font-bold text-charcoal-ink leading-tight">
+                  {pendingFollowUps}
+                </p>
+                <p className="text-[11px] text-charcoal-ink/40">
+                  {pendingFollowUps === 0 ? 'all responded!' : 'need reminders'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card
+            className={`py-0 ${unmatchedRsvps > 0 ? 'cursor-pointer hover:border-amber-300 transition-colors' : ''}`}
+            onClick={() => unmatchedRsvps > 0 && setPage('guests')}
+          >
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className={`flex items-center justify-center h-10 w-10 rounded-lg shrink-0 ${unmatchedRsvps > 0 ? 'bg-amber-50 text-amber-600' : 'bg-cinematic-gold/10 text-cinematic-gold'}`}>
+                <AlertCircle className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+                  Unmatched RSVPs
+                </p>
+                <p className="text-xl font-bold text-charcoal-ink leading-tight">
+                  {unmatchedRsvps}
+                </p>
+                <p className="text-[11px] text-charcoal-ink/40">
+                  {unmatchedRsvps === 0 ? 'all matched' : 'not on your list'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* KPI 5: Dietary requirements (both modes) */}
         <Card className="py-0">
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-cinematic-gold/10 text-cinematic-gold shrink-0">
-              <Mail className="size-5" />
+            <div className={`flex items-center justify-center h-10 w-10 rounded-lg shrink-0 ${dietaryCount > 0 ? 'bg-violet-50 text-violet-600' : 'bg-cinematic-gold/10 text-cinematic-gold'}`}>
+              <Utensils className="size-5" />
             </div>
             <div className="min-w-0">
               <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
-                RSVPs Received
+                Dietary Reqs
               </p>
               <p className="text-xl font-bold text-charcoal-ink leading-tight">
-                {rsvps.total}
+                {dietaryCount}
               </p>
-              {guests.total > 0 && (
-                <p className="text-[11px] text-charcoal-ink/40">
-                  {responseRate}% responded
-                </p>
-              )}
+              <p className="text-[11px] text-charcoal-ink/40">
+                {dietaryCount === 0 ? 'none noted' : 'special needs'}
+              </p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Wishes */}
+        {/* KPI 6: New wishes this week (both modes) */}
         <Card className="py-0">
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-cinematic-gold/10 text-cinematic-gold shrink-0">
+            <div className={`flex items-center justify-center h-10 w-10 rounded-lg shrink-0 ${newWishesThisWeek > 0 ? 'bg-rose-50 text-rose-500' : 'bg-cinematic-gold/10 text-cinematic-gold'}`}>
               <MessageSquareHeart className="size-5" />
             </div>
             <div className="min-w-0">
               <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
-                Wishes
+                New Wishes
               </p>
               <p className="text-xl font-bold text-charcoal-ink leading-tight">
-                {wishes.total}
+                {newWishesThisWeek}
+              </p>
+              <p className="text-[11px] text-charcoal-ink/40">
+                {newWishesThisWeek === 0 ? `${wishes.total} total` : 'this week'}
               </p>
             </div>
           </CardContent>
