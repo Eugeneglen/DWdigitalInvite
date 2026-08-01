@@ -128,12 +128,64 @@ const CONTENT_SECTION_LABELS = [
   { key: 'footer', label: 'Footer' },
 ];
 
+// ── Phase 2: Alert system ────────────────────────────────────────────────
+// Alerts are conditional banners that appear only when action is needed.
+// Dismissed alerts are stored in localStorage and reappear after 7 days
+// (per user decision). Maximum 3 alerts shown at once, by priority.
+
+const ALERT_DISMISSAL_DAYS = 7; // Reappear after 7 days
+
+interface OverviewAlert {
+  id: string;
+  severity: 'red' | 'amber' | 'green' | 'blue';
+  title: string;
+  message: string;
+  actionLabel?: string;
+  actionPage?: CoupleCMSPage;
+}
+
+const ALERT_SEVERITY_STYLES: Record<string, { border: string; bg: string; icon: string; iconBg: string }> = {
+  red: { border: 'border-red-200', bg: 'bg-red-50/60', icon: 'text-red-500', iconBg: 'bg-red-100' },
+  amber: { border: 'border-amber-200', bg: 'bg-amber-50/60', icon: 'text-amber-500', iconBg: 'bg-amber-100' },
+  green: { border: 'border-emerald-200', bg: 'bg-emerald-50/60', icon: 'text-emerald-500', iconBg: 'bg-emerald-100' },
+  blue: { border: 'border-sky-200', bg: 'bg-sky-50/60', icon: 'text-sky-500', iconBg: 'bg-sky-100' },
+};
+
+function getDismissedAlerts(): Record<string, number> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem('dw-dismissed-alerts');
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function isAlertDismissed(alertId: string): boolean {
+  const dismissed = getDismissedAlerts();
+  const dismissedAt = dismissed[alertId];
+  if (!dismissedAt) return false;
+  const daysSince = (Date.now() - dismissedAt) / (1000 * 60 * 60 * 24);
+  return daysSince < ALERT_DISMISSAL_DAYS;
+}
+
+function dismissAlert(alertId: string) {
+  const dismissed = getDismissedAlerts();
+  dismissed[alertId] = Date.now();
+  try {
+    localStorage.setItem('dw-dismissed-alerts', JSON.stringify(dismissed));
+  } catch {
+    // localStorage might be unavailable (private browsing) — silently skip
+  }
+}
+
 // ── Component ──────────────────────────────────────────────────────────────
 
 export default function CoupleOverview() {
   const [data, setData] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [alertRefreshKey, setAlertRefreshKey] = useState(0);
   const { setPage } = useCoupleCMSStore();
 
   useEffect(() => {
@@ -199,6 +251,91 @@ export default function CoupleOverview() {
   const responseRate =
     guests.total > 0 ? Math.round((guests.responded / guests.total) * 100) : 0;
 
+  // ── Phase 2: Build alerts list ───────────────────────────────────────
+  // Priority order: deadline > dietary > unmatched > partial > new wishes
+  // Maximum 3 alerts shown. Dismissed alerts reappear after 7 days.
+  // alertRefreshKey forces re-evaluation when an alert is dismissed.
+  const rsvpDeadlineStr = data.rsvpDeadline || null;
+  const partialCount = guests.byStatus.PARTIAL || 0;
+
+  const allAlerts: OverviewAlert[] = [];
+
+  // Alert 1: RSVP deadline approaching (within 14 days)
+  if (rsvpDeadlineStr && !isPast) {
+    const deadlineDate = new Date(rsvpDeadlineStr);
+    if (!isNaN(deadlineDate.getTime())) {
+      const daysToDeadline = Math.ceil((deadlineDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      if (daysToDeadline <= 14 && daysToDeadline >= 0) {
+        allAlerts.push({
+          id: 'rsvp-deadline',
+          severity: 'red',
+          title: daysToDeadline === 0 ? 'RSVP deadline is today!' : `RSVP deadline in ${daysToDeadline} day${daysToDeadline !== 1 ? 's' : ''}`,
+          message: pendingFollowUps > 0
+            ? `${pendingFollowUps} guest${pendingFollowUps !== 1 ? 's' : ''} still haven't responded. Send reminders now.`
+            : 'All guests have responded. You\'re all set!',
+          actionLabel: pendingFollowUps > 0 ? 'View Guests' : undefined,
+          actionPage: pendingFollowUps > 0 ? 'guests' : undefined,
+        });
+      }
+    }
+  }
+
+  // Alert 2: Dietary review needed
+  if (dietaryCount > 0) {
+    allAlerts.push({
+      id: 'dietary-review',
+      severity: 'amber',
+      title: `${dietaryCount} guest${dietaryCount !== 1 ? 's' : ''} with special dietary requirements`,
+      message: 'Review the dietary list and share it with your venue or caterer.',
+      actionLabel: 'View Guests',
+      actionPage: 'guests',
+    });
+  }
+
+  // Alert 3: Unmatched RSVPs (only in RELIABLE mode — in EMPTY/INCOMPLETE mode,
+  // the confidence prompt already mentions unmatched RSVPs)
+  if (isReliable && unmatchedRsvps > 0) {
+    allAlerts.push({
+      id: 'unmatched-rsvps',
+      severity: 'amber',
+      title: `${unmatchedRsvps} unmatched RSVP${unmatchedRsvps !== 1 ? 's' : ''}`,
+      message: 'Some guests RSVPed who aren\'t on your list. Match them to existing guests or add as new.',
+      actionLabel: 'View Guests',
+      actionPage: 'guests',
+    });
+  }
+
+  // Alert 4: Partial responses need clarification
+  if (partialCount > 0) {
+    allAlerts.push({
+      id: 'partial-responses',
+      severity: 'amber',
+      title: `${partialCount} guest${partialCount !== 1 ? 's' : ''} with partial RSVP`,
+      message: 'These guests are attending some events but not others. Contact them to clarify.',
+      actionLabel: 'View Guests',
+      actionPage: 'guests',
+    });
+  }
+
+  // Alert 5: New wishes this week
+  if (newWishesThisWeek > 0) {
+    allAlerts.push({
+      id: 'new-wishes',
+      severity: 'green',
+      title: `${newWishesThisWeek} new wish${newWishesThisWeek !== 1 ? 's' : ''} this week`,
+      message: 'Take a moment to read the blessings from your guests.',
+      actionLabel: 'Read Wishes',
+      actionPage: 'wishes',
+    });
+  }
+
+  // Filter out dismissed alerts, take max 3
+  // alertRefreshKey forces re-evaluation of isAlertDismissed when an alert is dismissed
+  void alertRefreshKey; // referenced to trigger re-render on dismiss
+  const visibleAlerts = allAlerts
+    .filter(a => !isAlertDismissed(a.id))
+    .slice(0, 3);
+
   // Figure out which content sections are filled
   // The API doesn't tell us which sections are filled individually, so we show the overall completion
   // and infer section status from filledSections count (ordered by common priority)
@@ -251,6 +388,53 @@ export default function CoupleOverview() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* 2b. Alerts — conditional banners (max 3, dismissible, reappear after 7 days) */}
+      {visibleAlerts.length > 0 && (
+        <div className="space-y-3">
+          {visibleAlerts.map((alert) => {
+            const style = ALERT_SEVERITY_STYLES[alert.severity] ?? ALERT_SEVERITY_STYLES.amber;
+            return (
+              <Card key={alert.id} className={`border ${style.border} ${style.bg} shadow-none`}>
+                <CardContent className="p-4 flex items-start gap-3">
+                  <div className={`flex items-center justify-center size-8 rounded-full shrink-0 ${style.iconBg}`}>
+                    <AlertCircle className={`size-4 ${style.icon}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-charcoal-ink">
+                      {alert.title}
+                    </p>
+                    <p className="text-xs text-charcoal-ink/60 mt-0.5">
+                      {alert.message}
+                    </p>
+                    {alert.actionLabel && alert.actionPage && (
+                      <button
+                        type="button"
+                        onClick={() => setPage(alert.actionPage!)}
+                        className="text-xs font-semibold text-cinematic-gold hover:text-cinematic-gold/80 mt-2 transition-colors"
+                      >
+                        {alert.actionLabel} →
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      dismissAlert(alert.id);
+                      setAlertRefreshKey(k => k + 1);
+                    }}
+                    className="text-charcoal-ink/30 hover:text-charcoal-ink/60 transition-colors shrink-0"
+                    title="Dismiss (will reappear in 7 days)"
+                    aria-label="Dismiss alert"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       )}
 
       {/* 3. Snapshot KPIs — 6 cards, mode-aware (2x3 on mobile, 3x2 on md+) */}
