@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   Plus, Star, Trash2, Copy, Check, Loader2, FileText,
   Palette, Calendar, HelpCircle, BookOpen, Image as ImageIcon,
-  RefreshCw, Lock, Pencil,
+  Lock, Pencil,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useCMSStore } from '@/store/useCMSStore';
@@ -52,7 +52,6 @@ export default function MasterTemplates() {
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ContentTemplate | null>(null);
-  const [applying, setApplying] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<ContentTemplate | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editData, setEditData] = useState<{
@@ -146,25 +145,10 @@ export default function MasterTemplates() {
     try {
       const res = await fetch(`/api/master/content-templates/${template.id}/set-default?XTransformPort=3000`, { method: 'POST' });
       if (!res.ok) throw new Error('Failed to set default');
-      toast({ title: 'Default Set', description: `${template.name} is now the default template for new couples.` });
+      toast({ title: 'Default Set', description: `${template.name} is now the default template. New couple accounts will use this template. Existing accounts are unchanged.` });
       fetchTemplates();
     } catch {
       toast({ title: 'Error', description: 'Failed to set default template', variant: 'destructive' });
-    }
-  }
-
-  async function handleApplyAll(template: ContentTemplate) {
-    if (!confirm(`Apply "${template.name}" to all non-customized weddings? This will overwrite their content, schedule, FAQs, stories, and media.`)) return;
-    try {
-      setApplying(template.id);
-      const res = await fetch(`/api/master/content-templates/${template.id}/apply-all?XTransformPort=3000`, { method: 'POST' });
-      if (!res.ok) throw new Error('Failed to apply template');
-      const data = await res.json();
-      toast({ title: 'Template Applied', description: data.message });
-    } catch {
-      toast({ title: 'Error', description: 'Failed to apply template', variant: 'destructive' });
-    } finally {
-      setApplying(null);
     }
   }
 
@@ -325,15 +309,6 @@ export default function MasterTemplates() {
                             <Star className="size-4 text-slate-400" />
                           </Button>
                         )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleApplyAll(t)}
-                          disabled={applying === t.id}
-                          title="Apply to all non-customized weddings"
-                        >
-                          {applying === t.id ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4 text-blue-500" />}
-                        </Button>
                         {!t.isDefault && (
                           <Button
                             variant="ghost"
