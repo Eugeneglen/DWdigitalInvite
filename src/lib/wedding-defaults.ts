@@ -125,6 +125,13 @@ export async function seedDefaultWeddingContent(info: WeddingCreateInfo): Promis
   const storyItems: TemplateStoryItem[] = JSON.parse(template.stories);
   const mediaItems: TemplateMediaItem[] = JSON.parse(template.media);
 
+  // Parse the theme JSON (colors + fonts) — this is the authoritative source
+  // for the template's visual theme, separate from the content items.
+  const themeData = JSON.parse(template.theme) as {
+    colors: { bg: string; text: string; accent: string; secondary: string; muted: string };
+    fonts: { heading: string; body: string };
+  };
+
   // ── 1. Clone content (substitute hero/title + hero/dateDisplay) ───────
   await db.weddingContent.createMany({
     data: contentItems.map((item) => ({
@@ -185,6 +192,28 @@ export async function seedDefaultWeddingContent(info: WeddingCreateInfo): Promis
       sortOrder: item.sortOrder,
     })),
   });
+
+  // ── 6. Apply theme (colors + fonts) from the template's `theme` column ─
+  // This OVERWRITES any stale `global` section values that were cloned from
+  // the content JSON in step 1. The `theme` column is the authoritative source
+  // for the template's visual theme.
+  const themeItems = [
+    { section: 'global', fieldKey: 'backgroundColor', fieldValue: themeData.colors.bg, fieldType: 'TEXT' },
+    { section: 'global', fieldKey: 'textColor', fieldValue: themeData.colors.text, fieldType: 'TEXT' },
+    { section: 'global', fieldKey: 'accentColor', fieldValue: themeData.colors.accent, fieldType: 'TEXT' },
+    { section: 'global', fieldKey: 'secondaryColor', fieldValue: themeData.colors.secondary, fieldType: 'TEXT' },
+    { section: 'global', fieldKey: 'mutedColor', fieldValue: themeData.colors.muted, fieldType: 'TEXT' },
+    { section: 'global', fieldKey: 'fontFamily', fieldValue: themeData.fonts.heading, fieldType: 'TEXT' },
+    { section: 'global', fieldKey: 'bodyFont', fieldValue: themeData.fonts.body, fieldType: 'TEXT' },
+    { section: 'hero', fieldKey: 'fontFamily', fieldValue: themeData.fonts.heading, fieldType: 'TEXT' },
+  ];
+  for (const item of themeItems) {
+    await db.weddingContent.upsert({
+      where: { weddingId_section_fieldKey: { weddingId, section: item.section, fieldKey: item.fieldKey } },
+      update: { fieldValue: item.fieldValue },
+      create: { weddingId, ...item },
+    });
+  }
 
   return {
     content: contentItems.length,

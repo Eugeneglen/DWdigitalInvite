@@ -29,6 +29,20 @@ export async function POST(
     const faqItems = JSON.parse(template.faqs) as { question: string; answer: string; sortOrder: number; isActive: boolean }[];
     const storyItems = JSON.parse(template.stories) as { title: string; content: string; date: string | null; imageUrl: string | null; sortOrder: number }[];
     const mediaItems = JSON.parse(template.media) as { url: string; thumbnailUrl: string | null; fileName: string; fileType: string; category: string; sortOrder: number }[];
+    // Parse the theme JSON — the authoritative source for colors + fonts
+    const themeData = JSON.parse(template.theme) as { colors: { bg: string; text: string; accent: string; secondary: string; muted: string }; fonts: { heading: string; body: string } };
+
+    // Theme items to apply (from the `theme` column, NOT the content JSON)
+    const themeItems = [
+      { section: 'global', fieldKey: 'backgroundColor', fieldValue: themeData.colors.bg, fieldType: 'TEXT' },
+      { section: 'global', fieldKey: 'textColor', fieldValue: themeData.colors.text, fieldType: 'TEXT' },
+      { section: 'global', fieldKey: 'accentColor', fieldValue: themeData.colors.accent, fieldType: 'TEXT' },
+      { section: 'global', fieldKey: 'secondaryColor', fieldValue: themeData.colors.secondary, fieldType: 'TEXT' },
+      { section: 'global', fieldKey: 'mutedColor', fieldValue: themeData.colors.muted, fieldType: 'TEXT' },
+      { section: 'global', fieldKey: 'fontFamily', fieldValue: themeData.fonts.heading, fieldType: 'TEXT' },
+      { section: 'global', fieldKey: 'bodyFont', fieldValue: themeData.fonts.body, fieldType: 'TEXT' },
+      { section: 'hero', fieldKey: 'fontFamily', fieldValue: themeData.fonts.heading, fieldType: 'TEXT' },
+    ];
 
     // Find all non-customized weddings
     const targetWeddings = await db.weddingAccount.findMany({
@@ -75,6 +89,16 @@ export async function POST(
       await db.weddingMedia.createMany({
         data: mediaItems.map((item) => ({ weddingId: wedding.id, ...item })),
       });
+
+      // Apply theme (colors + fonts) from the `theme` column — upserts into
+      // section='global' so it overrides any stale values from content JSON
+      for (const item of themeItems) {
+        await db.weddingContent.upsert({
+          where: { weddingId_section_fieldKey: { weddingId: wedding.id, section: item.section, fieldKey: item.fieldKey } },
+          update: { fieldValue: item.fieldValue },
+          create: { weddingId: wedding.id, ...item },
+        });
+      }
 
       updatedCount++;
     }
