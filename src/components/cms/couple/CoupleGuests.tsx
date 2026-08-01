@@ -89,6 +89,7 @@ interface ParsedRow {
   plusOne: string;
   plusOneName: string;
   dietaryNotes: string;
+  rsvpStatus: string;
   [key: string]: string;
 }
 
@@ -103,7 +104,9 @@ const CSV_TEMPLATE_HEADERS = 'name,email,phone,group,tableNumber,plusOne,plusOne
 const CSV_TEMPLATE_EXAMPLE = 'John Smith,john@email.com,+65 9123 4567,Bride\'s Family,1,yes,Jane Smith,Vegetarian';
 
 function parseCSV(text: string): { headers: string[]; rows: ParsedRow[] } {
-  const lines = text.trim().split(/\r?\n/).filter((l) => l.trim());
+  // Strip BOM character (\ufeff) that some CSV editors (incl. Excel) prepend
+  const cleanText = text.replace(/^\ufeff/, '');
+  const lines = cleanText.trim().split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) return { headers: [], rows: [] };
   const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
   const rows: ParsedRow[] = [];
@@ -119,20 +122,55 @@ function parseCSV(text: string): { headers: string[]; rows: ParsedRow[] } {
 }
 
 function resolveFieldName(row: ParsedRow): string {
-  return row.name || '';
+  // Case-insensitive lookup for the name field
+  for (const key of Object.keys(row)) {
+    if (key.toLowerCase() === 'name') return row[key];
+  }
+  return '';
+}
+
+/**
+ * Normalize a row so that column names from the system's own export format
+ * (capitalized, with spaces — e.g. "Plus One", "Dietary Notes", "RSVP Status")
+ * are mapped to the lowercase camelCase keys the API expects.
+ * Also handles the template format (already lowercase).
+ */
+function normalizeRow(row: ParsedRow): Record<string, string> {
+  const normalized: Record<string, string> = {};
+  for (const key of Object.keys(row)) {
+    // Lowercase + remove spaces → "Plus One" → "plusone", "Dietary Notes" → "dietarynotes"
+    const normKey = key.toLowerCase().replace(/\s+/g, '');
+    normalized[normKey] = row[key];
+  }
+  return normalized;
 }
 
 function rowToPayload(row: ParsedRow) {
+  const n = normalizeRow(row);
+
+  // Table number: CSV export uses "Table 8" — extract the number
+  const tableRaw = n.tablenumber || n.table || '';
+  const tableMatch = tableRaw.match(/\d+/);
+  const tableNumber = tableMatch ? parseInt(tableMatch[0], 10) : undefined;
+
+  // RSVP status: map export values to DB enum values
+  const rsvpRaw = (n.rsvpstatus || '').toLowerCase().trim();
+  let rsvpStatus: string | undefined;
+  if (rsvpRaw === 'pending') rsvpStatus = 'PENDING';
+  else if (rsvpRaw === 'confirmed' || rsvpRaw === 'attending') rsvpStatus = 'ATTENDING';
+  else if (rsvpRaw === 'declined') rsvpStatus = 'DECLINED';
+  else if (rsvpRaw === 'partial') rsvpStatus = 'PARTIAL';
+
   return {
-    name: (row.name || '').trim(),
-    email: (row.email || '').trim() || undefined,
-    phone: (row.phone || '').trim() || undefined,
-    group: (row.group || '').trim() || undefined,
-    groupName: (row.groupName || row.GroupName || '').trim() || undefined,
-    tableNumber: row.tableNumber ? parseInt(row.tableNumber, 10) : undefined,
-    plusOne: ['yes', 'true', '1', 'y'].includes((row.plusOne || '').toLowerCase()),
-    plusOneName: (row.plusOneName || '').trim() || undefined,
-    dietaryNotes: (row.dietaryNotes || '').trim() || undefined,
+    name: (n.name || '').trim(),
+    email: (n.email || '').trim() || undefined,
+    phone: (n.phone || '').trim() || undefined,
+    group: (n.group || n.groupname || '').trim() || undefined,
+    tableNumber,
+    plusOne: ['yes', 'true', '1', 'y'].includes((n.plusone || '').toLowerCase()),
+    plusOneName: (n.plusonename || '').trim() || undefined,
+    dietaryNotes: (n.dietarynotes || n.dietary || '').trim() || undefined,
+    rsvpStatus,
   };
 }
 
@@ -719,6 +757,7 @@ export default function CoupleGuests() {
                       {importRows.slice(0, 10).map((row, idx) => {
                         const name = resolveFieldName(row);
                         const hasError = !name.trim();
+                        const n = normalizeRow(row);
                         return (
                           <tr
                             key={idx}
@@ -729,16 +768,16 @@ export default function CoupleGuests() {
                               {name || <span className="italic text-red-400">Missing name</span>}
                             </td>
                             <td className="px-3 py-2 text-charcoal-ink/50 hidden sm:table-cell truncate max-w-[160px]">
-                              {row.email || '—'}
+                              {n.email || '—'}
                             </td>
                             <td className="px-3 py-2 text-charcoal-ink/50 hidden md:table-cell">
-                              {row.groupName || row.GroupName || row.group || '—'}
+                              {n.group || n.groupname || '—'}
                             </td>
                             <td className="px-3 py-2 text-charcoal-ink/50 hidden md:table-cell">
-                              {row.tableNumber || '—'}
+                              {n.tablenumber || n.table || '—'}
                             </td>
                             <td className="px-3 py-2 text-charcoal-ink/50 hidden lg:table-cell">
-                              {row.plusOne ? 'Yes' : 'No'}
+                              {['yes', 'true', '1', 'y'].includes((n.plusone || '').toLowerCase()) ? 'Yes' : 'No'}
                             </td>
                           </tr>
                         );
