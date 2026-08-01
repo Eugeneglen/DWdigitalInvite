@@ -83,7 +83,7 @@ interface TemplateData {
   theme: Theme;
 }
 
-type Section = 'home' | 'design' | 'schedule' | 'story' | 'faqs' | 'getting-there' | 'moments' | 'preview';
+type Section = 'home' | 'design' | 'schedule' | 'story' | 'faqs' | 'getting-there' | 'moments' | 'wishes' | 'preview';
 
 // ── Field configs (same pattern as couple CMS) ─────────────────────────────
 
@@ -125,12 +125,20 @@ const MOMENTS_FIELDS: { key: string; label: string; type: 'text' | 'textarea'; p
 ];
 
 const WISHES_FIELDS: { key: string; label: string; type: 'text' | 'textarea'; placeholder?: string }[] = [
-  { key: 'title', label: 'Section Title', type: 'text', placeholder: 'Wishes' },
-  { key: 'subtitle', label: 'Section Subtitle', type: 'text', placeholder: 'Weave Your Blessing Into Our Archive' },
+  { key: 'title', label: 'Section Title', type: 'text', placeholder: 'e.g. Wishes & Blessings' },
+  { key: 'subtitle', label: 'Section Subtitle', type: 'text', placeholder: 'e.g. Leave your heartfelt message for the couple' },
+  { key: 'nameLabel', label: 'Name Field Label', type: 'text', placeholder: 'e.g. Your Name' },
+  { key: 'messageLabel', label: 'Message Field Label', type: 'text', placeholder: 'e.g. Your Message' },
+  { key: 'relationshipLabel', label: 'Relationship Field Label', type: 'text', placeholder: 'e.g. Your Relationship to the Couple' },
+  { key: 'submitLabel', label: 'Submit Button Label', type: 'text', placeholder: 'e.g. Weave into Archive' },
+  { key: 'heirloomLabel', label: 'Section Label (Eyebrow)', type: 'text', placeholder: 'e.g. The Living Heirloom' },
+  { key: 'formEyebrow', label: 'Form Section Eyebrow', type: 'text', placeholder: 'e.g. YOUR TURN' },
+  { key: 'formHeading', label: 'Form Section Heading', type: 'text', placeholder: 'e.g. Contribute to the Heirloom' },
 ];
 
 const QA_FIELDS: { key: string; label: string; type: 'text'; placeholder?: string }[] = [
   { key: 'title', label: 'Section Title', type: 'text', placeholder: 'Questions & Answers' },
+  { key: 'subtitle', label: 'Section Subtitle', type: 'text', placeholder: 'e.g. Everything you need to know' },
 ];
 
 const SCHEDULE_FIELDS: { key: string; label: string; type: 'text' | 'textarea'; placeholder?: string }[] = [
@@ -727,6 +735,7 @@ export default function TemplateEditor() {
     { key: 'faqs', label: 'FAQs', icon: HelpCircle },
     { key: 'getting-there', label: 'Getting There', icon: MapPin },
     { key: 'moments', label: 'Moments', icon: Camera },
+    { key: 'wishes', label: 'Wishes', icon: MessageSquareHeart },
     { key: 'preview', label: 'Preview', icon: Eye },
   ];
 
@@ -802,6 +811,43 @@ export default function TemplateEditor() {
                     label={field.label}
                     aspectClass={field.aspect}
                     maxWidth={field.maxWidth}
+                  />
+                </div>
+              ))}
+              {/* Hero Video URL */}
+              <div className="space-y-1.5">
+                <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                  Hero Video URL (optional — overrides image)
+                </Label>
+                <Input
+                  value={getContentField('hero', 'heroVideoUrl')}
+                  onChange={(e) => setContentField('hero', 'heroVideoUrl', e.target.value, 'IMAGE_URL')}
+                  placeholder="/uploads/weddings/hero-video.mp4"
+                  className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                />
+                <p className="text-xs text-charcoal-ink/40">If set, the video plays instead of the hero image on the guest site.</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Ambient Animations */}
+          <Card className="border-charcoal-ink/5 shadow-none">
+            <CardContent className="p-6 space-y-4">
+              <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Ambient Animations</h3>
+              <p className="text-xs text-charcoal-ink/40">Toggle which ambient effects appear on the guest invitation. Multiple can be enabled simultaneously.</p>
+              {[
+                { key: 'animation:gold-dust', label: 'Gold Dust', desc: 'Floating gold particles drifting across the screen' },
+                { key: 'animation:flying-stars', label: 'Flying Stars', desc: 'Star-shaped sparkles trailing cursor movement' },
+                { key: 'animation:raining', label: 'Raining Petals', desc: 'Falling flower petals animation' },
+              ].map((anim) => (
+                <div key={anim.key} className="flex items-start justify-between gap-4 py-2 border-b border-charcoal-ink/5 last:border-0">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-charcoal-ink">{anim.label}</p>
+                    <p className="text-xs text-charcoal-ink/40">{anim.desc}</p>
+                  </div>
+                  <Switch
+                    checked={getContentField('hero', anim.key) === 'true'}
+                    onCheckedChange={(checked) => setContentField('hero', anim.key, String(checked), 'TEXT')}
                   />
                 </div>
               ))}
@@ -1161,6 +1207,108 @@ export default function TemplateEditor() {
               />
             </CardContent>
           </Card>
+
+          {/* Did You Know? (Tidbits) */}
+          <Card className="border-charcoal-ink/5 shadow-none">
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Did You Know? (Tidbits)</h3>
+                <Switch
+                  checked={getContentField('story', 'tidbitsEnabled') !== 'false'}
+                  onCheckedChange={(checked) => setContentField('story', 'tidbitsEnabled', String(checked), 'TEXT')}
+                />
+              </div>
+              <p className="text-xs text-charcoal-ink/40">Fun facts about the couple displayed on the story page.</p>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">Tidbits Title</Label>
+                <Input
+                  value={getContentField('story', 'tidbitsTitle')}
+                  onChange={(e) => setContentField('story', 'tidbitsTitle', e.target.value)}
+                  placeholder="e.g. Did You Know?"
+                  className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                />
+              </div>
+              <div className="space-y-2">
+                {(() => {
+                  try {
+                    const tidbits = JSON.parse(getContentField('story', 'tidbits') || '[]');
+                    return tidbits.map((t: { q: string; a: string }, idx: number) => (
+                      <div key={idx} className="flex items-start gap-2 p-2 rounded border border-charcoal-ink/10">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-charcoal-ink">{t.q}</p>
+                          <p className="text-xs text-charcoal-ink/50">{t.a}</p>
+                        </div>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-charcoal-ink/40 hover:text-red-500" onClick={() => {
+                          const updated = tidbits.filter((_: unknown, i: number) => i !== idx);
+                          setContentField('story', 'tidbits', JSON.stringify(updated), 'JSON');
+                        }}>
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
+                    ));
+                  } catch { return null; }
+                })()}
+                <Button variant="outline" size="sm" onClick={() => {
+                  const current = (() => { try { return JSON.parse(getContentField('story', 'tidbits') || '[]'); } catch { return []; } })();
+                  const q = prompt('Enter tidbit question:');
+                  if (!q) return;
+                  const a = prompt('Enter tidbit answer:') || '';
+                  setContentField('story', 'tidbits', JSON.stringify([...current, { q, a }]), 'JSON');
+                }}>
+                  <Plus className="size-3.5 mr-1" /> Add Tidbit
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Honeymoon Voting */}
+          <Card className="border-charcoal-ink/5 shadow-none">
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Honeymoon Destinations</h3>
+                <Switch
+                  checked={getContentField('story', 'honeymoonEnabled') !== 'false'}
+                  onCheckedChange={(checked) => setContentField('story', 'honeymoonEnabled', String(checked), 'TEXT')}
+                />
+              </div>
+              <p className="text-xs text-charcoal-ink/40">Destinations guests can vote on for the couple's honeymoon.</p>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">Honeymoon Section Eyebrow</Label>
+                <Input
+                  value={getContentField('story', 'honeymoonEyebrow')}
+                  onChange={(e) => setContentField('story', 'honeymoonEyebrow', e.target.value)}
+                  placeholder="e.g. Where should we go?"
+                  className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                />
+              </div>
+              <div className="space-y-2">
+                {(() => {
+                  try {
+                    const dests = JSON.parse(getContentField('story', 'honeymoonDestinations') || '[]');
+                    return dests.map((d: { name: string }, idx: number) => (
+                      <div key={idx} className="flex items-center gap-2 p-2 rounded border border-charcoal-ink/10">
+                        <span className="flex-1 text-sm text-charcoal-ink">{d.name}</span>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-charcoal-ink/40 hover:text-red-500" onClick={() => {
+                          const updated = dests.filter((_: unknown, i: number) => i !== idx);
+                          setContentField('story', 'honeymoonDestinations', JSON.stringify(updated), 'JSON');
+                        }}>
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
+                    ));
+                  } catch { return null; }
+                })()}
+                <Button variant="outline" size="sm" onClick={() => {
+                  const current = (() => { try { return JSON.parse(getContentField('story', 'honeymoonDestinations') || '[]'); } catch { return []; } })();
+                  const name = prompt('Enter destination name:');
+                  if (!name) return;
+                  setContentField('story', 'honeymoonDestinations', JSON.stringify([...current, { name }]), 'JSON');
+                }}>
+                  <Plus className="size-3.5 mr-1" /> Add Destination
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -1340,34 +1488,41 @@ export default function TemplateEditor() {
                 <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Gallery Images</h3>
                 <p className="text-xs text-charcoal-ink/40 mt-0.5">{momentsImages().length} image(s) · 3:4 portrait · mirrors guest-site framing</p>
               </div>
-              <MomentsAddButton onAdd={addMomentsImage} />
             </div>
 
-            {momentsImages().length === 0 ? (
-              <Card className="border-charcoal-ink/5 shadow-none">
-                <CardContent className="py-12 text-center">
-                  <Camera className="size-8 text-charcoal-ink/20 mx-auto mb-2" />
-                  <p className="text-sm text-charcoal-ink/40">No gallery images yet. Click &quot;Add Image&quot; to upload samples.</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {momentsImages().map((item, idx) => (
-                  <div key={idx} className="group relative aspect-[3/4] rounded-lg overflow-hidden border border-charcoal-ink/10 bg-paper-cream">
-                    <img src={item.url} alt={item.fileName} className="w-full h-full object-cover" />
-                    <button
-                      onClick={() => removeMomentsImage(idx)}
-                      className="absolute top-1.5 right-1.5 h-7 w-7 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center text-charcoal-ink/60 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="Remove image"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                    <p className="absolute bottom-0 left-0 right-0 px-2 py-1 text-[10px] text-white bg-charcoal-ink/60 truncate">{item.fileName}</p>
-                  </div>
-                ))}
-              </div>
-            )}
+            <SimpleImageGallery
+              media={momentsImages()}
+              onAdd={(url) => addMomentsImage(url, `moments-${Date.now()}.png`)}
+              onRemove={(idx) => removeMomentsImage(idx)}
+              maxImages={20}
+              aspectClass="aspect-[3/4]"
+            />
           </div>
+        </div>
+      )}
+
+      {/* ── WISHES SECTION ────────────────────────────────────────────── */}
+      {activeSection === 'wishes' && (
+        <div className="space-y-6 max-w-3xl">
+          <Card className="border-charcoal-ink/5 shadow-none">
+            <CardContent className="p-6 space-y-5">
+              <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Wishes Section Text</h3>
+              <p className="text-xs text-charcoal-ink/40">Customise the text guests see on the wishes/blessings section.</p>
+              {WISHES_FIELDS.map((field) => (
+                <div key={field.key} className="space-y-1.5">
+                  <Label className="text-[11px] tracking-[0.18em] uppercase font-semibold text-charcoal-ink/50">
+                    {field.label}
+                  </Label>
+                  <Input
+                    value={getContentField('wishes', field.key)}
+                    onChange={(e) => setContentField('wishes', field.key, e.target.value)}
+                    placeholder={field.placeholder}
+                    className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                  />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         </div>
       )}
 
