@@ -1563,150 +1563,566 @@ function MomentsAddButton({ onAdd }: { onAdd: (dataUrl: string, fileName: string
 // ── PreviewPanel — read-only live preview of the template ──────────────────
 
 function PreviewPanel({ data }: { data: TemplateData }) {
-  const { theme, content, schedule, stories } = data;
-  const heroTitle = content.find((c) => c.section === 'hero' && c.fieldKey === 'title')?.fieldValue || 'Couple Name';
-  const heroSubtitle = content.find((c) => c.section === 'hero' && c.fieldKey === 'subtitle')?.fieldValue || '';
-  const heroDescription = content.find((c) => c.section === 'hero' && c.fieldKey === 'description')?.fieldValue || '';
-  const dateDisplay = content.find((c) => c.section === 'hero' && c.fieldKey === 'dateDisplay')?.fieldValue || '';
-  const teaCeremonyImage = content.find((c) => c.section === 'hero' && c.fieldKey === 'teaCeremonyImage')?.fieldValue || '';
-  const scheduleTitle = content.find((c) => c.section === 'schedule' && c.fieldKey === 'title')?.fieldValue || 'The Day';
-  const storyTitle = content.find((c) => c.section === 'story' && c.fieldKey === 'title')?.fieldValue || 'Our Love Story';
+  const { theme, content, schedule, stories, faqs, media } = data;
 
+  // ── Field lookup helper ────────────────────────────────────────────────
+  const getField = (section: string, key: string, fallback = ''): string =>
+    content.find((c) => c.section === section && c.fieldKey === key)?.fieldValue || fallback;
+
+  // ── Hero content ───────────────────────────────────────────────────────
+  const heroTitle = getField('hero', 'title', 'Couple Name');
+  const heroSubtitle = getField('hero', 'subtitle', 'Together with their families');
+  const heroDescription = getField('hero', 'description', 'Together with their families, request the pleasure of your company');
+  const dateDisplay = getField('hero', 'dateDisplay', 'Saturday, 25th December 2027');
+  const heroImageUrl = getField('hero', 'heroImageUrl', '/wedding-images/hero-portrait.png');
+  const bannerUrl = getField('hero', 'bannerUrl', '/wedding-images/banner-bg.png');
+
+  // ── Tea ceremony content ───────────────────────────────────────────────
+  const teaCeremonyImage = getField('hero', 'teaCeremonyImage', '/wedding-images/tea-ceremony.png');
+  const teaCeremonyLabel = getField('hero', 'teaCeremonyLabel', 'The Tradition');
+  const teaCeremonyTitle = getField('hero', 'teaCeremonyTitle', 'The Tea Ceremony');
+  const teaCeremonyBody = getField('hero', 'teaCeremonyBody', 'A sacred tradition where we honour our elders and receive their blessings with cups of tea served on bended knee.');
+
+  // ── Narrative content ──────────────────────────────────────────────────
+  const narrativeLabel = getField('hero', 'narrativeLabel', 'The Prelude');
+  const narrativeTitle = getField('hero', 'narrativeTitle', 'Our Story Begins Here');
+  const narrativeBody = getField('hero', 'narrativeBody', 'Every great romance is a narrative woven over time. Ours began with a serendipitous meeting and has evolved into a tapestry of shared adventures, quiet moments, and a profound commitment to one another.');
+
+  // ── Section titles & subtitles ─────────────────────────────────────────
+  const scheduleTitle = getField('schedule', 'title', 'The Day');
+  const scheduleSubtitle = getField('schedule', 'subtitle', 'The Celebration');
+  const storyTitle = getField('story', 'title', 'Our Story');
+  const storySubtitle = getField('story', 'subtitle', 'A narrative woven through time, capturing the moments that led us here.');
+  const momentsTitle = getField('moments', 'title', 'Moments');
+  const momentsSubtitle = getField('moments', 'subtitle', 'The Journey Before the I Do—from childhood dreams to our first steps together.');
+  const qaTitle = getField('qa', 'title', 'Questions & Answers');
+  const qaSubtitle = getField('qa', 'subtitle', 'Everything you need to know for our celebration.');
+
+  // ── Theme tokens ───────────────────────────────────────────────────────
   const bg = theme.colors.bg;
   const text = theme.colors.text;
   const accent = theme.colors.accent;
+  const secondary = theme.colors.secondary;
   const muted = theme.colors.muted;
   const headingFont = `'${theme.fonts.heading}', serif`;
   const bodyFont = `'${theme.fonts.body}', sans-serif`;
 
-  return (
+  // ── Filtered media (moments gallery) ───────────────────────────────────
+  const momentsMedia = media.filter((m) => m.category === 'moments');
+
+  // ── Countdown (uses dateDisplay, falls back to a future date) ───────────
+  const [countdown, setCountdown] = useState({ days: 0, hours: 0, mins: 0, secs: 0 });
+  useEffect(() => {
+    const parseTarget = (dateStr: string): number => {
+      if (!dateStr) return Date.now() + 365 * 24 * 3600 * 1000;
+      // Strip ordinal suffixes (1st, 2nd, 3rd, 4th) so Date can parse it
+      const cleaned = dateStr.replace(/(\d+)(st|nd|rd|th)/gi, '$1');
+      const d = new Date(cleaned);
+      if (isNaN(d.getTime())) return Date.now() + 365 * 24 * 3600 * 1000;
+      return d.getTime();
+    };
+    const target = parseTarget(dateDisplay);
+    const calc = () => {
+      const now = Date.now();
+      const diff = Math.max(0, target - now);
+      setCountdown({
+        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+        mins: Math.floor((diff / (1000 * 60)) % 60),
+        secs: Math.floor((diff / 1000) % 60),
+      });
+    };
+    calc();
+    const id = setInterval(calc, 1000);
+    return () => clearInterval(id);
+  }, [dateDisplay]);
+
+  // ── FAQ accordion state ────────────────────────────────────────────────
+  const [openFaqIdx, setOpenFaqIdx] = useState<number | null>(0);
+
+  // ── Section banner (shared across schedule / story / moments / qa) ──────
+  // Mirrors src/components/wedding/SectionBanner.tsx: full-bleed banner
+  // image with the section title (and optional subtitle) overlaid.
+  const renderSectionBanner = (title: string, subtitle?: string) => (
     <div
-      className="rounded-xl border border-charcoal-ink/10 overflow-hidden shadow-sm"
-      style={{ backgroundColor: bg, color: text, fontFamily: bodyFont }}
+      className="relative w-full h-[200px] bg-cover bg-center flex items-center justify-center"
+      style={{ backgroundImage: `url('${bannerUrl}')` }}
     >
-      {/* Hero */}
-      <div className="px-6 py-12 sm:px-10 sm:py-16 text-center">
-        {heroSubtitle && (
-          <p className="text-xs sm:text-sm uppercase tracking-[0.2em] mb-3" style={{ color: accent, fontFamily: bodyFont }}>
-            {heroSubtitle}
+      <div
+        className="absolute inset-0"
+        style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.15), rgba(0,0,0,0.45))' }}
+      />
+      <div className="relative z-10 text-center px-6">
+        <h2
+          className="text-[30px] md:text-[40px] leading-[1.05] tracking-tight font-bold drop-shadow-sm"
+          style={{ fontFamily: headingFont, color: '#FFF8E7' }}
+        >
+          {title}
+        </h2>
+        {subtitle && (
+          <p
+            className="mt-2 text-[10px] md:text-xs uppercase tracking-[0.25em] font-semibold drop-shadow"
+            style={{ color: accent }}
+          >
+            {subtitle}
           </p>
         )}
-        <h1 className="text-3xl sm:text-5xl font-light leading-tight" style={{ fontFamily: headingFont, color: text }}>
-          {heroTitle}
-        </h1>
-        {dateDisplay && (
-          <p className="mt-4 text-xs sm:text-sm uppercase tracking-[0.15em]" style={{ color: muted, fontFamily: bodyFont }}>
-            {dateDisplay}
-          </p>
-        )}
-        {heroDescription && (
-          <p className="mt-5 text-sm sm:text-base max-w-md mx-auto" style={{ color: muted, fontFamily: bodyFont }}>
-            {heroDescription}
-          </p>
-        )}
-        <div className="mt-6 flex justify-center">
-          <div className="h-px w-16" style={{ backgroundColor: accent }} />
-        </div>
       </div>
+    </div>
+  );
 
-      {/* Tea ceremony image */}
-      {teaCeremonyImage && (
-        <div className="px-6 pb-10 sm:px-10">
-          <div className="aspect-[2/3] max-w-[220px] mx-auto rounded-lg overflow-hidden">
-            <img src={teaCeremonyImage} alt="Tea ceremony" className="w-full h-full object-cover" />
+  return (
+    <div className="rounded-xl border border-charcoal-ink/10 overflow-hidden shadow-sm">
+      <div
+        className="max-h-[600px] overflow-y-auto"
+        style={{ backgroundColor: bg, color: text, fontFamily: bodyFont }}
+      >
+        {/* ===== TOP BANNER (full-bleed background image with couple name) ===== */}
+        <div
+          className="relative w-full h-[260px] bg-cover bg-center flex items-center justify-center"
+          style={{ backgroundImage: `url('${bannerUrl}')` }}
+        >
+          <div
+            className="absolute inset-0"
+            style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.15), rgba(0,0,0,0.5))' }}
+          />
+          <div className="relative z-10 text-center px-6">
+            <h1
+              className="text-[38px] md:text-[56px] leading-[1.05] tracking-tight font-bold drop-shadow-sm"
+              style={{ fontFamily: headingFont, color: '#FFF8E7' }}
+            >
+              {heroTitle}
+            </h1>
+            {heroSubtitle && (
+              <p
+                className="mt-2 text-xs md:text-sm italic tracking-wide"
+                style={{ color: '#FFF8E7' }}
+              >
+                {heroSubtitle}
+              </p>
+            )}
           </div>
         </div>
-      )}
 
-      {/* Schedule */}
-      {schedule.length > 0 && (
-        <div className="px-6 py-10 sm:px-10" style={{ borderTop: `1px solid ${muted}33` }}>
-          <h2 className="text-center text-2xl sm:text-3xl font-light mb-1" style={{ fontFamily: headingFont, color: text }}>
-            {scheduleTitle}
-          </h2>
-          <div className="flex justify-center mb-8">
-            <div className="h-px w-12" style={{ backgroundColor: accent }} />
-          </div>
-          <div className="space-y-4 max-w-md mx-auto">
-            {schedule.map((item, idx) => {
-              const eventType = EVENT_TYPES.find((t) => t.value === item.eventType);
-              return (
-                <div key={idx} className="flex items-start gap-4 py-3" style={{ borderBottom: `1px solid ${muted}22` }}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] uppercase tracking-[0.15em] mb-1" style={{ color: accent, fontFamily: bodyFont }}>
-                      {eventType?.label || 'Event'}
-                    </p>
-                    <p className="text-sm font-medium" style={{ fontFamily: headingFont, color: text }}>
-                      {item.title}
-                    </p>
-                    {item.description && (
-                      <p className="text-xs mt-1" style={{ color: muted, fontFamily: bodyFont }}>
-                        {item.description}
-                      </p>
-                    )}
-                    {item.location && (
-                      <p className="text-xs mt-1 flex items-center gap-1" style={{ color: muted, fontFamily: bodyFont }}>
-                        <MapPin className="size-3" />
-                        {item.location}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-xs font-medium" style={{ color: text, fontFamily: bodyFont }}>
-                      {item.startTime}
-                    </p>
-                    {item.endTime && (
-                      <p className="text-[11px]" style={{ color: muted, fontFamily: bodyFont }}>
-                        {item.endTime}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Story chapters */}
-      {stories.length > 0 && (
-        <div className="px-6 py-10 sm:px-10" style={{ borderTop: `1px solid ${muted}33` }}>
-          <h2 className="text-center text-2xl sm:text-3xl font-light mb-1" style={{ fontFamily: headingFont, color: text }}>
-            {storyTitle}
-          </h2>
-          <div className="flex justify-center mb-8">
-            <div className="h-px w-12" style={{ backgroundColor: accent }} />
-          </div>
-          <div className="space-y-8 max-w-2xl mx-auto">
-            {stories.map((item, idx) => (
-              <div key={idx} className="flex flex-col md:flex-row gap-5 items-center">
-                {item.imageUrl && (
-                  <div className="aspect-[16/9] w-full md:w-1/2 max-w-xs rounded-lg overflow-hidden shrink-0">
-                    <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
-                  </div>
-                )}
-                <div className="flex-1 text-center md:text-left">
-                  <p className="text-[10px] uppercase tracking-[0.15em] mb-1" style={{ color: accent, fontFamily: bodyFont }}>
-                    {item.date || `Chapter ${idx + 1}`}
-                  </p>
-                  <h3 className="text-lg font-medium mb-2" style={{ fontFamily: headingFont, color: text }}>
-                    {item.title}
-                  </h3>
-                  <p className="text-xs leading-relaxed" style={{ color: muted, fontFamily: bodyFont }}>
-                    {item.content}
-                  </p>
-                </div>
+        {/* ===== HERO PORTRAIT (full-bleed image + date + description + countdown) ===== */}
+        <div className="relative w-full h-[520px] overflow-hidden">
+          <img
+            src={heroImageUrl}
+            alt="Hero Wedding Portrait"
+            className="absolute inset-0 w-full h-full object-cover object-center"
+          />
+          <div
+            className="absolute inset-0"
+            style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.6) 100%)' }}
+          />
+          <div className="relative z-10 h-full w-full px-8 pb-12 flex flex-col items-center justify-end text-center">
+            {/* Date badge */}
+            {dateDisplay && (
+              <div className="mb-6 inline-flex items-center justify-center border border-champagne-silk/60 px-5 py-1.5 rounded-full bg-white/10 backdrop-blur-sm">
+                <span
+                  className="text-[10px] md:text-xs tracking-[0.2em] uppercase font-semibold"
+                  style={{ color: '#FFF8E7' }}
+                >
+                  {dateDisplay}
+                </span>
               </div>
-            ))}
+            )}
+            {/* Description */}
+            {heroDescription && (
+              <p
+                className="max-w-md mx-auto mb-8 italic text-sm md:text-base"
+                style={{ color: 'rgba(255,248,231,0.85)' }}
+              >
+                {heroDescription}
+              </p>
+            )}
+            {/* Countdown */}
+            <div className="grid grid-cols-4 gap-2 md:gap-3 w-full max-w-md mx-auto">
+              {[
+                { value: countdown.days, label: 'DAYS' },
+                { value: countdown.hours, label: 'HOURS' },
+                { value: countdown.mins, label: 'MINS' },
+                { value: countdown.secs, label: 'SECS' },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="flex flex-col items-center justify-center rounded-lg border border-champagne-silk/50 bg-white/10 backdrop-blur-sm py-3 md:py-4"
+                >
+                  <span
+                    className="text-2xl md:text-3xl font-bold leading-none"
+                    style={{ fontFamily: headingFont, color: '#FFF8E7' }}
+                  >
+                    {String(item.value).padStart(2, '0')}
+                  </span>
+                  <span
+                    className="text-[9px] md:text-[10px] tracking-widest uppercase mt-2 font-semibold"
+                    style={{ color: 'rgba(255,248,231,0.8)' }}
+                  >
+                    {item.label}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      )}
 
-      {/* Footer */}
-      <div className="px-6 py-6 text-center" style={{ borderTop: `1px solid ${muted}33` }}>
-        <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: muted, fontFamily: bodyFont }}>
-          Template Preview · {data.name}
-        </p>
+        {/* ===== TEA CEREMONY (image + label + title + body, side by side) ===== */}
+        <section className="py-14 px-6 md:px-10 max-w-5xl mx-auto">
+          <div className="flex flex-col md:flex-row gap-8 md:gap-12 items-center">
+            <div className="w-full md:w-1/2 shrink-0">
+              <div className="aspect-[4/5] md:aspect-[3/4] w-full overflow-hidden rounded-lg shadow-xl">
+                <img
+                  src={teaCeremonyImage}
+                  alt={teaCeremonyTitle}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+            <div className="w-full md:w-1/2 text-center md:text-left">
+              <span
+                className="block mb-2 text-[10px] md:text-xs uppercase tracking-[0.2em] font-semibold"
+                style={{ color: accent, fontFamily: bodyFont }}
+              >
+                {teaCeremonyLabel}
+              </span>
+              <h3
+                className="text-2xl md:text-3xl font-semibold mb-4"
+                style={{ fontFamily: headingFont, color: text }}
+              >
+                {teaCeremonyTitle}
+              </h3>
+              {teaCeremonyBody && (
+                <p
+                  className="text-sm md:text-base leading-relaxed max-w-xl"
+                  style={{ color: muted, fontFamily: bodyFont }}
+                >
+                  {teaCeremonyBody}
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* ===== NARRATIVE (label + title + body, centered) ===== */}
+        <section
+          className="py-14 px-6 md:px-10 max-w-3xl mx-auto text-center"
+          style={{ borderTop: `1px solid ${muted}33` }}
+        >
+          <span
+            className="block mb-3 text-[10px] md:text-xs uppercase tracking-[0.2em] font-semibold"
+            style={{ color: accent, fontFamily: bodyFont }}
+          >
+            {narrativeLabel}
+          </span>
+          <h3
+            className="text-2xl md:text-3xl font-semibold mb-4"
+            style={{ fontFamily: headingFont, color: text }}
+          >
+            {narrativeTitle}
+          </h3>
+          <p
+            className="text-sm md:text-base leading-relaxed max-w-2xl mx-auto"
+            style={{ color: muted, fontFamily: bodyFont }}
+          >
+            {narrativeBody}
+          </p>
+        </section>
+
+        {/* ===== SCHEDULE (section banner + timeline of events) ===== */}
+        {renderSectionBanner(scheduleTitle, scheduleSubtitle)}
+        <section className="py-14 px-6 md:px-10 max-w-3xl mx-auto">
+          {schedule.length === 0 ? (
+            <p
+              className="text-center text-sm italic py-10"
+              style={{ color: muted, fontFamily: bodyFont }}
+            >
+              No events scheduled.
+            </p>
+          ) : (
+            <div className="relative border-l pl-8 ml-2" style={{ borderColor: `${accent}55` }}>
+              <div className="flex flex-col gap-10">
+                {schedule.map((item, idx) => {
+                  const eventType = EVENT_TYPES.find((t) => t.value === item.eventType);
+                  return (
+                    <div key={idx} className="relative">
+                      <div
+                        className="absolute -left-[calc(2px+5px)] top-2 w-2.5 h-2.5 rounded-full"
+                        style={{ backgroundColor: accent }}
+                      />
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        {item.startTime && (
+                          <span
+                            className="inline-block px-2.5 py-1 rounded text-[10px] font-medium uppercase tracking-widest"
+                            style={{
+                              backgroundColor: `${secondary}33`,
+                              color: text,
+                              fontFamily: bodyFont,
+                            }}
+                          >
+                            {item.startTime}
+                          </span>
+                        )}
+                        {eventType && (
+                          <span
+                            className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
+                            style={{
+                              backgroundColor: `${accent}22`,
+                              color: accent,
+                              fontFamily: bodyFont,
+                            }}
+                          >
+                            {eventType.label}
+                          </span>
+                        )}
+                      </div>
+                      <h4
+                        className="text-lg md:text-xl font-semibold"
+                        style={{ fontFamily: headingFont, color: text }}
+                      >
+                        {item.title}
+                      </h4>
+                      {item.description && (
+                        <p
+                          className="text-sm mt-1 leading-relaxed"
+                          style={{ color: muted, fontFamily: bodyFont }}
+                        >
+                          {item.description}
+                        </p>
+                      )}
+                      {item.location && (
+                        <span
+                          className="mt-3 inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] uppercase tracking-widest font-bold"
+                          style={{
+                            backgroundColor: `${secondary}22`,
+                            color: text,
+                            fontFamily: bodyFont,
+                          }}
+                        >
+                          <MapPin className="size-3" />
+                          {item.location}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* ===== STORY (section banner + zigzag timeline of chapters) ===== */}
+        {renderSectionBanner(storyTitle, storySubtitle)}
+        <section className="py-14 px-6 md:px-10 max-w-4xl mx-auto">
+          {storySubtitle && (
+            <p
+              className="text-center italic max-w-2xl mx-auto mb-10 text-sm md:text-base"
+              style={{ color: muted, fontFamily: bodyFont }}
+            >
+              {storySubtitle}
+            </p>
+          )}
+          {stories.length === 0 ? (
+            <p
+              className="text-center text-sm italic py-10"
+              style={{ color: muted, fontFamily: bodyFont }}
+            >
+              Our story coming soon.
+            </p>
+          ) : (
+            <div className="relative">
+              {/* Center vertical line */}
+              <div
+                className="absolute left-4 md:left-1/2 top-0 bottom-0 w-px -translate-x-1/2"
+                style={{ backgroundColor: `${accent}44` }}
+              />
+              <div className="flex flex-col gap-12">
+                {stories.map((story, idx) => {
+                  const isReversed = idx % 2 === 1;
+                  const hasImage = !!story.imageUrl;
+                  return (
+                    <div
+                      key={idx}
+                      className={`relative flex flex-col ${isReversed ? 'md:flex-row-reverse' : 'md:flex-row'} items-center justify-between w-full`}
+                    >
+                      <div
+                        className="absolute left-4 md:left-1/2 top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full z-10"
+                        style={{ backgroundColor: accent, boxShadow: `0 0 8px ${accent}88` }}
+                      />
+                      <div
+                        className={[
+                          'w-full pl-12 md:pl-0 text-left',
+                          hasImage ? 'md:w-5/12' : 'md:w-8/12 md:px-12',
+                          isReversed
+                            ? (hasImage ? 'md:pl-12 md:text-left' : 'md:pl-12 md:text-left')
+                            : (hasImage ? 'md:pr-12 md:text-right' : 'md:text-center'),
+                        ].join(' ')}
+                      >
+                        {story.date && (
+                          <span
+                            className="block mb-2 uppercase tracking-[0.2em] text-[10px] md:text-xs font-semibold"
+                            style={{ color: accent, fontFamily: bodyFont }}
+                          >
+                            {story.date}
+                          </span>
+                        )}
+                        <h4
+                          className="text-xl md:text-2xl italic mb-3"
+                          style={{ fontFamily: headingFont, color: text, fontWeight: 500 }}
+                        >
+                          {story.title}
+                        </h4>
+                        <p
+                          className="text-sm italic leading-relaxed"
+                          style={{ color: muted, fontFamily: bodyFont }}
+                        >
+                          {story.content}
+                        </p>
+                      </div>
+                      {hasImage && (
+                        <div
+                          className={`w-full pl-12 md:pl-0 md:w-5/12 flex ${isReversed ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div
+                            className={`w-full overflow-hidden rounded-lg shadow-md ${
+                              isReversed ? 'max-w-[260px] aspect-[3/4]' : 'max-w-[300px] aspect-square'
+                            }`}
+                          >
+                            <img
+                              src={story.imageUrl || ''}
+                              alt={story.title}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* ===== MOMENTS (section banner + masonry gallery) ===== */}
+        {renderSectionBanner(momentsTitle, momentsSubtitle)}
+        <section className="py-14 px-6 md:px-10 max-w-5xl mx-auto">
+          {momentsSubtitle && (
+            <p
+              className="text-center italic max-w-2xl mx-auto mb-10 text-sm md:text-base"
+              style={{ color: muted, fontFamily: bodyFont }}
+            >
+              {momentsSubtitle}
+            </p>
+          )}
+          {momentsMedia.length === 0 ? (
+            <p
+              className="text-center text-sm italic py-10"
+              style={{ color: muted, fontFamily: bodyFont }}
+            >
+              Photos coming soon.
+            </p>
+          ) : (
+            <div className="columns-1 sm:columns-2 lg:columns-3 gap-4">
+              {momentsMedia.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="break-inside-avoid mb-4 overflow-hidden rounded-lg shadow-sm p-3"
+                  style={{ backgroundColor: bg === '#FFFFFF' || bg === '#ffffff' ? '#FCF9F2' : `${bg}` }}
+                >
+                  <img
+                    src={item.url}
+                    alt={item.fileName || `Moment ${idx + 1}`}
+                    className="w-full h-auto object-cover rounded"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* ===== FAQ (section banner + accordion list of Q&A) ===== */}
+        {renderSectionBanner(qaTitle, qaSubtitle)}
+        <section className="py-14 px-6 md:px-10 max-w-3xl mx-auto">
+          {qaSubtitle && (
+            <p
+              className="text-center italic max-w-2xl mx-auto mb-10 text-sm md:text-base"
+              style={{ color: muted, fontFamily: bodyFont }}
+            >
+              {qaSubtitle}
+            </p>
+          )}
+          {faqs.length === 0 ? (
+            <p
+              className="text-center text-sm italic py-10"
+              style={{ color: muted, fontFamily: bodyFont }}
+            >
+              No questions have been added yet.
+            </p>
+          ) : (
+            <div className="border-t" style={{ borderColor: `${accent}33` }}>
+              {faqs.map((faq, idx) => {
+                const isOpen = openFaqIdx === idx;
+                return (
+                  <div
+                    key={idx}
+                    className="border-b"
+                    style={{ borderColor: `${accent}33` }}
+                  >
+                    <button
+                      type="button"
+                      className="w-full py-5 flex justify-between items-center text-left"
+                      onClick={() => setOpenFaqIdx(isOpen ? null : idx)}
+                    >
+                      <h4
+                        className="text-base md:text-lg pr-6"
+                        style={{ fontFamily: headingFont, color: text, fontWeight: 500 }}
+                      >
+                        {faq.question}
+                      </h4>
+                      <span
+                        className="text-lg transition-transform duration-300"
+                        style={{
+                          color: accent,
+                          transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                          display: 'inline-block',
+                        }}
+                      >
+                        ▾
+                      </span>
+                    </button>
+                    <div
+                      className="overflow-hidden transition-all duration-500"
+                      style={{
+                        maxHeight: isOpen ? '500px' : '0px',
+                        opacity: isOpen ? 1 : 0,
+                      }}
+                    >
+                      <p
+                        className="pb-5 text-sm md:text-base leading-relaxed"
+                        style={{ color: muted, fontFamily: bodyFont }}
+                      >
+                        {faq.answer}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* ===== FOOTER (copyright text) ===== */}
+        <footer
+          className="py-8 px-6 text-center"
+          style={{ borderTop: `1px solid ${muted}33` }}
+        >
+          <p
+            className="text-[10px] uppercase tracking-[0.2em] font-semibold"
+            style={{ color: muted, fontFamily: bodyFont }}
+          >
+            © {new Date().getFullYear()} {heroTitle} · Template Preview · {data.name}
+          </p>
+        </footer>
       </div>
     </div>
   );
