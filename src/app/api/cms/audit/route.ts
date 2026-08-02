@@ -24,20 +24,53 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('userId') || '';
     const tenantId = searchParams.get('tenantId') || '';
     const action = searchParams.get('action') || '';
+    const entity = searchParams.get('entity') || '';
     const fromDate = searchParams.get('fromDate') || '';
     const toDate = searchParams.get('toDate') || '';
+    const search = (searchParams.get('search') || '').trim();
 
     const where: Record<string, unknown> = {};
 
     if (userId) where.userId = userId;
     if (tenantId) where.weddingId = tenantId;
     if (action) where.action = action;
+    if (entity) where.entity = entity;
 
     if (fromDate || toDate) {
       const createdAt: Record<string, Date> = {};
       if (fromDate) createdAt.gte = new Date(fromDate);
-      if (toDate) createdAt.lte = new Date(toDate);
+      if (toDate) {
+        // Add 1 day to make toDate inclusive of the entire day
+        const end = new Date(toDate);
+        end.setDate(end.getDate() + 1);
+        createdAt.lte = end;
+      }
       where.createdAt = createdAt;
+    }
+
+    // Server-side search: matches user name/email, entity, action, details.
+    // SQLite doesn't support mode: 'insensitive', so we generate OR clauses
+    // for common case variants. On PostgreSQL (Railway prod), this still works.
+    if (search) {
+      // Generate case variants of the search term
+      const variants = [search, search.toLowerCase(), search.toUpperCase()];
+      // Capitalize first letter (e.g. "Gleneugene")
+      if (search.length > 0) {
+        variants.push(search.charAt(0).toUpperCase() + search.slice(1));
+      }
+      const uniqueVariants = [...new Set(variants)];
+
+      const orClauses: Record<string, unknown>[] = [];
+      for (const v of uniqueVariants) {
+        orClauses.push(
+          { entity: { contains: v } },
+          { action: { contains: v } },
+          { details: { contains: v } },
+          { user: { name: { contains: v } } },
+          { user: { email: { contains: v } } },
+        );
+      }
+      where.OR = orClauses;
     }
 
     const [logs, total] = await Promise.all([
