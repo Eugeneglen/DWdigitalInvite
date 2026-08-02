@@ -61,4 +61,6 @@ tool-results/
 upload/
 worklog.md
 ensure-server.sh
-mini-services/
+mini-services/PUSH_PROCEDURE.md
+
+PUSH_PROCEDURE.md
