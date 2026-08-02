@@ -90,6 +90,8 @@ const SETTINGS_SECTIONS: { title: string; description: string; fields: SettingFi
     fields: [
       { key: 'default_wedding_status', label: 'Default Wedding Status', type: 'select', defaultValue: 'DRAFT', options: ['DRAFT', 'ACTIVE'] },
       { key: 'default_plan', label: 'Default Plan', type: 'select', defaultValue: 'GOLD', options: ['GOLD', 'PLATINUM', 'DIAMOND'] },
+      { key: 'default_couple_password', label: 'Default Couple Password', type: 'text', defaultValue: 'Couple@123', placeholder: 'Couple@123' },
+      { key: 'couple_access_expiry_days', label: 'Couple Access Expiry (days after wedding)', type: 'number', defaultValue: '30', placeholder: '30' },
       { key: 'max_guests_per_wedding', label: 'Max Guests Per Wedding', type: 'number', defaultValue: '500', placeholder: '500' },
       { key: 'max_media_per_wedding', label: 'Max Media Per Wedding', type: 'number', defaultValue: '100', placeholder: '100' },
     ],
@@ -496,6 +498,9 @@ export default function MasterSettings() {
                     <div className="w-full max-w-sm">
                       <Input
                         type="password"
+                        autoComplete="off"
+                        data-1p-ignore
+                        data-lpignore="true"
                         value={emailConfig.apiKey}
                         onChange={(e) => setEmailConfig(prev => ({ ...prev, apiKey: e.target.value }))}
                         placeholder={emailConfig.provider === 'smtp' ? 'SMTP connection string' : 'Enter API key...'}

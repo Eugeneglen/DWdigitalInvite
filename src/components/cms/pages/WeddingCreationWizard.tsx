@@ -137,6 +137,7 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
   const [form, setForm] = useState<FormData>(INITIAL_FORM);
   const [staff, setStaff] = useState<StaffUser[]>([]);
   const [packages, setPackages] = useState<PackageTemplate[]>([]);
+  const [defaultPassword, setDefaultPassword] = useState<string>('Couple@123');
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [result, setResult] = useState<{ credentials: Record<string, string>; wedding: Record<string, unknown> } | null>(null);
@@ -168,6 +169,10 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
           try {
             setPackages(JSON.parse(templatesStr));
           } catch { /* ignore */ }
+        }
+        const pwd = settingsData.settings?.default_couple_password;
+        if (typeof pwd === 'string' && pwd.trim().length > 0) {
+          setDefaultPassword(pwd.trim());
         }
       }
     } catch {
@@ -602,7 +607,7 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
                 </p>
                 <ul className="text-xs text-charcoal-ink/60 mt-1 space-y-0.5">
                   <li>✓ Create wedding account (DRAFT / Onboarding)</li>
-                  <li>✓ Create couple login ({form.coupleEmail} / Couple@123)</li>
+                  <li>✓ Create couple login ({form.coupleEmail} / {defaultPassword})</li>
                   <li>✓ Apply {form.plan} package features</li>
                   <li>✓ Generate Couple CMS URL + Guest URL</li>
                   <li>✓ Set access expiry (30 days after wedding)</li>
