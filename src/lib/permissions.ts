@@ -33,11 +33,73 @@ let roleCacheTime = 0;
 const ROLE_CACHE_TTL = 60_000; // 1 minute — roles change rarely
 
 /**
+ * SELF-HEALING: Seed default roles if the Role table is empty.
+ * This runs automatically when loadRoleCache() finds no roles,
+ * ensuring the permission system works even if seed scripts didn't
+ * run during deployment (e.g. Railway overriding the Dockerfile CMD).
+ *
+ * Uses upsert — safe to call multiple times.
+ */
+async function seedDefaultRoles(): Promise<void> {
+  const PLATFORM_PERMS = [
+    'platform:users:manage', 'platform:weddings:read', 'platform:weddings:write',
+    'platform:settings:read', 'platform:settings:write', 'platform:analytics:read',
+    'platform:audit:read', 'platform:templates:manage', 'platform:weddings:read-all',
+  ];
+  const WEDDING_PERMS = [
+    'wedding:read', 'wedding:content:write', 'wedding:media:write',
+    'wedding:guests:write', 'wedding:rsvps:read', 'wedding:rsvps:manage',
+    'wedding:schedule:write', 'wedding:settings:write', 'wedding:analytics:read',
+  ];
+  const ALL_PERMS = [...PLATFORM_PERMS, ...WEDDING_PERMS, '*'];
+  const READ_ONLY_PLATFORM = ['platform:weddings:read', 'platform:weddings:read-all', 'platform:analytics:read', 'platform:audit:read'];
+
+  const defaultRoles = [
+    { key: 'SUPER_ADMIN_1', label: 'Super Admin 1', tier: 'platform', isSystem: true, permissions: ALL_PERMS, sortOrder: 1 },
+    { key: 'SUPER_ADMIN_2', label: 'Super Admin 2', tier: 'platform', isSystem: true, permissions: ALL_PERMS, sortOrder: 2 },
+    { key: 'CONSULTANT_1', label: 'Consultant 1', tier: 'wedding_staff', isSystem: false, permissions: [...PLATFORM_PERMS, ...WEDDING_PERMS], sortOrder: 3 },
+    { key: 'CONSULTANT_2', label: 'Consultant 2', tier: 'wedding_staff', isSystem: false, permissions: ['platform:weddings:read', ...WEDDING_PERMS], sortOrder: 4 },
+    { key: 'COORDINATOR_1', label: 'Coordinator 1', tier: 'wedding_staff', isSystem: false, permissions: WEDDING_PERMS, sortOrder: 5 },
+    { key: 'SUPPORT_1', label: 'Support 1', tier: 'platform', isSystem: false, permissions: READ_ONLY_PLATFORM, sortOrder: 6 },
+    { key: 'SUPPORT_2', label: 'Support 2', tier: 'platform', isSystem: false, permissions: ['platform:weddings:read'], sortOrder: 7 },
+    { key: 'COUPLE', label: 'Couple', tier: 'account', isSystem: true, permissions: [...WEDDING_PERMS, '*'], sortOrder: 8 },
+    { key: 'EDITOR', label: 'Editor', tier: 'account', isSystem: true, permissions: ['wedding:read', 'wedding:content:write', 'wedding:media:write', 'wedding:schedule:write'], sortOrder: 9 },
+    { key: 'VIEWER', label: 'Viewer', tier: 'account', isSystem: true, permissions: ['wedding:read'], sortOrder: 10 },
+  ];
+
+  for (const role of defaultRoles) {
+    await db.role.upsert({
+      where: { key: role.key },
+      update: {},
+      create: {
+        key: role.key,
+        label: role.label,
+        tier: role.tier,
+        isSystem: role.isSystem,
+        permissions: JSON.stringify(role.permissions),
+        sortOrder: role.sortOrder,
+      },
+    });
+  }
+}
+
+/**
  * Load all roles from DB into the cache.
  * Called on first access and when cache expires.
  */
 async function loadRoleCache(): Promise<void> {
-  const roles = await db.role.findMany();
+  let roles = await db.role.findMany();
+
+  // SELF-HEALING: If the Role table is empty (e.g. seed scripts didn't run
+  // during deployment), auto-seed default roles so the permission system
+  // works immediately without manual intervention.
+  if (roles.length === 0) {
+    console.warn('[permissions] Role table is empty — auto-seeding default roles...');
+    await seedDefaultRoles();
+    roles = await db.role.findMany();
+    console.log(`[permissions] Auto-seeded ${roles.length} roles`);
+  }
+
   roleCache = new Map();
   for (const r of roles) {
     try {
@@ -149,7 +211,16 @@ export async function hasPlatformPermission(
   // Normalize legacy role vocabulary (e.g. 'SUPER_ADMIN' → 'SUPER_ADMIN_1')
   // so the DB-driven permission check works for users created before the
   // role vocabulary migration.
-  const normalizedRole = LEGACY_PLATFORM_ROLE_MAP[userRole] ?? userRole;
+  // NOTE: LEGACY_PLATFORM_ROLE_MAP maps NEW→OLD (for UI routing). We need
+  // the REVERSE mapping (OLD→NEW) for the DB Role table lookup.
+  const normalizedRole = REVERSE_LEGACY_ROLE_MAP[userRole] ?? userRole;
+
+  // SELF-HEALING: If the user has a legacy role string, update it in the DB
+  // so future requests skip the normalization step.
+  if (normalizedRole !== userRole) {
+    db.user.update({ where: { id: userId }, data: { role: normalizedRole } })
+      .catch(() => { /* non-blocking — will retry on next request */ });
+  }
 
   // Get role permissions from cache/DB
   const rolePerms = await getRolePermissions(normalizedRole);
@@ -344,6 +415,21 @@ const LEGACY_PLATFORM_ROLE_MAP: Record<string, string> = {
   ADMIN_2: 'ACCOUNT_MANAGER_2',
   ADMIN_3: 'SUPPORT',
   ACCOUNT_MANAGER: 'ACCOUNT_MANAGER_1',
+};
+
+// REVERSE map: OLD/legacy vocabulary → NEW DB-driven vocabulary
+// Used by hasPlatformPermission() to normalize User.role before Role table lookup.
+// Maps the first (primary) new role for each legacy value.
+const REVERSE_LEGACY_ROLE_MAP: Record<string, string> = {
+  SUPER_ADMIN: 'SUPER_ADMIN_1',
+  ACCOUNT_MANAGER_1: 'CONSULTANT_1',
+  ACCOUNT_MANAGER_2: 'COORDINATOR_1',
+  ADMIN_1: 'CONSULTANT_1',
+  ADMIN_2: 'COORDINATOR_1',
+  ADMIN_3: 'SUPPORT_1',
+  ACCOUNT_MANAGER: 'CONSULTANT_1',
+  SUPPORT: 'SUPPORT_1',
+  COUPLE: 'COUPLE',
 };
 
 export type NormalizedPlatformRole =
