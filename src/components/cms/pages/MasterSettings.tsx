@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Save, GripVertical, Plus, Trash2, ChevronUp, ChevronDown, FileText, Palette } from 'lucide-react';
+import { Save, GripVertical, Plus, Trash2, ChevronUp, ChevronDown, FileText, Palette, Mail, Send, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { invalidateSiteSettingsCache } from '@/hooks/useSiteSettings';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -156,6 +156,29 @@ export default function MasterSettings() {
 
   const [footerOpen, setFooterOpen] = useState<Record<string, boolean>>({});
 
+  // ── Email provider config state ──────────────────────────────────────
+
+  interface EmailProviderConfig {
+    provider: 'none' | 'resend' | 'sendgrid' | 'ses' | 'postmark' | 'smtp';
+    apiKey: string;
+    fromEmail: string;
+    fromName: string;
+    replyTo: string;
+  }
+
+  const DEFAULT_EMAIL_CONFIG: EmailProviderConfig = {
+    provider: 'none',
+    apiKey: '',
+    fromEmail: '',
+    fromName: 'DreamWeavers',
+    replyTo: '',
+  };
+
+  const [emailConfig, setEmailConfig] = useState<EmailProviderConfig>(DEFAULT_EMAIL_CONFIG);
+  const [initialEmailConfig, setInitialEmailConfig] = useState<EmailProviderConfig>(DEFAULT_EMAIL_CONFIG);
+  const [emailConfigLoaded, setEmailConfigLoaded] = useState(false);
+  const [testingEmail, setTestingEmail] = useState(false);
+
   // ── Fetch settings on mount ───────────────────────────────────────────
 
   useEffect(() => {
@@ -197,6 +220,23 @@ export default function MasterSettings() {
           openState[f.key] = !!fetched[f.key];
         }
         setFooterOpen(openState);
+
+        // Load email provider config
+        if (fetched['email_provider_config']) {
+          try {
+            const parsed = JSON.parse(fetched['email_provider_config']);
+            const config: EmailProviderConfig = {
+              provider: parsed.provider || 'none',
+              apiKey: parsed.apiKey || '',
+              fromEmail: parsed.fromEmail || '',
+              fromName: parsed.fromName || 'DreamWeavers',
+              replyTo: parsed.replyTo || '',
+            };
+            setEmailConfig(config);
+            setInitialEmailConfig(config);
+          } catch { /* keep defaults */ }
+        }
+        setEmailConfigLoaded(true);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
@@ -214,13 +254,15 @@ export default function MasterSettings() {
       if (String(settings[k] ?? '') !== String(initialSettings[k] ?? '')) return true;
     }
     if (JSON.stringify(tabs) !== JSON.stringify(initialTabs)) return true;
+    if (JSON.stringify(emailConfig) !== JSON.stringify(initialEmailConfig)) return true;
     return false;
-  }, [settings, initialSettings, tabs, initialTabs]);
+  }, [settings, initialSettings, tabs, initialTabs, emailConfig, initialEmailConfig]);
 
   const dirty = !loading && isDirty();
   const changedCount = dirty
     ? Object.keys(initialSettings).filter((k) => String(settings[k] ?? '') !== String(initialSettings[k] ?? '')).length
       + (JSON.stringify(tabs) !== JSON.stringify(initialTabs) ? 1 : 0)
+      + (JSON.stringify(emailConfig) !== JSON.stringify(initialEmailConfig) ? 1 : 0)
     : 0;
 
   // ── Update helpers ───────────────────────────────────────────────────
@@ -267,9 +309,10 @@ export default function MasterSettings() {
     try {
       setSaving(true);
 
-      // Combine standard settings with tabs and footer content
+      // Combine standard settings with tabs, footer content, and email config
       const allSettings: Record<string, string> = { ...settings };
       allSettings['site_nav_tabs'] = JSON.stringify(tabs);
+      allSettings['email_provider_config'] = JSON.stringify(emailConfig);
 
       const res = await fetch('/api/master/settings?XTransformPort=3000', {
         method: 'PUT',
@@ -281,6 +324,7 @@ export default function MasterSettings() {
 
       setInitialSettings({ ...allSettings });
       setInitialTabs([...tabs]);
+      setInitialEmailConfig({ ...emailConfig });
       invalidateSiteSettingsCache();
       toast({ title: 'Settings Saved', description: `${json.updated} ${json.updated === 1 ? 'value' : 'values'} updated` });
     } catch (err) {
@@ -402,6 +446,158 @@ export default function MasterSettings() {
               </CardContent>
             </Card>
           ))}
+
+          <Separator />
+
+          {/* ── Email Service Configuration ────────────────────────────── */}
+          <Card className="border-slate-200 rounded-xl bg-white shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                <Mail className="h-5 w-5 text-slate-400" />
+                Email Service
+              </CardTitle>
+              <p className="text-sm text-slate-400">
+                Configure the email provider for onboarding emails, password resets, and notifications. When set to &quot;None&quot;, emails are queued but not sent.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {/* Provider selector */}
+              <div className="flex items-center justify-between gap-4">
+                <Label className="text-sm text-slate-700 whitespace-nowrap shrink-0">
+                  Email Provider
+                </Label>
+                <div className="w-full max-w-sm">
+                  <Select
+                    value={emailConfig.provider}
+                    onValueChange={(val) => setEmailConfig(prev => ({ ...prev, provider: val as EmailProviderConfig['provider'] }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None (Queue Only)</SelectItem>
+                      <SelectItem value="resend">Resend</SelectItem>
+                      <SelectItem value="sendgrid">SendGrid</SelectItem>
+                      <SelectItem value="ses">AWS SES</SelectItem>
+                      <SelectItem value="postmark">Postmark</SelectItem>
+                      <SelectItem value="smtp">SMTP</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* API Key (hidden when provider is 'none') */}
+              {emailConfig.provider !== 'none' && (
+                <>
+                  <div className="flex items-center justify-between gap-4">
+                    <Label className="text-sm text-slate-700 whitespace-nowrap shrink-0">
+                      API Key
+                    </Label>
+                    <div className="w-full max-w-sm">
+                      <Input
+                        type="password"
+                        value={emailConfig.apiKey}
+                        onChange={(e) => setEmailConfig(prev => ({ ...prev, apiKey: e.target.value }))}
+                        placeholder={emailConfig.provider === 'smtp' ? 'SMTP connection string' : 'Enter API key...'}
+                        className="max-w-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    <Label className="text-sm text-slate-700 whitespace-nowrap shrink-0">
+                      From Email
+                    </Label>
+                    <div className="w-full max-w-sm">
+                      <Input
+                        type="email"
+                        value={emailConfig.fromEmail}
+                        onChange={(e) => setEmailConfig(prev => ({ ...prev, fromEmail: e.target.value }))}
+                        placeholder="noreply@dreamweavers.sg"
+                        className="max-w-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    <Label className="text-sm text-slate-700 whitespace-nowrap shrink-0">
+                      From Name
+                    </Label>
+                    <div className="w-full max-w-sm">
+                      <Input
+                        value={emailConfig.fromName}
+                        onChange={(e) => setEmailConfig(prev => ({ ...prev, fromName: e.target.value }))}
+                        placeholder="DreamWeavers"
+                        className="max-w-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    <Label className="text-sm text-slate-700 whitespace-nowrap shrink-0">
+                      Reply-To Email
+                    </Label>
+                    <div className="w-full max-w-sm">
+                      <Input
+                        type="email"
+                        value={emailConfig.replyTo}
+                        onChange={(e) => setEmailConfig(prev => ({ ...prev, replyTo: e.target.value }))}
+                        placeholder="support@dreamweavers.sg (optional)"
+                        className="max-w-sm"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Test email button */}
+                  <div className="flex items-center gap-3 pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          setTestingEmail(true);
+                          const res = await fetch('/api/master/settings/test-email?XTransformPort=3000', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ config: emailConfig }),
+                          });
+                          const data = await res.json();
+                          if (res.ok) {
+                            toast({ title: 'Test Email Sent', description: 'Check the console log or your inbox.' });
+                          } else {
+                            toast({ title: 'Test Failed', description: data.error || 'Failed to send test email', variant: 'destructive' });
+                          }
+                        } catch {
+                          toast({ title: 'Test Failed', description: 'Network error', variant: 'destructive' });
+                        } finally {
+                          setTestingEmail(false);
+                        }
+                      }}
+                      disabled={testingEmail || !emailConfig.apiKey || !emailConfig.fromEmail}
+                      className="gap-2"
+                    >
+                      {testingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                      Send Test Email
+                    </Button>
+                    <p className="text-xs text-slate-400">
+                      Save settings first, then click to test.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {/* Status indicator */}
+              <div className="flex items-center gap-2 pt-1">
+                <span className={`size-2 rounded-full ${emailConfig.provider === 'none' ? 'bg-amber-400' : 'bg-emerald-500'}`} />
+                <p className="text-xs text-slate-500">
+                  {emailConfig.provider === 'none'
+                    ? 'Emails are being queued. Configure a provider to start sending.'
+                    : `Active: ${emailConfig.provider} — emails will be sent immediately.`}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
 
           <Separator />
 

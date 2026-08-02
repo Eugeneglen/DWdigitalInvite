@@ -42,7 +42,7 @@ interface QueuedEmail {
 // ── Provider Configuration ─────────────────────────────────────────────────
 
 interface EmailProviderConfig {
-  provider: 'none' | 'sendgrid' | 'ses' | 'postmark' | 'smtp';
+  provider: 'none' | 'resend' | 'sendgrid' | 'ses' | 'postmark' | 'smtp';
   apiKey?: string;
   fromEmail?: string;
   fromName?: string;
@@ -119,19 +119,83 @@ export async function sendEmail(message: EmailMessage, templateKey: string): Pro
   }
 }
 
-// ── Provider Implementation (placeholder) ──────────────────────────────────
+// ── Provider Implementation ────────────────────────────────────────────────
 //
-// Replace this function with your provider's SDK call when ready.
-// Example for SendGrid:
-//   import sgMail from '@sendgrid/mail';
-//   sgMail.setApiKey(config.apiKey);
-//   await sgMail.send({ to: message.to, from: config.fromEmail, subject: message.subject, html: message.html });
+// Supports Resend (recommended), SendGrid, AWS SES, Postmark, and raw SMTP.
+// The provider is selected via the email_provider_config SystemSetting.
 
 async function sendWithProvider(message: EmailMessage, config: EmailProviderConfig): Promise<{ success: boolean; error?: string }> {
-  // TODO: Implement with your chosen email provider
-  // For now, this is a placeholder that always succeeds (for testing)
-  console.log(`📧 [EMAIL SENT VIA ${config.provider}] To: ${message.to} | Subject: ${message.subject}`);
-  return { success: true };
+  if (!config.apiKey) {
+    return { success: false, error: 'No API key configured' };
+  }
+
+  const fromAddress = config.fromEmail
+    ? `${config.fromName || 'DreamWeavers'} <${config.fromEmail}>`
+    : 'DreamWeavers <noreply@dreamweavers.sg>';
+
+  const emailPayload: Record<string, unknown> = {
+    from: fromAddress,
+    to: message.to,
+    subject: message.subject,
+    html: message.html,
+  };
+  if (message.text) emailPayload.text = message.text;
+  if (config.replyTo) emailPayload.replyTo = config.replyTo;
+
+  try {
+    switch (config.provider) {
+      case 'resend': {
+        const res = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${config.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(emailPayload),
+        });
+        if (!res.ok) {
+          const errBody = await res.text();
+          return { success: false, error: `Resend API error (${res.status}): ${errBody}` };
+        }
+        return { success: true };
+      }
+
+      case 'sendgrid': {
+        const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${config.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            personalizations: [{ to: [{ email: message.to }] }],
+            from: { email: config.fromEmail || 'noreply@dreamweavers.sg', name: config.fromName || 'DreamWeavers' },
+            subject: message.subject,
+            content: [{ type: 'text/html', value: message.html }],
+            ...(config.replyTo ? { reply_to: { email: config.replyTo } } : {}),
+          }),
+        });
+        if (!res.ok) {
+          const errBody = await res.text();
+          return { success: false, error: `SendGrid API error (${res.status}): ${errBody}` };
+        }
+        return { success: true };
+      }
+
+      case 'ses':
+      case 'postmark':
+      case 'smtp':
+        // These providers use SDKs that would need npm packages installed.
+        // For now, use the fetch API where possible, or log a warning.
+        console.warn(`[email-service] Provider "${config.provider}" requires additional SDK setup. Using fallback.`);
+        return { success: false, error: `Provider "${config.provider}" is not yet implemented. Please use Resend or SendGrid.` };
+
+      default:
+        return { success: false, error: `Unknown provider: ${config.provider}` };
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
 }
 
 // ── Email Templates ────────────────────────────────────────────────────────

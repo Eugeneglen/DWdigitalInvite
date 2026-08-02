@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { db } from '@/lib/db';
+import { sendEmail } from '@/lib/email-service';
 
 /**
  * POST /api/auth/forgot-password
@@ -47,22 +48,34 @@ export async function POST(req: NextRequest) {
     });
 
     // ── Email dispatch ───────────────────────────────────────────────
-    // Production: send a real email with the reset link.
-    //
-    //   import { sendEmail } from '@/lib/email';
-    //   const resetUrl = `${process.env.NEXTAUTH_URL}/reset-password?token=${token}`;
-    //   await sendEmail({
-    //     to: user.email,
-    //     subject: 'Dreamweavers — Password Reset',
-    //     html: `
-    //       <p>Hi ${user.name},</p>
-    //       <p>We received a request to reset your password. Click the link below to set a new password:</p>
-    //       <p><a href="${resetUrl}">Reset Password</a></p>
-    //       <p>This link expires in 30 minutes. If you did not request this, you can safely ignore this email.</p>
-    //     `,
-    //   });
-    // ──────────────────────────────────────────────────────────────────
-    console.log(`[forgot-password] Password reset requested for ${user.email}`);
+    const resetUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
+    const userName = user.name || user.email;
+
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: 'DreamWeavers — Password Reset',
+        html: `
+          <div style="font-family: Georgia, serif; max-width: 600px; margin: 0 auto; background: #FCF9F2; padding: 40px; border-radius: 8px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #1A1A1A; font-size: 24px; margin: 0;">DreamWeavers</h1>
+              <p style="color: #D4AF37; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; margin: 5px 0 0 0;">Digital Wedding Invitations</p>
+            </div>
+            <h2 style="color: #1A1A1A; font-size: 20px;">Password Reset Request</h2>
+            <p style="color: #555; line-height: 1.6;">Hi ${userName},</p>
+            <p style="color: #555; line-height: 1.6;">We received a request to reset your password. Click the link below to set a new password:</p>
+            <div style="text-align: center; margin: 24px 0;">
+              <a href="${resetUrl}" style="display: inline-block; background: #D4AF37; color: #1A1A1A; padding: 12px 32px; border-radius: 6px; text-decoration: none; font-weight: 600;">Reset Password</a>
+            </div>
+            <p style="color: #999; font-size: 12px;">This link expires in 30 minutes. If you did not request this, you can safely ignore this email.</p>
+            <p style="color: #555; line-height: 1.6;">Warm regards,<br>The DreamWeavers Team</p>
+          </div>
+        `,
+        text: `Hi ${userName},\n\nWe received a request to reset your password. Click the link below to set a new password:\n\n${resetUrl}\n\nThis link expires in 30 minutes. If you did not request this, you can safely ignore this email.\n\nWarm regards,\nThe DreamWeavers Team`,
+      }, 'password_reset');
+    } catch (emailError) {
+      console.error('[forgot-password] Email send failed (non-blocking):', emailError);
+    }
 
     return NextResponse.json({
       message:
