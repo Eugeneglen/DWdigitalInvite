@@ -12,12 +12,12 @@ async function seed() {
   const adminPassword = await bcrypt.hash('Admin@2024', 12);
   const admin = await db.user.upsert({
     where: { email: 'admin@dreamweavers.sg' },
-    update: { role: 'SUPER_ADMIN', passwordHash: adminPassword },
+    update: { role: 'SUPER_ADMIN_1', passwordHash: adminPassword },
     create: {
       email: 'admin@dreamweavers.sg',
       passwordHash: adminPassword,
       name: 'Dreamweavers Admin',
-      role: 'SUPER_ADMIN',
+      role: 'SUPER_ADMIN_1',
       isActive: true,
     },
   });
@@ -42,27 +42,27 @@ async function seed() {
   const staffPassword = await bcrypt.hash('Staff@2024', 12);
   const consultant = await db.user.upsert({
     where: { email: 'consultant@dreamweavers.sg' },
-    update: { role: 'ADMIN_1', passwordHash: staffPassword },
+    update: { role: 'CONSULTANT_1', passwordHash: staffPassword },
     create: {
       email: 'consultant@dreamweavers.sg',
       passwordHash: staffPassword,
       name: 'Sarah Chen',
-      role: 'ADMIN_1',
+      role: 'CONSULTANT_1',
       isActive: true,
     },
   });
   const coordinator = await db.user.upsert({
     where: { email: 'coordinator@dreamweavers.sg' },
-    update: { role: 'ADMIN_2', passwordHash: staffPassword },
+    update: { role: 'COORDINATOR_1', passwordHash: staffPassword },
     create: {
       email: 'coordinator@dreamweavers.sg',
       passwordHash: staffPassword,
       name: 'Marcus Tan',
-      role: 'ADMIN_2',
+      role: 'COORDINATOR_1',
       isActive: true,
     },
   });
-  console.log(`✅ Staff: ${consultant.name} (ADMIN_1/Consultant), ${coordinator.name} (ADMIN_2/Coordinator)`);
+  console.log(`✅ Staff: ${consultant.name} (CONSULTANT_1), ${coordinator.name} (COORDINATOR_1)`);
 
   // ============================================================
   // 2. WEDDING #1 — Eleanor & James (ACTIVE / FREE, owned by couple)

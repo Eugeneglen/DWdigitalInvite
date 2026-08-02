@@ -146,8 +146,13 @@ export async function hasPlatformPermission(
   userRole: string,
   action: PlatformAction,
 ): Promise<boolean> {
+  // Normalize legacy role vocabulary (e.g. 'SUPER_ADMIN' → 'SUPER_ADMIN_1')
+  // so the DB-driven permission check works for users created before the
+  // role vocabulary migration.
+  const normalizedRole = LEGACY_PLATFORM_ROLE_MAP[userRole] ?? userRole;
+
   // Get role permissions from cache/DB
-  const rolePerms = await getRolePermissions(userRole);
+  const rolePerms = await getRolePermissions(normalizedRole);
 
   // Check overrides first (highest priority)
   const overrides = await getUserOverrides(userId);
