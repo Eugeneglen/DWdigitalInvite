@@ -4,13 +4,16 @@ import React, { useEffect, useState } from 'react';
 import {
   Loader2,
   CalendarDays,
-  Users,
   Mail,
   MessageSquareHeart,
   CheckCircle2,
   Circle,
   Check,
   X,
+  BarChart3,
+  Utensils,
+  AlertCircle,
+  UserCheck,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -52,6 +55,22 @@ interface OverviewData {
     userName: string;
   }>;
   media: { total: number };
+  // ── Phase 1 new fields (additive) ───────────────────────────────────
+  guestListConfidence?: 'EMPTY' | 'INCOMPLETE' | 'RELIABLE';
+  unmatchedRsvps?: number;
+  confirmedHeadcount?: number;
+  confirmedPlusOnes?: number;
+  dietaryCount?: number;
+  pendingFollowUps?: number;
+  newWishesThisWeek?: number;
+  rsvpDeadline?: string | null;
+  recentGuestActivity?: Array<{
+    id: string;
+    type: 'rsvp' | 'wish';
+    name: string;
+    action: string;
+    createdAt: string;
+  }>;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -87,16 +106,6 @@ const CHECKLIST_PAGE_MAP: Record<string, CoupleCMSPage> = {
   features: 'features',
 };
 
-const ACTION_STYLES: Record<string, string> = {
-  CREATE: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  UPDATE: 'bg-sky-100 text-sky-700 border-sky-200',
-  DELETE: 'bg-red-100 text-red-700 border-red-200',
-};
-
-function getActionStyle(action: string): string {
-  return ACTION_STYLES[action] ?? 'bg-gray-100 text-gray-600 border-gray-200';
-}
-
 const CONTENT_SECTION_LABELS = [
   { key: 'hero', label: 'Hero' },
   { key: 'schedule', label: 'Schedule' },
@@ -109,12 +118,64 @@ const CONTENT_SECTION_LABELS = [
   { key: 'footer', label: 'Footer' },
 ];
 
+// ── Phase 2: Alert system ────────────────────────────────────────────────
+// Alerts are conditional banners that appear only when action is needed.
+// Dismissed alerts are stored in localStorage and reappear after 7 days
+// (per user decision). Maximum 3 alerts shown at once, by priority.
+
+const ALERT_DISMISSAL_DAYS = 7; // Reappear after 7 days
+
+interface OverviewAlert {
+  id: string;
+  severity: 'red' | 'amber' | 'green' | 'blue';
+  title: string;
+  message: string;
+  actionLabel?: string;
+  actionPage?: CoupleCMSPage;
+}
+
+const ALERT_SEVERITY_STYLES: Record<string, { border: string; bg: string; icon: string; iconBg: string }> = {
+  red: { border: 'border-red-200', bg: 'bg-red-50/60', icon: 'text-red-500', iconBg: 'bg-red-100' },
+  amber: { border: 'border-amber-200', bg: 'bg-amber-50/60', icon: 'text-amber-500', iconBg: 'bg-amber-100' },
+  green: { border: 'border-emerald-200', bg: 'bg-emerald-50/60', icon: 'text-emerald-500', iconBg: 'bg-emerald-100' },
+  blue: { border: 'border-sky-200', bg: 'bg-sky-50/60', icon: 'text-sky-500', iconBg: 'bg-sky-100' },
+};
+
+function getDismissedAlerts(): Record<string, number> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem('dw-dismissed-alerts');
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function isAlertDismissed(alertId: string): boolean {
+  const dismissed = getDismissedAlerts();
+  const dismissedAt = dismissed[alertId];
+  if (!dismissedAt) return false;
+  const daysSince = (Date.now() - dismissedAt) / (1000 * 60 * 60 * 24);
+  return daysSince < ALERT_DISMISSAL_DAYS;
+}
+
+function dismissAlert(alertId: string) {
+  const dismissed = getDismissedAlerts();
+  dismissed[alertId] = Date.now();
+  try {
+    localStorage.setItem('dw-dismissed-alerts', JSON.stringify(dismissed));
+  } catch {
+    // localStorage might be unavailable (private browsing) — silently skip
+  }
+}
+
 // ── Component ──────────────────────────────────────────────────────────────
 
 export default function CoupleOverview() {
   const [data, setData] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [alertRefreshKey, setAlertRefreshKey] = useState(0);
   const { setPage } = useCoupleCMSStore();
 
   useEffect(() => {
@@ -160,7 +221,17 @@ export default function CoupleOverview() {
   }
 
   // ── Derived Values ─────────────────────────────────────────────────────
-  const { daysUntil, isPast, coupleName, guests, rsvps, wishes, content, checklist, recentActivity } = data;
+  const { daysUntil, isPast, coupleName, guests, rsvps, wishes, content, checklist } = data;
+
+  // Phase 1: mode-aware KPIs
+  const confidence = data.guestListConfidence ?? 'RELIABLE';
+  const isReliable = confidence === 'RELIABLE';
+  const confirmedHeadcount = data.confirmedHeadcount ?? 0;
+  const confirmedPlusOnes = data.confirmedPlusOnes ?? 0;
+  const dietaryCount = data.dietaryCount ?? 0;
+  const pendingFollowUps = data.pendingFollowUps ?? 0;
+  const newWishesThisWeek = data.newWishesThisWeek ?? 0;
+  const unmatchedRsvps = data.unmatchedRsvps ?? 0;
 
   // Split coupleName into bride & groom
   const nameParts = coupleName.split(/[\s&]+/).filter(Boolean);
@@ -170,12 +241,97 @@ export default function CoupleOverview() {
   const responseRate =
     guests.total > 0 ? Math.round((guests.responded / guests.total) * 100) : 0;
 
+  // ── Phase 2: Build alerts list ───────────────────────────────────────
+  // Priority order: deadline > dietary > unmatched > partial > new wishes
+  // Maximum 3 alerts shown. Dismissed alerts reappear after 7 days.
+  // alertRefreshKey forces re-evaluation when an alert is dismissed.
+  const rsvpDeadlineStr = data.rsvpDeadline || null;
+  const partialCount = guests.byStatus.PARTIAL || 0;
+
+  const allAlerts: OverviewAlert[] = [];
+
+  // Alert 1: RSVP deadline approaching (within 14 days)
+  if (rsvpDeadlineStr && !isPast) {
+    const deadlineDate = new Date(rsvpDeadlineStr);
+    if (!isNaN(deadlineDate.getTime())) {
+      const daysToDeadline = Math.ceil((deadlineDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      if (daysToDeadline <= 14 && daysToDeadline >= 0) {
+        allAlerts.push({
+          id: 'rsvp-deadline',
+          severity: 'red',
+          title: daysToDeadline === 0 ? 'RSVP deadline is today!' : `RSVP deadline in ${daysToDeadline} day${daysToDeadline !== 1 ? 's' : ''}`,
+          message: pendingFollowUps > 0
+            ? `${pendingFollowUps} guest${pendingFollowUps !== 1 ? 's' : ''} still haven't responded. Send reminders now.`
+            : 'All guests have responded. You\'re all set!',
+          actionLabel: pendingFollowUps > 0 ? 'View Guests' : undefined,
+          actionPage: pendingFollowUps > 0 ? 'guests' : undefined,
+        });
+      }
+    }
+  }
+
+  // Alert 2: Dietary review needed
+  if (dietaryCount > 0) {
+    allAlerts.push({
+      id: 'dietary-review',
+      severity: 'amber',
+      title: `${dietaryCount} guest${dietaryCount !== 1 ? 's' : ''} with special dietary requirements`,
+      message: 'Review the dietary list and share it with your venue or caterer.',
+      actionLabel: 'View Guests',
+      actionPage: 'guests',
+    });
+  }
+
+  // Alert 3: Unmatched RSVPs (only in RELIABLE mode — in EMPTY/INCOMPLETE mode,
+  // the confidence prompt already mentions unmatched RSVPs)
+  if (isReliable && unmatchedRsvps > 0) {
+    allAlerts.push({
+      id: 'unmatched-rsvps',
+      severity: 'amber',
+      title: `${unmatchedRsvps} unmatched RSVP${unmatchedRsvps !== 1 ? 's' : ''}`,
+      message: 'Some guests RSVPed who aren\'t on your list. Match them to existing guests or add as new.',
+      actionLabel: 'View Guests',
+      actionPage: 'guests',
+    });
+  }
+
+  // Alert 4: Partial responses need clarification
+  if (partialCount > 0) {
+    allAlerts.push({
+      id: 'partial-responses',
+      severity: 'amber',
+      title: `${partialCount} guest${partialCount !== 1 ? 's' : ''} with partial RSVP`,
+      message: 'These guests are attending some events but not others. Contact them to clarify.',
+      actionLabel: 'View Guests',
+      actionPage: 'guests',
+    });
+  }
+
+  // Alert 5: New wishes this week
+  if (newWishesThisWeek > 0) {
+    allAlerts.push({
+      id: 'new-wishes',
+      severity: 'green',
+      title: `${newWishesThisWeek} new wish${newWishesThisWeek !== 1 ? 's' : ''} this week`,
+      message: 'Take a moment to read the blessings from your guests.',
+      actionLabel: 'Read Wishes',
+      actionPage: 'wishes',
+    });
+  }
+
+  // Filter out dismissed alerts, take max 3
+  // alertRefreshKey forces re-evaluation of isAlertDismissed when an alert is dismissed
+  void alertRefreshKey; // referenced to trigger re-render on dismiss
+  const visibleAlerts = allAlerts
+    .filter(a => !isAlertDismissed(a.id))
+    .slice(0, 3);
+
   // Figure out which content sections are filled
   // The API doesn't tell us which sections are filled individually, so we show the overall completion
   // and infer section status from filledSections count (ordered by common priority)
   const filledSectionKeys = CONTENT_SECTION_LABELS.slice(0, content.filledSections).map((s) => s.key);
 
-  const activityItems = recentActivity.slice(0, 8);
+  // activityItems removed — replaced by recentGuestActivity in Phase 3
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
@@ -192,9 +348,88 @@ export default function CoupleOverview() {
         </p>
       </div>
 
-      {/* 2. Top Stats Row — 4 cards, 2x2 on mobile, 4-col on md+ */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* Days Left */}
+      {/* 2. Guest list confidence prompt (only for EMPTY/INCOMPLETE) */}
+      {!isReliable && (
+        <Card className={`border ${confidence === 'EMPTY' ? 'border-sky-200 bg-sky-50/50' : 'border-amber-200 bg-amber-50/50'}`}>
+          <CardContent className="p-4 flex items-start gap-3">
+            <AlertCircle className={`size-5 shrink-0 mt-0.5 ${confidence === 'EMPTY' ? 'text-sky-500' : 'text-amber-500'}`} />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-charcoal-ink">
+                {confidence === 'EMPTY'
+                  ? 'Add your guest list to track RSVPs'
+                  : 'Your guest list may be incomplete'}
+              </p>
+              <p className="text-xs text-charcoal-ink/50 mt-1">
+                {confidence === 'EMPTY'
+                  ? rsvps.total > 0
+                    ? `You've received ${rsvps.total} RSVP${rsvps.total !== 1 ? 's' : ''}. Add your full guest list to track response rate and follow up with non-responders.`
+                    : 'Add your full guest list to track RSVP response rate, send reminders, and manage dietary requirements.'
+                  : unmatchedRsvps > 0
+                    ? `${unmatchedRsvps} guest${unmatchedRsvps !== 1 ? 's' : ''} RSVPed who aren't on your list. Review and add them to track accurately.`
+                    : 'Your guest list has fewer than 10 guests. Add more to get accurate response rate tracking.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => setPage('guests')}
+                className="text-xs font-semibold text-cinematic-gold hover:text-cinematic-gold/80 mt-2 transition-colors"
+              >
+                Go to Guest List →
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 2b. Alerts — conditional banners (max 3, dismissible, reappear after 7 days) */}
+      {visibleAlerts.length > 0 && (
+        <div className="space-y-3">
+          {visibleAlerts.map((alert) => {
+            const style = ALERT_SEVERITY_STYLES[alert.severity] ?? ALERT_SEVERITY_STYLES.amber;
+            return (
+              <Card key={alert.id} className={`border ${style.border} ${style.bg} shadow-none`}>
+                <CardContent className="p-4 flex items-start gap-3">
+                  <div className={`flex items-center justify-center size-8 rounded-full shrink-0 ${style.iconBg}`}>
+                    <AlertCircle className={`size-4 ${style.icon}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-charcoal-ink">
+                      {alert.title}
+                    </p>
+                    <p className="text-xs text-charcoal-ink/60 mt-0.5">
+                      {alert.message}
+                    </p>
+                    {alert.actionLabel && alert.actionPage && (
+                      <button
+                        type="button"
+                        onClick={() => setPage(alert.actionPage!)}
+                        className="text-xs font-semibold text-cinematic-gold hover:text-cinematic-gold/80 mt-2 transition-colors"
+                      >
+                        {alert.actionLabel} →
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      dismissAlert(alert.id);
+                      setAlertRefreshKey(k => k + 1);
+                    }}
+                    className="text-charcoal-ink/30 hover:text-charcoal-ink/60 transition-colors shrink-0"
+                    title="Dismiss (will reappear in 7 days)"
+                    aria-label="Dismiss alert"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 3. Snapshot KPIs — 6 cards, mode-aware (2x3 on mobile, 3x2 on md+) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        {/* KPI 1: Days until wedding (both modes) */}
         <Card className="py-0">
           <CardContent className="p-4 flex items-center gap-3">
             <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-cinematic-gold/10 text-cinematic-gold shrink-0">
@@ -214,64 +449,172 @@ export default function CoupleOverview() {
           </CardContent>
         </Card>
 
-        {/* Total Guests */}
-        <Card className="py-0">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-cinematic-gold/10 text-cinematic-gold shrink-0">
-              <Users className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
-                Total Guests
-              </p>
-              <div className="flex items-center gap-2">
-                <p className="text-xl font-bold text-charcoal-ink leading-tight">
-                  {guests.total}
+        {/* KPI 2: Mode-aware — Confirmed headcount (RELIABLE) or RSVPs received (EMPTY/INCOMPLETE) */}
+        {isReliable ? (
+          <Card className="py-0">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-emerald-50 text-emerald-600 shrink-0">
+                <UserCheck className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+                  Confirmed Headcount
                 </p>
-                {guests.totalWithPlusOne > 0 && (
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-cinematic-gold/30 text-cinematic-gold">
-                    {guests.totalWithPlusOne} with +1
-                  </Badge>
+                <p className="text-xl font-bold text-charcoal-ink leading-tight">
+                  {confirmedHeadcount}
+                </p>
+                {confirmedPlusOnes > 0 && (
+                  <p className="text-[11px] text-charcoal-ink/40">
+                    incl. {confirmedPlusOnes} plus-one{confirmedPlusOnes !== 1 ? 's' : ''}
+                  </p>
                 )}
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="py-0">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-cinematic-gold/10 text-cinematic-gold shrink-0">
+                <Mail className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+                  RSVPs Received
+                </p>
+                <p className="text-xl font-bold text-charcoal-ink leading-tight">
+                  {rsvps.total}
+                </p>
+                <p className="text-[11px] text-charcoal-ink/40">
+                  {confirmedHeadcount > 0 ? `${confirmedHeadcount} attending` : 'submissions'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* RSVPs Received */}
+        {/* KPI 3: Mode-aware — Response rate (RELIABLE) or Declined (EMPTY/INCOMPLETE) */}
+        {isReliable ? (
+          <Card className="py-0">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-cinematic-gold/10 text-cinematic-gold shrink-0">
+                <BarChart3 className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+                  Response Rate
+                </p>
+                <p className="text-xl font-bold text-charcoal-ink leading-tight">
+                  {responseRate}%
+                </p>
+                <p className="text-[11px] text-charcoal-ink/40">
+                  {guests.responded} of {guests.total} responded
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="py-0">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-red-50 text-red-500 shrink-0">
+                <X className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+                  Declined
+                </p>
+                <p className="text-xl font-bold text-charcoal-ink leading-tight">
+                  {guests.byStatus.DECLINED || 0}
+                </p>
+                <p className="text-[11px] text-charcoal-ink/40">
+                  {rsvps.total > 0 ? `of ${rsvps.total} RSVPs` : 'guests'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* KPI 4: Mode-aware — Pending follow-ups (RELIABLE) or Unmatched RSVPs (EMPTY/INCOMPLETE) */}
+        {isReliable ? (
+          <Card
+            className="py-0 cursor-pointer hover:border-cinematic-gold/30 transition-colors"
+            onClick={() => setPage('guests')}
+          >
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className={`flex items-center justify-center h-10 w-10 rounded-lg shrink-0 ${pendingFollowUps > 0 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                <Mail className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+                  Pending Follow-ups
+                </p>
+                <p className="text-xl font-bold text-charcoal-ink leading-tight">
+                  {pendingFollowUps}
+                </p>
+                <p className="text-[11px] text-charcoal-ink/40">
+                  {pendingFollowUps === 0 ? 'all responded!' : 'need reminders'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card
+            className={`py-0 ${unmatchedRsvps > 0 ? 'cursor-pointer hover:border-amber-300 transition-colors' : ''}`}
+            onClick={() => unmatchedRsvps > 0 && setPage('guests')}
+          >
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className={`flex items-center justify-center h-10 w-10 rounded-lg shrink-0 ${unmatchedRsvps > 0 ? 'bg-amber-50 text-amber-600' : 'bg-cinematic-gold/10 text-cinematic-gold'}`}>
+                <AlertCircle className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+                  Unmatched RSVPs
+                </p>
+                <p className="text-xl font-bold text-charcoal-ink leading-tight">
+                  {unmatchedRsvps}
+                </p>
+                <p className="text-[11px] text-charcoal-ink/40">
+                  {unmatchedRsvps === 0 ? 'all matched' : 'not on your list'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* KPI 5: Dietary requirements (both modes) */}
         <Card className="py-0">
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-cinematic-gold/10 text-cinematic-gold shrink-0">
-              <Mail className="size-5" />
+            <div className={`flex items-center justify-center h-10 w-10 rounded-lg shrink-0 ${dietaryCount > 0 ? 'bg-violet-50 text-violet-600' : 'bg-cinematic-gold/10 text-cinematic-gold'}`}>
+              <Utensils className="size-5" />
             </div>
             <div className="min-w-0">
               <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
-                RSVPs Received
+                Dietary Reqs
               </p>
               <p className="text-xl font-bold text-charcoal-ink leading-tight">
-                {rsvps.total}
+                {dietaryCount}
               </p>
-              {guests.total > 0 && (
-                <p className="text-[11px] text-charcoal-ink/40">
-                  {responseRate}% responded
-                </p>
-              )}
+              <p className="text-[11px] text-charcoal-ink/40">
+                {dietaryCount === 0 ? 'none noted' : 'special needs'}
+              </p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Wishes */}
+        {/* KPI 6: New wishes this week (both modes) */}
         <Card className="py-0">
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-cinematic-gold/10 text-cinematic-gold shrink-0">
+            <div className={`flex items-center justify-center h-10 w-10 rounded-lg shrink-0 ${newWishesThisWeek > 0 ? 'bg-rose-50 text-rose-500' : 'bg-cinematic-gold/10 text-cinematic-gold'}`}>
               <MessageSquareHeart className="size-5" />
             </div>
             <div className="min-w-0">
               <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
-                Wishes
+                New Wishes
               </p>
               <p className="text-xl font-bold text-charcoal-ink leading-tight">
-                {wishes.total}
+                {newWishesThisWeek}
+              </p>
+              <p className="text-[11px] text-charcoal-ink/40">
+                {newWishesThisWeek === 0 ? `${wishes.total} total` : 'this week'}
               </p>
             </div>
           </CardContent>
@@ -441,58 +784,63 @@ export default function CoupleOverview() {
         </CardContent>
       </Card>
 
-      {/* 5. Recent Activity Card (full width) */}
+      {/* 5. Recent Guest Activity Card (replaces audit log — shows guest-initiated actions) */}
       <Card>
         <CardHeader className="pb-0">
           <CardTitle className="text-sm font-semibold text-charcoal-ink">
-            Recent Activity
+            Recent Guest Activity
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {activityItems.length === 0 ? (
-            <p className="text-sm text-charcoal-ink/40 py-4 text-center">
-              No recent activity yet
-            </p>
-          ) : (
-            <div className="max-h-96 overflow-y-auto space-y-0">
-              {activityItems.map((item, idx) => (
-                <div
-                  key={item.id}
-                  className={`flex items-start gap-3 py-3 ${
-                    idx < activityItems.length - 1 ? 'border-b border-charcoal-ink/5' : ''
-                  }`}
-                >
-                  {/* Action badge */}
-                  <Badge
-                    variant="outline"
-                    className={`shrink-0 text-[10px] mt-0.5 ${getActionStyle(item.action)}`}
+          {(() => {
+            const guestActivity = data.recentGuestActivity ?? [];
+            if (guestActivity.length === 0) {
+              return (
+                <p className="text-sm text-charcoal-ink/40 py-4 text-center">
+                  No guest activity yet
+                </p>
+              );
+            }
+            return (
+              <div className="max-h-96 overflow-y-auto space-y-0">
+                {guestActivity.map((item, idx) => (
+                  <div
+                    key={item.id}
+                    className={`flex items-start gap-3 py-3 ${
+                      idx < guestActivity.length - 1 ? 'border-b border-charcoal-ink/5' : ''
+                    }`}
                   >
-                    {item.action}
-                  </Badge>
-
-                  {/* Details */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-sm font-medium text-charcoal-ink truncate">
-                        {item.entity}
-                      </span>
-                      {item.details && (
-                        <>
-                          <span className="text-charcoal-ink/20 text-xs">·</span>
-                          <span className="text-sm text-charcoal-ink/50 truncate">
-                            {item.details}
-                          </span>
-                        </>
+                    {/* Type icon */}
+                    <div className={`flex items-center justify-center size-8 rounded-full shrink-0 ${
+                      item.type === 'rsvp' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500'
+                    }`}>
+                      {item.type === 'rsvp' ? (
+                        <Mail className="size-4" />
+                      ) : (
+                        <MessageSquareHeart className="size-4" />
                       )}
                     </div>
-                    <p className="text-xs text-charcoal-ink/35 mt-0.5">
-                      {item.userName} · {formatTimeAgo(item.createdAt)}
-                    </p>
+
+                    {/* Details */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-sm font-medium text-charcoal-ink truncate">
+                          {item.name}
+                        </span>
+                        <span className="text-charcoal-ink/20 text-xs">·</span>
+                        <span className="text-sm text-charcoal-ink/50 truncate">
+                          {item.action}
+                        </span>
+                      </div>
+                      <p className="text-xs text-charcoal-ink/35 mt-0.5">
+                        {formatTimeAgo(item.createdAt)}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
     </div>

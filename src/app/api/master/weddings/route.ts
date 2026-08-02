@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions, hashPassword } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { hasPlatformPermission } from '@/lib/permissions';
 import { z } from 'zod/v4';
 
 // Prevent Next.js from caching this route — always return fresh data
@@ -30,7 +31,7 @@ const createWeddingSchema = z.object({
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'SUPER_ADMIN') {
+    if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:weddings:read'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -83,8 +84,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    // SUPER_ADMIN and ADMIN_1 (Consultant) can create weddings
-    if (!session?.user || (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'ADMIN_1')) {
+    // SUPER_ADMIN and ACCOUNT_MANAGER_1 (formerly ADMIN_1) can create weddings
+    if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:weddings:write'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -100,7 +101,16 @@ export async function POST(req: NextRequest) {
     // Check if couple email is already registered
     const existingUser = await db.user.findUnique({ where: { email: data.coupleEmail.toLowerCase() } });
     if (existingUser) {
-      return NextResponse.json({ error: 'A user with this email already exists' }, { status: 409 });
+      // If the existing user is a COUPLE, reuse their account instead of
+      // failing. This lets an admin create a second wedding for an existing
+      // couple (e.g. vow renewal) without a "email already exists" error.
+      if (existingUser.role !== 'COUPLE') {
+        return NextResponse.json(
+          { error: 'A user with this email already exists (non-couple account)' },
+          { status: 409 },
+        );
+      }
+      // Fall through — coupleUser will be resolved to existingUser below
     }
 
     // Generate slug
@@ -159,17 +169,27 @@ export async function POST(req: NextRequest) {
     const accessExpiryDate = new Date(weddingDate);
     accessExpiryDate.setDate(accessExpiryDate.getDate() + expiryDays);
 
-    // Create couple user account
-    const passwordHash = await hashPassword(defaultPassword);
-    const coupleUser = await db.user.create({
-      data: {
-        email: data.coupleEmail.toLowerCase(),
-        passwordHash,
-        name: data.coupleName,
-        role: 'COUPLE',
-        isActive: true,
-      },
-    });
+    // Create couple user account (or reuse existing COUPLE user)
+    let coupleUser;
+    if (existingUser) {
+      // Reuse the existing COUPLE account — update the name in case it changed
+      coupleUser = await db.user.update({
+        where: { id: existingUser.id },
+        data: { name: data.coupleName },
+      });
+    } else {
+      const passwordHash = await hashPassword(defaultPassword);
+      coupleUser = await db.user.create({
+        data: {
+          email: data.coupleEmail.toLowerCase(),
+          passwordHash,
+          name: data.coupleName,
+          role: 'COUPLE',
+          isActive: true,
+          mustChangePassword: true,  // Force password change on first login
+        },
+      });
+    }
 
     // Create wedding account
     const wedding = await db.weddingAccount.create({
@@ -222,24 +242,47 @@ export async function POST(req: NextRequest) {
       // Defensive — ignore errors if rows already exist
     });
 
-    // Audit log
-    await db.auditLog.create({
-      data: {
-        userId: session.user.id,
+    // Seed default content, schedule, FAQs, and stories so the couple has
+    // a starting template to customize (rather than an empty shell).
+    try {
+      const { seedDefaultWeddingContent } = await import('@/lib/wedding-defaults');
+      await seedDefaultWeddingContent({
         weddingId: wedding.id,
-        action: 'CREATE',
-        entity: 'WeddingAccount',
-        entityId: wedding.id,
-        details: JSON.stringify({
-          coupleName: data.coupleName,
-          plan: data.plan,
-          jobNumber,
-          coupleEmail: data.coupleEmail,
-          slug,
-          features: enabledFeatures,
-        }),
-      },
-    });
+        coupleName: data.coupleName,
+        brideName: data.brideName,
+        groomName: data.groomName,
+        weddingDate,
+        weddingTime: data.weddingTime || null,
+        venue: data.venue || null,
+        venueAddress: data.venueAddress,
+      });
+    } catch (err) {
+      console.error('[master/weddings POST] Default content seed failed (non-blocking):', err);
+    }
+
+    // Audit log (non-blocking — wedding is already created, don't fail the
+    // entire request if the audit log fails for any reason)
+    try {
+      await db.auditLog.create({
+        data: {
+          userId: session.user.id,
+          weddingId: wedding.id,
+          action: 'CREATE',
+          entity: 'WeddingAccount',
+          entityId: wedding.id,
+          details: JSON.stringify({
+            coupleName: data.coupleName,
+            plan: data.plan,
+            jobNumber,
+            coupleEmail: data.coupleEmail,
+            slug,
+            features: enabledFeatures,
+          }),
+        },
+      });
+    } catch (auditErr) {
+      console.error('[master/weddings POST] Audit log creation failed (non-blocking):', auditErr);
+    }
 
     // Send onboarding email (queued if no email provider configured)
     try {
@@ -287,7 +330,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'SUPER_ADMIN') {
+    if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:weddings:write'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -387,7 +430,7 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'SUPER_ADMIN') {
+    if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:weddings:write'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

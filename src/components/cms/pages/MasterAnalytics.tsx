@@ -2,99 +2,80 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  Heart, CheckCircle, Users, Mail, MessageSquareHeart, UserCheck,
+  Heart, CheckCircle, Mail, Users, Download,
 } from 'lucide-react';
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, BarChart, Bar, Legend,
-} from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
+  PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  AreaChart, Area, LineChart, Line,
+} from 'recharts';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
 interface AnalyticsData {
+  range: number;
+  avgRsvpsPerWedding: number;
+  planDistribution: { plan: string; count: number; percentage: number }[];
+  monthlyTrend: { month: string; GOLD: number; PLATINUM: number; DIAMOND: number }[];
+  growthData: { month: string; count: number }[];
+  activeOverTime: { month: string; count: number }[];
+  staffPerformance: { id: string; name: string; email: string; role: string; weddingsAssigned: number; rsvpsOnAssignedWeddings: number; auditActionsInRange: number }[];
+  coupleEngagement: {
+    totalCouples: number;
+    activeCouples7d: number;
+    activeCouples30d: number;
+    avgCompletionPct: number;
+    weddingCompletion: { slug: string; coupleName: string; contentCount: number; completionPct: number }[];
+  };
+  rsvpAnalytics: {
+    totalInRange: number;
+    totalGuestsInRange: number;
+    avgPartySize: number;
+    trend: { date: string; count: number }[];
+  };
   totalWeddings: number;
   activeWeddings: number;
-  totalUsers: number;
-  totalRSVPs: number;
-  totalWishes: number;
-  totalContacts: number;
-  totalGuests: number;
-  rsvpTrend: { date: string; count: number }[];
-  weddingStatusBreakdown: Record<string, number>;
-  planBreakdown: Record<string, number>;
-  recentActivity: {
-    id: string;
-    action: string;
-    entity: string;
-    entityId: string | null;
-    details: string | null;
-    createdAt: string;
-    user: { name: string | null; email: string } | null;
-  }[];
 }
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-function formatRelative(dateStr: string) {
-  const diffMs = Date.now() - new Date(dateStr).getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return 'Just now';
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHrs = Math.floor(diffMin / 60);
-  if (diffHrs < 24) return `${diffHrs}h ago`;
-  const diffDays = Math.floor(diffHrs / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  ACTIVE: '#10b981',
-  DRAFT: '#f59e0b',
-  SUSPENDED: '#ef4444',
-  ARCHIVED: '#94a3b8',
-  COMPLETED: '#3b82f6',
-};
 
 const PLAN_COLORS: Record<string, string> = {
-  GOLD: '#94a3b8',
-  PLATINUM: '#d4af37',
-  DIAMOND: '#8b5cf6',
+  GOLD: '#f59e0b',
+  PLATINUM: '#8b5cf6',
+  DIAMOND: '#06b6d4',
 };
 
-// ── Sub-components ─────────────────────────────────────────────────────────
+const PLAN_BADGE: Record<string, string> = {
+  GOLD: 'bg-amber-50 text-amber-700 border-amber-200',
+  PLATINUM: 'bg-violet-50 text-violet-700 border-violet-200',
+  DIAMOND: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+};
 
-function KPICard({ label, value, icon: Icon, subtitle }: {
-  label: string; value: number; icon: React.ElementType; subtitle?: string;
-}) {
-  return (
-    <Card className="border-slate-200 rounded-xl bg-white shadow-sm">
-      <CardContent className="p-5">
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-slate-500">{label}</p>
-          <Icon className="h-4 w-4 text-slate-400" />
-        </div>
-        <p className="mt-2 text-3xl font-bold text-slate-900">{value.toLocaleString()}</p>
-        {subtitle && <p className="mt-1 text-xs text-slate-400">{subtitle}</p>}
-      </CardContent>
-    </Card>
-  );
+// ── CSV Export ──────────────────────────────────────────────────────────────
+
+function exportCSV(filename: string, headers: string[], rows: (string | number)[][]) {
+  const csv = [headers.join(','), ...rows.map((r) => r.map((c) => `"${c}"`).join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
-function KPICardSkeleton() {
+// ── Empty State ─────────────────────────────────────────────────────────────
+
+function EmptyChartState({ message }: { message: string }) {
   return (
-    <Card className="border-slate-200 rounded-xl bg-white shadow-sm">
-      <CardContent className="p-5">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-4 w-4 rounded" />
-        </div>
-        <Skeleton className="mt-2 h-8 w-16" />
-        <Skeleton className="mt-1 h-3 w-32" />
-      </CardContent>
-    </Card>
+    <div className="flex items-center justify-center h-40 text-sm text-slate-400 italic">
+      {message}
+    </div>
   );
 }
 
@@ -103,231 +84,398 @@ function KPICardSkeleton() {
 export default function MasterAnalytics() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [period, setPeriod] = useState('mtd');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [showCustom, setShowCustom] = useState(false);
 
   useEffect(() => {
-    async function fetchAnalytics() {
+    async function fetchData() {
+      setLoading(true);
       try {
-        setLoading(true);
-        const res = await fetch('/api/master/analytics?XTransformPort=3000');
-        if (!res.ok) throw new Error(`Failed to load analytics (${res.status})`);
-        const json = await res.json();
-        setData(json);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        let url = `/api/master/analytics?period=${period}&XTransformPort=3000`;
+        if (period === 'custom' && customFrom && customTo) {
+          url += `&from=${customFrom}&to=${customTo}`;
+        }
+        const res = await fetch(url);
+        if (res.ok) setData(await res.json());
+      } catch {
+        // silently fail
       } finally {
         setLoading(false);
       }
     }
-    fetchAnalytics();
-  }, []);
+    fetchData();
+  }, [period, customFrom, customTo]);
 
-  if (error) {
+  if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-        <p className="text-sm font-medium text-red-500">Error loading analytics</p>
-        <p className="text-xs mt-1">{error}</p>
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24" />)}
+        </div>
+        <Skeleton className="h-64" />
       </div>
     );
   }
 
-  // Prepare chart data
-  const statusPieData = data
-    ? Object.entries(data.weddingStatusBreakdown)
-        .filter(([, v]) => v > 0)
-        .map(([name, value]) => ({ name, value }))
-    : [];
+  if (!data) {
+    return <div className="py-20 text-center text-slate-400">Failed to load analytics data.</div>;
+  }
 
-  const planBarData = data
-    ? Object.entries(data.planBreakdown).map(([name, count]) => ({ name, count }))
-    : [];
+  const hasRsvpData = data.rsvpAnalytics.trend.some((d) => d.count > 0);
+  const hasGrowthData = data.growthData.some((d) => d.count > 0);
 
-  const trendData = data?.rsvpTrend.map((d) => ({
+  // Format RSVP trend dates for chart
+  const rsvpTrendFormatted = data.rsvpAnalytics.trend.map((d) => ({
     ...d,
-    date: new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-  })) ?? [];
+    label: new Date(d.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
+  }));
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* ── Header + Period Selector ──────────────────────────────────── */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold text-slate-900">Analytics</h2>
+          <p className="text-sm text-slate-500 mt-1">Business performance insights</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={period === 'mtd' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => { setPeriod('mtd'); setShowCustom(false); }}
+          >MTD</Button>
+          <Button
+            variant={period === 'ytd' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => { setPeriod('ytd'); setShowCustom(false); }}
+          >YTD</Button>
+          <Button
+            variant={period === 'custom' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setShowCustom(!showCustom)}
+          >Custom</Button>
+        </div>
+      </div>
+
+      {showCustom && (
+        <div className="flex items-center gap-2 bg-slate-50 rounded-lg p-3">
+          <input
+            type="date"
+            value={customFrom}
+            onChange={(e) => { setCustomFrom(e.target.value); setPeriod('custom'); }}
+            className="text-sm border border-slate-200 rounded px-2 py-1"
+          />
+          <span className="text-slate-400 text-sm">to</span>
+          <input
+            type="date"
+            value={customTo}
+            onChange={(e) => { setCustomTo(e.target.value); setPeriod('custom'); }}
+            className="text-sm border border-slate-200 rounded px-2 py-1"
+          />
+          {customFrom && customTo && (
+            <Button size="sm" onClick={() => setPeriod('custom')}>Apply</Button>
+          )}
+        </div>
+      )}
+
+      {/* ── Summary KPIs ─────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3 mb-2">
+              <Heart className="size-5 text-rose-500" />
+              <span className="text-xs text-slate-500 uppercase tracking-wider">Total Weddings</span>
+            </div>
+            <p className="text-2xl font-bold text-slate-900">{data.totalWeddings}</p>
+            <p className="text-xs text-slate-400 mt-1">{data.activeWeddings} active</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3 mb-2">
+              <Mail className="size-5 text-blue-500" />
+              <span className="text-xs text-slate-500 uppercase tracking-wider">Avg RSVPs / Wedding</span>
+            </div>
+            <p className="text-2xl font-bold text-slate-900">{data.avgRsvpsPerWedding}</p>
+            <p className="text-xs text-slate-400 mt-1">{data.rsvpAnalytics.totalInRange} total in period</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3 mb-2">
+              <Users className="size-5 text-emerald-500" />
+              <span className="text-xs text-slate-500 uppercase tracking-wider">Couples Active</span>
+            </div>
+            <p className="text-2xl font-bold text-slate-900">{data.coupleEngagement.activeCouples7d}</p>
+            <p className="text-xs text-slate-400 mt-1">in last 7 days</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3 mb-2">
+              <CheckCircle className="size-5 text-amber-500" />
+              <span className="text-xs text-slate-500 uppercase tracking-wider">Avg Completion</span>
+            </div>
+            <p className="text-2xl font-bold text-slate-900">{data.coupleEngagement.avgCompletionPct}%</p>
+            <p className="text-xs text-slate-400 mt-1">content filled</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Revenue & Packaging + Growth ─────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Plan Distribution Donut */}
+        <div>
+          <h3 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">Plan Distribution</h3>
+          <Card>
+            <CardContent className="p-5">
+              {data.planDistribution.every((p) => p.count === 0) ? (
+                <EmptyChartState message="No weddings yet" />
+              ) : (
+                <div className="flex items-center gap-6">
+                  <ResponsiveContainer width="50%" height={180}>
+                    <PieChart>
+                      <Pie
+                        data={data.planDistribution}
+                        dataKey="count"
+                        nameKey="plan"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={45}
+                        outerRadius={75}
+                        paddingAngle={2}
+                      >
+                        {data.planDistribution.map((entry) => (
+                          <Cell key={entry.plan} fill={PLAN_COLORS[entry.plan] || '#94a3b8'} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value: number, name: string) => [`${value} wedding(s)`, name]}
+                        contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="space-y-3 flex-1">
+                    {data.planDistribution.map((p) => (
+                      <div key={p.plan} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: PLAN_COLORS[p.plan] || '#94a3b8' }} />
+                          <span className="text-sm font-medium text-slate-700">{p.plan}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-sm font-bold text-slate-900">{p.count}</span>
+                          <span className="text-xs text-slate-400 ml-2">({p.percentage}%)</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Growth Chart */}
+        <div>
+          <h3 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">New Weddings per Month</h3>
+          <Card>
+            <CardContent className="p-5">
+              {!hasGrowthData ? (
+                <EmptyChartState message="No new weddings in the last 12 months" />
+              ) : (
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={data.growthData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <Tooltip
+                      formatter={(value: number) => [`${value} wedding(s)`, 'New']}
+                      contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+                    />
+                    <Bar dataKey="count" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* ── Active Weddings Over Time ────────────────────────────────── */}
       <div>
-        <h2 className="text-2xl font-semibold text-slate-900">Analytics</h2>
-        <p className="text-slate-500 mt-1">Platform-wide metrics and reports</p>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {loading
-          ? Array.from({ length: 6 }).map((_, i) => <KPICardSkeleton key={i} />)
-          : data && (
-            <>
-              <KPICard label="Total Weddings" value={data.totalWeddings} icon={Heart} subtitle={`${data.activeWeddings} active`} />
-              <KPICard label="Active Weddings" value={data.activeWeddings} icon={CheckCircle} subtitle="currently live" />
-              <KPICard label="Total Users" value={data.totalUsers} icon={Users} subtitle="active accounts" />
-              <KPICard label="Total RSVPs" value={data.totalRSVPs} icon={Mail} subtitle="all submissions" />
-              <KPICard label="Total Wishes" value={data.totalWishes} icon={MessageSquareHeart} subtitle="guest messages" />
-              <KPICard label="Total Guests" value={data.totalGuests} icon={UserCheck} subtitle="tracked guests" />
-            </>
-          )
-        }
-      </div>
-
-      {/* Charts Row 1: RSVP Trend + Wedding Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* RSVP Trend — Area Chart (spans 2 cols) */}
-        <Card className="lg:col-span-2 border-slate-200 rounded-xl bg-white shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-semibold text-slate-900">RSVP Trend</CardTitle>
-            <p className="text-sm text-slate-400">Submissions over the last 30 days</p>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-[280px] w-full rounded-lg" />
+        <h3 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">Cumulative Weddings Over Time</h3>
+        <Card>
+          <CardContent className="p-5">
+            {data.activeOverTime.every((d) => d.count === 0) ? (
+              <EmptyChartState message="No data" />
             ) : (
-              <ResponsiveContainer width="100%" height={280}>
-                <AreaChart data={trendData} margin={{ top: 5, right: 20, left: 0, bottom: 0 }}>
+              <ResponsiveContainer width="100%" height={200}>
+                <AreaChart data={data.activeOverTime}>
                   <defs>
-                    <linearGradient id="rsvpGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#94a3b8" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#94a3b8" stopOpacity={0} />
+                    <linearGradient id="activeGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
                   <Tooltip
-                    contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px' }}
-                    labelStyle={{ color: '#475569' }}
+                    formatter={(value: number) => [`${value} total`, 'Cumulative']}
+                    contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
                   />
-                  <Area type="monotone" dataKey="count" name="RSVPs" stroke="#D4AF37" strokeWidth={2} fill="url(#rsvpGradient)" />
+                  <Area type="monotone" dataKey="count" stroke="#10b981" strokeWidth={2} fill="url(#activeGrad)" />
                 </AreaChart>
               </ResponsiveContainer>
             )}
           </CardContent>
         </Card>
+      </div>
 
-        {/* Wedding Status — Donut Chart */}
-        <Card className="border-slate-200 rounded-xl bg-white shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-semibold text-slate-900">Wedding Status</CardTitle>
-            <p className="text-sm text-slate-400">Distribution by status</p>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-[280px] w-full rounded-lg" />
-            ) : statusPieData.length === 0 ? (
-              <div className="flex items-center justify-center h-[280px] text-slate-400 text-sm">No data</div>
+      {/* ── RSVP Trend ───────────────────────────────────────────────── */}
+      <div>
+        <h3 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">RSVP Trend ({data.range} days)</h3>
+        <Card>
+          <CardContent className="p-5">
+            {!hasRsvpData ? (
+              <EmptyChartState message="No RSVPs in this period" />
             ) : (
-              <ResponsiveContainer width="100%" height={280}>
-                <PieChart>
-                  <Pie
-                    data={statusPieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {statusPieData.map((entry) => (
-                      <Cell key={entry.name} fill={STATUS_COLORS[entry.name] || '#94a3b8'} />
-                    ))}
-                  </Pie>
-                  <Legend
-                    verticalAlign="bottom"
-                    iconType="circle"
-                    iconSize={8}
-                    formatter={(value: string) => <span className="text-xs text-slate-600">{value}</span>}
-                  />
-                  <Tooltip
-                    contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              <>
+                <ResponsiveContainer width="100%" height={200}>
+                  <AreaChart data={rsvpTrendFormatted}>
+                    <defs>
+                      <linearGradient id="rsvpGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                    <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <Tooltip
+                      formatter={(value: number) => [`${value} RSVP(s)`, '']}
+                      labelFormatter={(label: string) => `Date: ${label}`}
+                      contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+                    />
+                    <Area type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2} fill="url(#rsvpGrad)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+                <div className="flex items-center justify-between mt-4 text-xs text-slate-400">
+                  <span>Avg party size: <span className="font-medium text-slate-600">{data.rsvpAnalytics.avgPartySize}</span></span>
+                  <span>Total guests: <span className="font-medium text-slate-600">{data.rsvpAnalytics.totalGuestsInRange}</span></span>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Charts Row 2: Plan Distribution */}
-      <Card className="border-slate-200 rounded-xl bg-white shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg font-semibold text-slate-900">Plan Distribution</CardTitle>
-          <p className="text-sm text-slate-400">Weddings by subscription plan</p>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <Skeleton className="h-[200px] w-full rounded-lg" />
-          ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={planBarData} layout="vertical" margin={{ top: 0, right: 20, left: 40, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: '#475569' }} tickLine={false} axisLine={false} width={80} />
-                <Tooltip
-                  contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px' }}
-                />
-                <Bar dataKey="count" name="Weddings" radius={[0, 6, 6, 0]} barSize={28}>
-                  {planBarData.map((entry) => (
-                    <Cell key={entry.name} fill={PLAN_COLORS[entry.name] || '#94a3b8'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+      {/* ── Staff Performance ────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Staff Performance</h3>
+          {data.staffPerformance.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportCSV(
+                'staff-performance.csv',
+                ['Name', 'Email', 'Role', 'Weddings Assigned', 'RSVPs on Assigned', `Actions (${data.range}d)`],
+                data.staffPerformance.map((s) => [s.name, s.email, s.role, s.weddingsAssigned, s.rsvpsOnAssignedWeddings, s.auditActionsInRange]),
+              )}
+            >
+              <Download className="size-3.5 mr-1.5" />
+              Export CSV
+            </Button>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Recent Activity */}
-      <Card className="border-slate-200 rounded-xl bg-white shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-semibold text-slate-900">Recent Activity</CardTitle>
-          <p className="text-sm text-slate-400">Last 10 audit log entries</p>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="space-y-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-4">
-                  <Skeleton className="h-4 w-20 shrink-0" />
-                  <Skeleton className="h-4 w-32 shrink-0" />
-                  <Skeleton className="h-4 w-24 shrink-0" />
-                  <Skeleton className="h-4 flex-1" />
-                </div>
-              ))}
-            </div>
-          ) : data && data.recentActivity.length === 0 ? (
-            <div className="flex items-center justify-center py-8 text-slate-400 text-sm">No activity yet</div>
-          ) : (
-            <div className="overflow-x-auto">
+        </div>
+        <Card>
+          <CardContent className="p-0">
+            {data.staffPerformance.length === 0 ? (
+              <EmptyChartState message="No staff to display" />
+            ) : (
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100">
-                    <th className="text-left py-2 pr-4 text-xs font-medium text-slate-400 uppercase tracking-wider">Time</th>
-                    <th className="text-left py-2 pr-4 text-xs font-medium text-slate-400 uppercase tracking-wider">User</th>
-                    <th className="text-left py-2 pr-4 text-xs font-medium text-slate-400 uppercase tracking-wider">Action</th>
-                    <th className="text-left py-2 pr-4 text-xs font-medium text-slate-400 uppercase tracking-wider">Entity</th>
-                    <th className="text-left py-2 text-xs font-medium text-slate-400 uppercase tracking-wider">Details</th>
+                    <th className="text-left p-3 text-xs text-slate-500 uppercase">Staff</th>
+                    <th className="text-center p-3 text-xs text-slate-500 uppercase">Role</th>
+                    <th className="text-center p-3 text-xs text-slate-500 uppercase">Weddings</th>
+                    <th className="text-center p-3 text-xs text-slate-500 uppercase">RSVPs</th>
+                    <th className="text-center p-3 text-xs text-slate-500 uppercase">Actions ({data.range}d)</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {data?.recentActivity.map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-2.5 pr-4 whitespace-nowrap text-slate-500">{formatRelative(log.createdAt)}</td>
-                      <td className="py-2.5 pr-4 whitespace-nowrap text-slate-700 font-medium">{log.user?.name || 'System'}</td>
-                      <td className="py-2.5 pr-4 whitespace-nowrap">
-                        <Badge variant="outline" className="text-xs border-slate-200 text-slate-600">{log.action}</Badge>
+                <tbody>
+                  {data.staffPerformance.map((staff) => (
+                    <tr key={staff.id} className="border-b border-slate-50 last:border-0">
+                      <td className="p-3">
+                        <p className="font-medium text-slate-800">{staff.name}</p>
+                        <p className="text-xs text-slate-400">{staff.email}</p>
                       </td>
-                      <td className="py-2.5 pr-4 whitespace-nowrap text-slate-600">{log.entity}</td>
-                      <td className="py-2.5 text-slate-400 max-w-[200px] truncate">{log.details || '—'}</td>
+                      <td className="text-center p-3">
+                        <Badge variant="outline" className="text-xs">{staff.role.replace(/_/g, ' ')}</Badge>
+                      </td>
+                      <td className="text-center p-3 font-bold text-slate-900">{staff.weddingsAssigned}</td>
+                      <td className="text-center p-3 font-bold text-slate-900">{staff.rsvpsOnAssignedWeddings}</td>
+                      <td className="text-center p-3 text-slate-600">{staff.auditActionsInRange}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Couple Engagement ────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Couple Engagement — Content Completion</h3>
+          {data.coupleEngagement.weddingCompletion.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportCSV(
+                'couple-engagement.csv',
+                ['Couple Name', 'Slug', 'Content Items', 'Completion %'],
+                data.coupleEngagement.weddingCompletion.map((w) => [w.coupleName, w.slug, w.contentCount, `${w.completionPct}%`]),
+              )}
+            >
+              <Download className="size-3.5 mr-1.5" />
+              Export CSV
+            </Button>
           )}
-        </CardContent>
-      </Card>
+        </div>
+        <Card>
+          <CardContent className="p-0">
+            {data.coupleEngagement.weddingCompletion.length === 0 ? (
+              <EmptyChartState message="No weddings to display" />
+            ) : (
+              <div className="max-h-64 overflow-y-auto">
+                {data.coupleEngagement.weddingCompletion.map((w) => (
+                  <div key={w.slug} className="flex items-center gap-4 p-3 border-b border-slate-50 last:border-0">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-slate-800">{w.coupleName}</p>
+                      <p className="text-xs text-slate-400">{w.slug} · {w.contentCount} items</p>
+                    </div>
+                    <div className="w-48">
+                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${w.completionPct >= 80 ? 'bg-emerald-400' : w.completionPct >= 50 ? 'bg-amber-400' : 'bg-red-400'}`}
+                          style={{ width: `${w.completionPct}%` }}
+                        />
+                      </div>
+                    </div>
+                    <span className="text-sm font-bold text-slate-700 w-12 text-right">{w.completionPct}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

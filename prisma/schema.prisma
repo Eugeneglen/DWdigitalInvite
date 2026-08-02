@@ -17,9 +17,15 @@ model User {
   email        String   @unique
   passwordHash String
   name         String
-  role         String   @default("ADMIN_1") // SUPER_ADMIN | ADMIN_1 | ADMIN_2 | ADMIN_3 | COUPLE | ACCOUNT_MANAGER
+  // Platform role key — references Role.key in the Role table.
+  // The role's permissions are stored in Role.permissions (JSON array),
+  // and can be overridden per-user via UserPermissionOverride rows.
+  // Default roles: SUPER_ADMIN_1, SUPER_ADMIN_2, CONSULTANT_1, CONSULTANT_2,
+  // COORDINATOR_1, SUPPORT_1, SUPPORT_2, COUPLE
+  role         String   @default("CONSULTANT_1")
   avatarUrl         String?
   isActive          Boolean  @default(true)
+  mustChangePassword Boolean @default(false)  // true = forced to change password on next login
   resetToken        String?
   resetTokenExpiry  DateTime?
   lastLoginAt       DateTime?
@@ -29,8 +35,72 @@ model User {
   ownedWeddings     WeddingAccount[]
   consultantWeddings WeddingAccount[] @relation("ConsultantWeddings")
   coordinatorWeddings WeddingAccount[] @relation("CoordinatorWeddings")
+  weddingRoles      UserWeddingRole[]   // Tier 2 + Tier 3 per-wedding roles
+  permissionOverrides UserPermissionOverride[]
   auditLogs      AuditLog[]
   notifications  Notification[]
+}
+
+// ============================================================
+// ROLES (DB-managed, admin can add/edit/delete via Team page)
+// ============================================================
+// Each role defines a set of permissions (JSON array of permission strings).
+// System roles (isSystem: true) cannot be deleted — Super Admin 1, Super Admin 2, Couple.
+// All other roles can be edited or deleted by the admin if no users are assigned.
+model Role {
+  id          String   @id @default(cuid())
+  key         String   @unique  // e.g. "SUPER_ADMIN_1", "CONSULTANT_1"
+  label       String              // "Super Admin 1", "Consultant 1"
+  tier        String              // "platform" | "wedding_staff" | "account"
+  isSystem    Boolean  @default(false)  // true = cannot delete
+  permissions String              // JSON array of permission strings, e.g. ["platform:users:manage", "wedding:read"]
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ============================================================
+// USER PERMISSION OVERRIDES (per-user grant/revoke of individual permissions)
+// ============================================================
+// Allows the admin to grant or revoke specific permissions on top of the
+// user's role. granted=true adds a permission the role doesn't have;
+// granted=false removes a permission the role does have.
+model UserPermissionOverride {
+  id         String   @id @default(cuid())
+  userId     String
+  permission String   // e.g. "platform:users:manage", "wedding:settings:write"
+  granted    Boolean  // true = explicitly granted, false = explicitly revoked
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, permission])
+  @@index([userId])
+}
+
+// ============================================================
+// CONTENT TEMPLATES (DB-managed wedding blueprints)
+// ============================================================
+// A ContentTemplate is a complete wedding blueprint — content text, schedule,
+// FAQs, stories, media (URLs), and theme (colors + fonts). When a new couple
+// is created, the default template is cloned into their wedding.
+// Admins can create/edit/delete templates (including seasonal variants).
+// Only one template can be isDefault=true at a time.
+model ContentTemplate {
+  id          String   @id @default(cuid())
+  name        String   @unique  // "Classic Elegance", "Summer Garden"
+  description String?
+  isDefault   Boolean  @default(false)  // only one can be true
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  // Complete wedding content stored as JSON strings
+  content     String   // JSON: [{section, fieldKey, fieldValue, fieldType}]
+  schedule    String   // JSON: [{eventType, title, description, startTime, endTime, location, sortOrder}]
+  faqs        String   // JSON: [{question, answer, sortOrder, isActive}]
+  stories     String   // JSON: [{title, content, date, imageUrl, sortOrder}]
+  media       String   // JSON: [{url, thumbnailUrl, fileName, fileType, category, sortOrder}]
+  theme       String   // JSON: {colors: {bg,text,accent,secondary,muted}, fonts: {heading,body}}
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // ============================================================
@@ -88,6 +158,7 @@ model WeddingAccount {
   contacts      ContactSubmission[]
   auditLogs     AuditLog[]
   notifications Notification[]
+  members       UserWeddingRole[]   // Tier 2 + Tier 3 per-wedding role assignments
 
   // Indexes for Admin CMS search + filter performance at scale
   @@index([coupleName])       // Search by couple name
@@ -95,6 +166,36 @@ model WeddingAccount {
   @@index([plan])             // Filter by plan
   @@index([createdAt])        // Default ordering (newest first)
   @@index([consultantId])     // Filter by consultant
+}
+
+// ============================================================
+// PER-WEDDING ROLE ASSIGNMENTS (Tier 2 + Tier 3)
+// ============================================================
+// Junction table linking a User to a WeddingAccount with a specific
+// per-wedding role. This replaces the implicit consultantId/coordinatorId
+// FKs on WeddingAccount with a flexible, multi-role model.
+//
+// Tier 2 (wedding staff, assigned by platform admins):
+//   CONSULTANT_1 | CONSULTANT_2 | COORDINATOR
+// Tier 3 (account roles, couple-controlled):
+//   COUPLE | EDITOR | VIEWER
+//
+// A user can have multiple rows for the same wedding with different roles
+// (rare but allowed). The @@unique constraint prevents duplicate
+// (userId, weddingId, role) triples.
+model UserWeddingRole {
+  id         String         @id @default(cuid())
+  userId     String
+  weddingId  String
+  role       String         // CONSULTANT_1 | CONSULTANT_2 | COORDINATOR | COUPLE | EDITOR | VIEWER
+  createdAt  DateTime       @default(now())
+
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wedding    WeddingAccount @relation(fields: [weddingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weddingId, role])
+  @@index([weddingId])      // List all members of a wedding
+  @@index([userId])         // List all weddings a user has access to
 }
 
 model WeddingFeature {

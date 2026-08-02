@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { Sparkles, LayoutDashboard, Heart, Users, FileText, BarChart3, Settings, LogOut, Loader2, Lock } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useAuthModalStore } from '@/store/useAuthModalStore';
+import { normalizePlatformRole } from '@/lib/permissions';
 
 const LoginModal = dynamic(
   () => import('@/components/cms/LoginModal').then((m) => ({ default: m.LoginModal })),
@@ -168,7 +169,10 @@ export default function AdminCMSView() {
 
   // Authenticated → check role before rendering
   const userRole = session?.user?.role;
-  const isAdmin = userRole === 'SUPER_ADMIN' || userRole?.startsWith('ADMIN');
+  const isAdmin = (() => {
+    const normalized = normalizePlatformRole(userRole || '');
+    return normalized === 'SUPER_ADMIN' || normalized === 'ACCOUNT_MANAGER_1' || normalized === 'ACCOUNT_MANAGER_2' || normalized === 'SUPPORT';
+  })();
 
   // Non-admin authenticated user → sign out + show access denied
   if (status === 'authenticated' && cmsReady && !isAdmin) {

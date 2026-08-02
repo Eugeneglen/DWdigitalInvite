@@ -2,6 +2,7 @@ import { db } from '@/lib/db';
 import type { Metadata } from 'next';
 import SlugWeddingPage from './SlugWeddingPage';
 import { getServerSession } from '@/lib/auth';
+import { normalizePlatformRole } from '@/lib/permissions';
 
 interface SlugPageProps {
   params: Promise<{ slug: string }>;
@@ -23,7 +24,8 @@ interface WeddingLookupResult {
 async function getWeddingBySlug(slug: string, sessionUserId?: string): Promise<WeddingLookupResult> {
   const session = await getServerSession();
   const role = session?.user?.role;
-  const isAdmin = role === 'SUPER_ADMIN' || role === 'ADMIN_1' || role === 'ADMIN_2' || role === 'ACCOUNT_MANAGER';
+  const normalizedRole = normalizePlatformRole(role || '');
+  const isAdmin = normalizedRole === 'SUPER_ADMIN' || normalizedRole === 'ACCOUNT_MANAGER_1' || normalizedRole === 'ACCOUNT_MANAGER_2' || normalizedRole === 'SUPPORT';
 
   // First, check if the wedding exists at all (regardless of status)
   const wedding = await db.weddingAccount.findFirst({

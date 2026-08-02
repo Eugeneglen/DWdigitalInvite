@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Eye,
   EyeOff,
+  KeyRound,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,6 +46,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
+import { normalizePlatformRole } from '@/lib/permissions';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -72,24 +74,56 @@ const EMPTY_FORM: UserForm = {
   name: '',
   email: '',
   password: '',
-  role: 'ADMIN_1',
+  role: 'CONSULTANT_1',
   isActive: true,
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const roleVariant: Record<string, string> = {
+  // New DB-driven vocabulary
+  SUPER_ADMIN_1: 'bg-cinematic-gold/15 text-cinematic-gold border-cinematic-gold/30',
+  SUPER_ADMIN_2: 'bg-cinematic-gold/15 text-cinematic-gold border-cinematic-gold/30',
+  CONSULTANT_1: 'bg-charcoal-ink/10 text-charcoal-ink border-charcoal-ink/20',
+  CONSULTANT_2: 'bg-charcoal-ink/10 text-charcoal-ink border-charcoal-ink/20',
+  COORDINATOR_1: 'bg-charcoal-ink/10 text-charcoal-ink border-charcoal-ink/20',
+  SUPPORT_1: 'bg-charcoal-ink/5 text-charcoal-ink/60 border-charcoal-ink/10',
+  SUPPORT_2: 'bg-charcoal-ink/5 text-charcoal-ink/60 border-charcoal-ink/10',
+  COUPLE: 'bg-cinematic-gold/5 text-cinematic-gold/70 border-cinematic-gold/20',
+  EDITOR: 'bg-blue-50 text-blue-700 border-blue-200',
+  VIEWER: 'bg-gray-50 text-gray-600 border-gray-200',
+  // Legacy values
   SUPER_ADMIN: 'bg-cinematic-gold/15 text-cinematic-gold border-cinematic-gold/30',
+  ACCOUNT_MANAGER_1: 'bg-charcoal-ink/10 text-charcoal-ink border-charcoal-ink/20',
+  ACCOUNT_MANAGER_2: 'bg-charcoal-ink/10 text-charcoal-ink border-charcoal-ink/20',
+  SUPPORT: 'bg-charcoal-ink/5 text-charcoal-ink/60 border-charcoal-ink/10',
   ADMIN_1: 'bg-charcoal-ink/10 text-charcoal-ink border-charcoal-ink/20',
   ADMIN_2: 'bg-charcoal-ink/10 text-charcoal-ink border-charcoal-ink/20',
   ADMIN_3: 'bg-charcoal-ink/10 text-charcoal-ink border-charcoal-ink/20',
+  ACCOUNT_MANAGER: 'bg-charcoal-ink/10 text-charcoal-ink border-charcoal-ink/20',
 };
 
 const roleLabel: Record<string, string> = {
-  SUPER_ADMIN: 'Super Admin',
-  ADMIN_1: 'Admin 1',
-  ADMIN_2: 'Admin 2',
-  ADMIN_3: 'Admin 3',
+  // New DB-driven vocabulary
+  SUPER_ADMIN_1: 'Super Admin 1',
+  SUPER_ADMIN_2: 'Super Admin 2',
+  CONSULTANT_1: 'Consultant 1',
+  CONSULTANT_2: 'Consultant 2',
+  COORDINATOR_1: 'Coordinator 1',
+  SUPPORT_1: 'Support 1',
+  SUPPORT_2: 'Support 2',
+  COUPLE: 'Couple',
+  EDITOR: 'Editor',
+  VIEWER: 'Viewer',
+  // Legacy values
+  SUPER_ADMIN: 'Super Admin (Legacy)',
+  ACCOUNT_MANAGER: 'Account Manager (Legacy)',
+  ACCOUNT_MANAGER_1: 'Account Manager 1 (Legacy)',
+  ACCOUNT_MANAGER_2: 'Account Manager 2 (Legacy)',
+  SUPPORT: 'Support (Legacy)',
+  ADMIN_1: 'Consultant (Legacy)',
+  ADMIN_2: 'Coordinator (Legacy)',
+  ADMIN_3: 'Operations (Legacy)',
 };
 
 function relativeTime(dateStr: string | null): string {
@@ -173,6 +207,7 @@ export default function MasterUsers() {
   const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [roles, setRoles] = useState<{ key: string; label: string; tier: string; isSystem: boolean }[]>([]);
 
   // Dialog state
   const [formOpen, setFormOpen] = useState(false);
@@ -182,6 +217,11 @@ export default function MasterUsers() {
   const [form, setForm] = useState<UserForm>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  // Reset password dialog state
+  const [resetUser, setResetUser] = useState<UserItem | null>(null);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [resetting, setResetting] = useState(false);
 
   // ── Fetch users ──────────────────────────────────────────────────────
 
@@ -212,12 +252,36 @@ export default function MasterUsers() {
     return () => clearTimeout(timer);
   }, [search, fetchUsers]);
 
+  // ── Fetch roles (for dropdown) ───────────────────────────────────────
+  useEffect(() => {
+    async function fetchRoles() {
+      try {
+        const res = await fetch('/api/master/roles?XTransformPort=3000');
+        if (res.ok) {
+          const data = await res.json();
+          // Exclude COUPLE, EDITOR, VIEWER — those are per-wedding roles,
+          // not assignable from the Team page (staff management)
+          const staffRoles = (data.roles || []).filter(
+            (r: { key: string; tier: string }) => r.tier !== 'account'
+          );
+          setRoles(staffRoles);
+        }
+      } catch {
+        // Silently fail — dropdown will be empty
+      }
+    }
+    fetchRoles();
+  }, []);
+
   // ── Stats ────────────────────────────────────────────────────────────
 
   const stats = useMemo(() => {
     const total = users.length;
     const active = users.filter((u) => u.isActive).length;
-    const admins = users.filter((u) => u.role.startsWith('ADMIN')).length;
+    const admins = users.filter((u) => {
+      const r = normalizePlatformRole(u.role);
+      return r !== 'COUPLE';
+    }).length;
     return { total, active, admins };
   }, [users]);
 
@@ -371,6 +435,39 @@ export default function MasterUsers() {
         description: err instanceof Error ? err.message : 'An unexpected error occurred',
         variant: 'destructive',
       });
+    }
+  }
+
+  // ── Reset password handler ──────────────────────────────────────────
+
+  function openReset(user: UserItem) {
+    setResetUser(user);
+    setNewPassword('');
+    setResetOpen(true);
+  }
+
+  async function handleResetPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!resetUser) return;
+    if (newPassword.length < 8) {
+      toast({ title: 'Validation Error', description: 'Password must be at least 8 characters', variant: 'destructive' });
+      return;
+    }
+    try {
+      setResetting(true);
+      const res = await fetch(
+        `/api/master/users/${resetUser.id}/reset-password?XTransformPort=3000`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ newPassword }) }
+      );
+      if (!res.ok) throw new Error('Failed to reset password');
+      toast({ title: 'Password Reset', description: `Password updated for ${resetUser.name}.` });
+      setResetOpen(false);
+      setResetUser(null);
+      setNewPassword('');
+    } catch (err) {
+      toast({ title: 'Reset Failed', description: err instanceof Error ? err.message : 'An unexpected error occurred', variant: 'destructive' });
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -557,6 +654,16 @@ export default function MasterUsers() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8"
+                            onClick={() => openReset(user)}
+                            title="Reset password"
+                          >
+                            <KeyRound className="h-4 w-4 text-amber-500" />
+                            <span className="sr-only">Reset password</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
                             onClick={() => openDelete(user)}
                             disabled={user.isActive === false}
                           >
@@ -663,10 +770,11 @@ export default function MasterUsers() {
                   <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
-                  <SelectItem value="ADMIN_1">Admin 1</SelectItem>
-                  <SelectItem value="ADMIN_2">Admin 2</SelectItem>
-                  <SelectItem value="ADMIN_3">Admin 3</SelectItem>
+                  {roles.map((r) => (
+                    <SelectItem key={r.key} value={r.key}>
+                      {r.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -787,6 +895,53 @@ export default function MasterUsers() {
               Delete User
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+            <DialogDescription>
+              Set a new password for {resetUser?.name} ({resetUser?.email}).
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="new-password" className="text-xs uppercase tracking-wider text-slate-500">
+                New Password
+              </Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Minimum 8 characters"
+                required
+                disabled={resetting}
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setResetOpen(false)} disabled={resetting}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={resetting || newPassword.length < 8}>
+                {resetting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Resetting...
+                  </>
+                ) : (
+                  <>
+                    <KeyRound className="h-4 w-4 mr-2" />
+                    Reset Password
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

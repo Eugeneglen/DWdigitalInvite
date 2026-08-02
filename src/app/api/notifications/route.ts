@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { normalizePlatformRole } from '@/lib/permissions';
 
 // ---------------------------------------------------------------------------
 // GET /api/notifications — list notifications for the current user
@@ -21,7 +22,7 @@ export async function GET(req: Request) {
 
     // Build the where clause — couples see wedding-linked notifications too
     let weddingIds: string[] = [];
-    if (role === 'COUPLE') {
+    if (normalizePlatformRole(role) === 'COUPLE') {
       const weddings = await db.weddingAccount.findMany({
         where: { ownerId: session.user.id },
         select: { id: true },
@@ -29,7 +30,7 @@ export async function GET(req: Request) {
       weddingIds = weddings.map((w) => w.id);
     }
 
-    const where = role === 'COUPLE'
+    const where = normalizePlatformRole(role) === 'COUPLE'
       ? {
           OR: [
             { userId: session.user.id },
@@ -49,7 +50,7 @@ export async function GET(req: Request) {
         take: limit,
       }),
       db.notification.count({
-        where: role === 'COUPLE'
+        where: normalizePlatformRole(role) === 'COUPLE'
           ? {
               OR: [
                 { userId: session.user.id },
@@ -85,7 +86,7 @@ export async function PUT(req: Request) {
 
     // Build base where for user/wedding scoping
     let baseWhere: Record<string, unknown> = {};
-    if (role === 'COUPLE') {
+    if (normalizePlatformRole(role) === 'COUPLE') {
       const weddings = await db.weddingAccount.findMany({
         where: { ownerId: session.user.id },
         select: { id: true },
@@ -145,7 +146,7 @@ export async function DELETE(req: Request) {
     const role = session.user.role;
 
     let baseWhere: Record<string, unknown> = {};
-    if (role === 'COUPLE') {
+    if (normalizePlatformRole(role) === 'COUPLE') {
       const weddings = await db.weddingAccount.findMany({
         where: { ownerId: session.user.id },
         select: { id: true },

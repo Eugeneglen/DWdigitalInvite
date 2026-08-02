@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { hasPlatformPermission } from '@/lib/permissions';
 
 // GET /api/master/expiry-check
 // Scans all ACTIVE/COMPLETED weddings and:
@@ -12,7 +13,7 @@ import { db } from '@/lib/db';
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || (session.user.role !== 'SUPER_ADMIN' && !session.user.role?.startsWith('ADMIN'))) {
+    if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:weddings:write'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -73,7 +74,7 @@ export async function GET() {
 
     // Create notifications for super admins (if not already created)
     const admins = await db.user.findMany({
-      where: { role: 'SUPER_ADMIN', isActive: true },
+      where: { role: { in: ['SUPER_ADMIN_1', 'SUPER_ADMIN_2'] }, isActive: true },
       select: { id: true },
     });
 

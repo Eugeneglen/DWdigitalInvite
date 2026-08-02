@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { authenticateRequest, requireTenantAccess, createAuditLog } from '@/lib/auth-middleware';
+import { authenticateRequest, createAuditLog } from '@/lib/auth-middleware';
+import { hasWeddingPermission } from '@/lib/permissions';
 
 // ============================================
 // PATCH — Update a wish (message, name, etc.)
@@ -26,9 +27,9 @@ export async function PATCH(
     }
 
     const { id: weddingId, wishId } = await params;
-    const accessError = await requireTenantAccess(user, weddingId, 'editor');
-    if (accessError) {
-      return Response.json({ success: false, error: accessError }, { status: 403 });
+    const canAccess = await hasWeddingPermission(user.userId, user.role, weddingId, 'wedding:wishes:moderate');
+    if (!canAccess) {
+      return Response.json({ success: false, error: 'Access denied. You do not have permission to moderate wishes.' }, { status: 403 });
     }
 
     const existing = await db.wish.findFirst({
@@ -96,9 +97,9 @@ export async function DELETE(
     }
 
     const { id: weddingId, wishId } = await params;
-    const accessError = await requireTenantAccess(user, weddingId, 'editor');
-    if (accessError) {
-      return Response.json({ success: false, error: accessError }, { status: 403 });
+    const canAccess = await hasWeddingPermission(user.userId, user.role, weddingId, 'wedding:wishes:moderate');
+    if (!canAccess) {
+      return Response.json({ success: false, error: 'Access denied. You do not have permission to moderate wishes.' }, { status: 403 });
     }
 
     const existing = await db.wish.findFirst({

@@ -4,14 +4,29 @@ import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod/v4';
+import { hasPlatformPermission, normalizePlatformRole } from '@/lib/permissions';
 
 // ── Schemas ───────────────────────────────────────────────────────────────
+// Accept the new DB-driven vocabulary (SUPER_ADMIN_1, CONSULTANT_1, etc.)
+// plus legacy values for backward compatibility.
+
+const ROLE_VALUES = [
+  // New DB-driven vocabulary
+  'SUPER_ADMIN_1', 'SUPER_ADMIN_2',
+  'CONSULTANT_1', 'CONSULTANT_2',
+  'COORDINATOR_1',
+  'SUPPORT_1', 'SUPPORT_2',
+  'COUPLE',
+  // Legacy values (still accepted for backward compatibility)
+  'SUPER_ADMIN', 'ACCOUNT_MANAGER', 'ACCOUNT_MANAGER_1', 'ACCOUNT_MANAGER_2',
+  'SUPPORT', 'ADMIN_1', 'ADMIN_2', 'ADMIN_3',
+] as const;
 
 const createUserSchema = z.object({
   email: z.email('Invalid email address'),
   name: z.string().min(2, 'Name must be at least 2 characters'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  role: z.enum(['SUPER_ADMIN', 'ADMIN_1', 'ADMIN_2', 'ADMIN_3']),
+  role: z.enum(ROLE_VALUES),
   isActive: z.boolean().optional().default(true),
 });
 
@@ -20,34 +35,37 @@ const updateUserSchema = z.object({
   email: z.email('Invalid email address').optional(),
   name: z.string().min(2, 'Name must be at least 2 characters').optional(),
   password: z.string().min(8, 'Password must be at least 8 characters').optional(),
-  role: z.enum(['SUPER_ADMIN', 'ADMIN_1', 'ADMIN_2', 'ADMIN_3']).optional(),
+  role: z.enum(ROLE_VALUES).optional(),
   isActive: z.boolean().optional(),
 });
-
-// ── Helpers ──────────────────────────────────────────────────────────────
-
-function isAuthorized(role?: string): boolean {
-  return role === 'SUPER_ADMIN' || role?.startsWith('ADMIN');
-}
 
 // ── GET ───────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || !isAuthorized(session.user.role)) {
+    if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:weddings:read'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('search') || '';
+    const status = searchParams.get('status') || ''; // 'active' | 'deactivated' | ''
 
-    const where: Record<string, unknown> = {};
+    // Filter out COUPLE users — the Team page is for internal staff only
+    const where: Record<string, unknown> = {
+      role: { not: 'COUPLE' },
+    };
     if (search) {
       where.OR = [
         { name: { contains: search } },
         { email: { contains: search } },
       ];
+    }
+    if (status === 'active') {
+      where.isActive = true;
+    } else if (status === 'deactivated') {
+      where.isActive = false;
     }
 
     const users = await db.user.findMany({
@@ -79,12 +97,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || !isAuthorized(session.user.role)) {
+    if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:users:manage'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only SUPER_ADMIN can create users
-    if (session.user.role !== 'SUPER_ADMIN') {
+    // Only SUPER_ADMIN can create users (defense-in-depth escalation gate)
+    if (normalizePlatformRole(session.user.role) !== 'SUPER_ADMIN') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -96,9 +114,10 @@ export async function POST(req: NextRequest) {
     }
 
     const { email, name, password, role, isActive } = parsed.data;
+    const normalizedEmail = email.trim().toLowerCase();
 
-    // Check email uniqueness
-    const existing = await db.user.findUnique({ where: { email } });
+    // Check email uniqueness (always lowercase — login lowercases too)
+    const existing = await db.user.findUnique({ where: { email: normalizedEmail } });
     if (existing) {
       return NextResponse.json({ error: 'A user with this email already exists' }, { status: 409 });
     }
@@ -107,11 +126,12 @@ export async function POST(req: NextRequest) {
 
     const user = await db.user.create({
       data: {
-        email,
+        email: normalizedEmail,
         name,
         passwordHash,
         role,
         isActive,
+        mustChangePassword: true,  // Force password change on first login
       },
       select: {
         id: true,
@@ -149,7 +169,9 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || !isAuthorized(session.user.role)) {
+    // SEC-1 fix: Only users with platform:users:manage (Super Admins) can edit users.
+    // Previously used platform:weddings:read which let consultants reset any user's password.
+    if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:users:manage'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -165,20 +187,21 @@ export async function PUT(req: NextRequest) {
     const updateData: Record<string, unknown> = {};
     if (updates.name !== undefined) updateData.name = updates.name;
     if (updates.email !== undefined) {
-      // Check email uniqueness if changing
-      const existing = await db.user.findFirst({ where: { email: updates.email, NOT: { id } } });
+      const normalizedEmail = updates.email.trim().toLowerCase();
+      // Check email uniqueness if changing (always lowercase — login lowercases too)
+      const existing = await db.user.findFirst({ where: { email: normalizedEmail, NOT: { id } } });
       if (existing) {
         return NextResponse.json({ error: 'A user with this email already exists' }, { status: 409 });
       }
-      updateData.email = updates.email;
+      updateData.email = normalizedEmail;
     }
     if (updates.password) {
       updateData.passwordHash = await bcrypt.hash(updates.password, 12);
     }
     if (updates.role !== undefined) {
-      // Only SUPER_ADMIN can change roles. ADMIN_* users cannot escalate
-      // themselves or others to SUPER_ADMIN.
-      if (session.user.role !== 'SUPER_ADMIN') {
+      // Only SUPER_ADMIN can change roles (defense-in-depth escalation gate).
+      // ACCOUNT_MANAGER_* users cannot escalate themselves or others.
+      if (normalizePlatformRole(session.user.role) !== 'SUPER_ADMIN') {
         return NextResponse.json({ error: 'Only Super Admins can change user roles' }, { status: 403 });
       }
       updateData.role = updates.role;
@@ -224,12 +247,12 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || !isAuthorized(session.user.role)) {
+    if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:users:manage'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only SUPER_ADMIN can delete users
-    if (session.user.role !== 'SUPER_ADMIN') {
+    // Only SUPER_ADMIN can delete users (defense-in-depth escalation gate)
+    if (normalizePlatformRole(session.user.role) !== 'SUPER_ADMIN') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

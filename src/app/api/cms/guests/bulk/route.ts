@@ -68,9 +68,10 @@ export async function POST(req: NextRequest) {
             phone: (row.phone || row.Phone || '').trim() || null,
             groupName: (row.group || row.Group || row.groupName || row.GroupName || '').trim() || null,
             tableNumber: row.tableNumber || row.TableNumber ? parseInt(String(row.tableNumber || row.TableNumber), 10) || null : null,
-            plusOne: row.plusOne === 'true' || row.PlusOne === 'true' || row.plus_one === 'yes' || row.plus_one === '1',
+            plusOne: row.plusOne === 'true' || row.PlusOne === 'true' || row.plus_one === 'yes' || row.plus_one === '1' || row.plusOne === true,
             plusOneName: (row.plusOneName || row.PlusOneName || row.plus_one_name || '').trim() || null,
             dietaryNotes: (row.dietaryNotes || row.DietaryNotes || row.dietary || row.Dietary || '').trim() || null,
+            rsvpStatus: (row.rsvpStatus as string) || null,
             invitationCode: generateCode(),
           },
         });

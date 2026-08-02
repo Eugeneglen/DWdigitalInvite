@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
-import { authenticateRequest, requireMasterAdmin } from '@/lib/auth-middleware';
+import { authenticateRequest } from '@/lib/auth-middleware';
+import { hasPlatformPermission } from '@/lib/permissions';
 
 // ============================================
 // GET — Recent submissions across ALL tenants (master admin dashboard)
@@ -13,9 +14,8 @@ export async function GET(request: NextRequest) {
       return Response.json({ success: false, error: authError || 'Authentication required' }, { status: 401 });
     }
 
-    const masterError = requireMasterAdmin(user);
-    if (masterError) {
-      return Response.json({ success: false, error: masterError }, { status: 403 });
+    if (!(await hasPlatformPermission(user.userId, user.role, 'platform:weddings:read'))) {
+      return Response.json({ success: false, error: 'Access denied. Admin privileges required.' }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);

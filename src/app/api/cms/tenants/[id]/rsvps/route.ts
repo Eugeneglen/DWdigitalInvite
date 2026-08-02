@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
-import { authenticateRequest, requireTenantAccess, createAuditLog } from '@/lib/auth-middleware';
+import { authenticateRequest, createAuditLog } from '@/lib/auth-middleware';
+import { hasWeddingPermission } from '@/lib/permissions';
 
 // ============================================
 // GET — List RSVPs for a wedding (paginated, filterable)
@@ -17,9 +18,9 @@ export async function GET(
     }
 
     const { id: weddingId } = await params;
-    const accessError = await requireTenantAccess(user, weddingId, 'viewer');
-    if (accessError) {
-      return Response.json({ success: false, error: accessError }, { status: 403 });
+    const canAccess = await hasWeddingPermission(user.userId, user.role, weddingId, 'wedding:read');
+    if (!canAccess) {
+      return Response.json({ success: false, error: 'Access denied. You do not have access to this wedding.' }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);

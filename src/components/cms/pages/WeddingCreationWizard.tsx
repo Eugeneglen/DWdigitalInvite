@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Loader2, Check, Copy, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
+import { Loader2, Check, Copy, ChevronLeft, ChevronRight, Sparkles, CalendarIcon } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import {
   Dialog,
   DialogContent,
@@ -22,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { normalizePlatformRole } from '@/lib/permissions';
 
 interface StaffUser {
   id: string;
@@ -112,6 +119,19 @@ const INITIAL_FORM: FormData = {
   internalNotes: '',
 };
 
+/**
+ * Format a date string (YYYY-MM-DD or ISO) as DD/MM/YYYY for display.
+ * Parses the string manually to avoid timezone shifts and locale quirks
+ * from `new Date().toLocaleDateString()`.
+ */
+function formatDateDisplay(dateStr: string): string {
+  const parts = dateStr.split('T')[0].split('-');
+  if (parts.length !== 3) return dateStr;
+  const [year, month, day] = parts;
+  if (!year || !month || !day) return dateStr;
+  return `${day}/${month}/${year}`;
+}
+
 export default function WeddingCreationWizard({ open, onOpenChange, onCreated }: WeddingCreationWizardProps) {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormData>(INITIAL_FORM);
@@ -134,7 +154,11 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
       if (usersRes.ok) {
         const userData = await usersRes.json();
         const allUsers: StaffUser[] = userData.users ?? [];
-        setStaff(allUsers.filter((u) => u.role === 'ADMIN_1' || u.role === 'ADMIN_2'));
+        // Include both legacy (ADMIN_1, ADMIN_2) and new (ACCOUNT_MANAGER_1, ACCOUNT_MANAGER_2) vocabulary
+        setStaff(allUsers.filter((u) => {
+          const normalized = normalizePlatformRole(u.role);
+          return normalized === 'ACCOUNT_MANAGER_1' || normalized === 'ACCOUNT_MANAGER_2';
+        }));
       }
 
       if (settingsRes.ok) {
@@ -175,8 +199,8 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
     }
   }, [form.plan, packages]);
 
-  const consultants = staff.filter((s) => s.role === 'ADMIN_1');
-  const coordinators = staff.filter((s) => s.role === 'ADMIN_2');
+  const consultants = staff.filter((s) => normalizePlatformRole(s.role) === 'ACCOUNT_MANAGER_1');
+  const coordinators = staff.filter((s) => normalizePlatformRole(s.role) === 'ACCOUNT_MANAGER_2');
 
   const handleCreate = async () => {
     try {
@@ -388,7 +412,33 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Wedding Date *</Label>
-                  <Input type="date" value={form.weddingDate ? form.weddingDate.split('T')[0] : ''} onChange={(e) => setForm({ ...form, weddingDate: e.target.value })} className="border-charcoal-ink/10" />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-start text-left font-normal border-charcoal-ink/10 h-9"
+                      >
+                        <CalendarIcon className="mr-2 size-4 text-charcoal-ink/50" />
+                        {form.weddingDate ? formatDateDisplay(form.weddingDate) : <span className="text-charcoal-ink/30">Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={form.weddingDate ? new Date(form.weddingDate.split('T')[0] + 'T00:00:00') : undefined}
+                        onSelect={(date) => {
+                          if (date) {
+                            const y = date.getFullYear();
+                            const m = String(date.getMonth() + 1).padStart(2, '0');
+                            const d = String(date.getDate()).padStart(2, '0');
+                            setForm({ ...form, weddingDate: `${y}-${m}-${d}` });
+                          }
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Wedding Time</Label>
@@ -476,7 +526,7 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
           {step === 2 && (
             <div className="space-y-4">
               <div className="space-y-1.5">
-                <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Assigned Consultant (ADMIN_1)</Label>
+                <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Assigned Consultant (Senior)</Label>
                 <Select value={form.consultantId || 'none'} onValueChange={(v) => setForm({ ...form, consultantId: v === 'none' ? '' : v })}>
                   <SelectTrigger className="w-full border-charcoal-ink/10">
                     <SelectValue placeholder="Select consultant" />
@@ -490,7 +540,7 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Assigned Coordinator (ADMIN_2)</Label>
+                <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Assigned Coordinator (Junior)</Label>
                 <Select value={form.coordinatorId || 'none'} onValueChange={(v) => setForm({ ...form, coordinatorId: v === 'none' ? '' : v })}>
                   <SelectTrigger className="w-full border-charcoal-ink/10">
                     <SelectValue placeholder="Select coordinator" />
@@ -524,7 +574,7 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
                   <div><span className="text-charcoal-ink/50">Couple:</span> <span className="font-medium text-charcoal-ink">{form.coupleName}</span></div>
                   <div><span className="text-charcoal-ink/50">Email:</span> <span className="font-medium text-charcoal-ink">{form.coupleEmail}</span></div>
                   <div><span className="text-charcoal-ink/50">Mobile:</span> <span className="font-medium text-charcoal-ink">{form.couplePhone || '—'}</span></div>
-                  <div><span className="text-charcoal-ink/50">Date:</span> <span className="font-medium text-charcoal-ink">{form.weddingDate ? new Date(form.weddingDate).toLocaleDateString('en-SG') : '—'}</span></div>
+                  <div><span className="text-charcoal-ink/50">Date:</span> <span className="font-medium text-charcoal-ink">{form.weddingDate ? formatDateDisplay(form.weddingDate) : '—'}</span></div>
                   <div><span className="text-charcoal-ink/50">Venue:</span> <span className="font-medium text-charcoal-ink">{form.venue || '—'}</span></div>
                   <div><span className="text-charcoal-ink/50">Job #:</span> <span className="font-medium text-charcoal-ink">{form.jobNumber || '(auto)'}</span></div>
                 </div>

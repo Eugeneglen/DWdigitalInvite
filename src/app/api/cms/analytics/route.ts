@@ -25,11 +25,18 @@ export async function GET() {
     }
 
     // ── Guest Stats ────────────────────────────────────────────
+    // Extended select to include name, email, phone, dietaryNotes for Phase 4
     const guests = await db.guest.findMany({
       where: { weddingId },
       select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
         rsvpStatus: true,
         groupName: true,
+        dietaryNotes: true,
+        plusOne: true,
         updatedAt: true,
       },
     });
@@ -105,6 +112,65 @@ export async function GET() {
       }))
       .sort((a, b) => b.total - a.total);
 
+    // ── Phase 4: Non-responders list (PENDING guests) ──────────
+    const nonResponders = guests
+      .filter((g) => !g.rsvpStatus || g.rsvpStatus === 'PENDING')
+      .map((g) => ({
+        id: g.id,
+        name: g.name,
+        groupName: g.groupName || 'Ungrouped',
+        email: g.email,
+        phone: g.phone,
+      }))
+      .sort((a, b) => a.groupName.localeCompare(b.groupName) || a.name.localeCompare(b.name));
+
+    // ── Phase 4: Dietary requirements list ─────────────────────
+    const dietaryGuests = guests
+      .filter((g) => g.dietaryNotes && g.dietaryNotes.trim().length > 0)
+      .map((g) => ({
+        id: g.id,
+        name: g.name,
+        groupName: g.groupName || 'Ungrouped',
+        dietaryNotes: g.dietaryNotes!,
+        rsvpStatus: g.rsvpStatus || 'PENDING',
+      }))
+      .sort((a, b) => a.groupName.localeCompare(b.groupName) || a.name.localeCompare(b.name));
+
+    // ── Phase 5: Unmatched RSVPs (submissions with no guestId link) ─
+    const unmatchedRsvpRecords = await db.rSVPSubmission.findMany({
+      where: { weddingId, guestId: null },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        partySize: true,
+        createdAt: true,
+        guests: { select: { name: true, attendance: true, dietary: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    const unmatchedRsvps = unmatchedRsvpRecords.map((r) => ({
+      id: r.id,
+      name: `${r.firstName} ${r.lastName}`.trim(),
+      partySize: r.partySize,
+      createdAt: r.createdAt.toISOString(),
+      guests: r.guests.map((g) => ({
+        name: g.name,
+        attendance: g.attendance,
+        dietary: g.dietary,
+      })),
+    }));
+
+    // ── Phase 5: All guests (for the match dropdown) ────────────
+    const allGuestsForMatch = guests
+      .map((g) => ({
+        id: g.id,
+        name: g.name,
+        groupName: g.groupName || 'Ungrouped',
+        email: g.email,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
     return NextResponse.json({
       guestStats: {
         total,
@@ -117,6 +183,12 @@ export async function GET() {
       wishesCount,
       rsvpTimeline,
       groupBreakdown,
+      // ── Phase 4 new fields (additive) ───────────────────────────
+      nonResponders,
+      dietaryGuests,
+      // ── Phase 5 new fields (additive) ───────────────────────────
+      unmatchedRsvps,
+      allGuestsForMatch,
     });
   } catch (error) {
     console.error('Analytics error:', error);

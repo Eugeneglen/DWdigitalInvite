@@ -2,646 +2,103 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  Palette, Star, Eye, Pencil, Save, RotateCcw,
+  Plus, Star, Trash2, Copy, Check, Loader2, FileText,
+  Palette, Calendar, HelpCircle, BookOpen, Image as ImageIcon,
+  Lock, Pencil,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { useCMSStore } from '@/store/useCMSStore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
-import { Check } from 'lucide-react';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 
-// ── Types ──────────────────────────────────────────────────────────────────
-
-// WeddingTemplate type + DEFAULT_TEMPLATES are imported from the shared
-// single-source-of-truth file so the Admin CMS and the Couple CMS API
-// always show identical palettes.
-import { type WeddingTemplate, DEFAULT_TEMPLATES } from '@/lib/wedding-templates';
-
-const COLOR_LABELS: Record<keyof WeddingTemplate['colors'], string> = {
-  bg: 'Background',
-  text: 'Text',
-  accent: 'Accent',
-  secondary: 'Secondary',
-  muted: 'Muted',
-};
-
-const TEMPLATE_FONT_OPTIONS = [
-  { value: 'Playfair Display', category: 'Elegant Serif' },
-  { value: 'Cormorant Garamond', category: 'Elegant Serif' },
-  { value: 'EB Garamond', category: 'Elegant Serif' },
-  { value: 'Lora', category: 'Elegant Serif' },
-  { value: 'Spectral', category: 'Elegant Serif' },
-  { value: 'Libre Baskerville', category: 'Elegant Serif' },
-  { value: 'Merriweather', category: 'Elegant Serif' },
-  { value: 'DM Serif Display', category: 'Elegant Serif' },
-  { value: 'Bodoni Moda', category: 'Elegant Serif' },
-  { value: 'Cinzel', category: 'Display Serif' },
-  { value: 'Cinzel Decorative', category: 'Display Serif' },
-  { value: 'Prata', category: 'Display Serif' },
-  { value: 'Italiana', category: 'Display Serif' },
-  { value: 'Montserrat', category: 'Modern Sans' },
-  { value: 'Raleway', category: 'Modern Sans' },
-  { value: 'Poppins', category: 'Modern Sans' },
-  { value: 'Lato', category: 'Modern Sans' },
-  { value: 'Quicksand', category: 'Modern Sans' },
-  { value: 'Nunito', category: 'Modern Sans' },
-  { value: 'Work Sans', category: 'Modern Sans' },
-  { value: 'Great Vibes', category: 'Script & Calligraphy' },
-  { value: 'Alex Brush', category: 'Script & Calligraphy' },
-  { value: 'Allura', category: 'Script & Calligraphy' },
-  { value: 'Parisienne', category: 'Script & Calligraphy' },
-  { value: 'Sacramento', category: 'Script & Calligraphy' },
-  { value: 'Dancing Script', category: 'Handwritten' },
-  { value: 'Kaushan Script', category: 'Handwritten' },
-  { value: 'Caveat', category: 'Handwritten' },
-  { value: 'Amatic SC', category: 'Handwritten' },
-  { value: 'Satisfy', category: 'Handwritten' },
-  { value: 'Pacifico', category: 'Handwritten' },
-  { value: 'Lobster', category: 'Handwritten' },
-  { value: 'Inter', category: 'Modern Sans' },
-  { value: 'Josefin Sans', category: 'Modern Sans' },
-];
-
-const FONT_CATEGORIES = [...new Set(TEMPLATE_FONT_OPTIONS.map((f) => f.category))];
-
-// ── API helpers ────────────────────────────────────────────────────────────
-
-async function loadSettings(): Promise<Record<string, string>> {
-  const res = await fetch('/api/master/settings?XTransformPort=3000');
-  if (!res.ok) throw new Error(`Failed to load settings (${res.status})`);
-  const json = await res.json();
-  return json.settings || {};
+interface ContentTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  isDefault: boolean;
+  isActive: boolean;
+  sortOrder: number;
+  contentCount: number;
+  scheduleCount: number;
+  faqCount: number;
+  storyCount: number;
+  mediaCount: number;
+  theme: { colors: { bg: string; text: string; accent: string; secondary: string; muted: string }; fonts: { heading: string; body: string } };
+  createdAt: string;
+  updatedAt: string;
 }
 
-async function saveSettings(settings: Record<string, string>): Promise<void> {
-  const res = await fetch('/api/master/settings?XTransformPort=3000', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ settings }),
-  });
-  if (!res.ok) throw new Error(`Save failed (${res.status})`);
+interface Wedding {
+  id: string;
+  coupleName: string;
+  slug: string;
 }
-
-// ── Sub-components ─────────────────────────────────────────────────────────
-
-function ColorSwatch({ color, label }: { color: string; label?: string }) {
-  const isLight = isLightColor(color);
-  return (
-    <div className="flex flex-col items-center gap-1.5">
-      <div
-        className="w-10 h-10 rounded-lg border border-slate-200 shadow-sm transition-transform hover:scale-110 cursor-default"
-        style={{ backgroundColor: color }}
-        title={label ? `${label}: ${color}` : color}
-      />
-      {label && (
-        <span
-          className="text-[10px] leading-tight font-medium max-w-[56px] text-center"
-          style={{ color: isLight ? '#64748B' : '#94A3B8' }}
-        >
-          {label}
-        </span>
-      )}
-    </div>
-  );
-}
-
-function isLightColor(hex: string): boolean {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return (r * 299 + g * 587 + b * 114) / 1000 > 150;
-}
-
-function TemplateCardSkeleton() {
-  return (
-    <Card className="border-slate-200 rounded-xl bg-white shadow-sm overflow-hidden">
-      <div className="p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-5 w-32" />
-          <Skeleton className="h-5 w-16 rounded-full" />
-        </div>
-        <div className="flex gap-2">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="w-10 h-10 rounded-lg" />
-          ))}
-        </div>
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-3/4" />
-        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-          <Skeleton className="h-5 w-20" />
-          <div className="flex gap-2">
-            <Skeleton className="h-8 w-8 rounded-md" />
-            <Skeleton className="h-8 w-8 rounded-md" />
-            <Skeleton className="h-8 w-8 rounded-md" />
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-// ── Edit Dialog ────────────────────────────────────────────────────────────
-
-function EditTemplateDialog({
-  template,
-  open,
-  onOpenChange,
-  onSave,
-}: {
-  template: WeddingTemplate;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSave: (updated: WeddingTemplate) => void;
-}) {
-  const [editing, setEditing] = useState<WeddingTemplate>(template);
-
-  const updateColor = (key: keyof WeddingTemplate['colors'], value: string) => {
-    setEditing((prev) => ({
-      ...prev,
-      colors: { ...prev.colors, [key]: value },
-    }));
-  };
-
-  const updateFont = (key: keyof WeddingTemplate['fonts'], value: string) => {
-    setEditing((prev) => ({
-      ...prev,
-      fonts: { ...prev.fonts, [key]: value },
-    }));
-  };
-
-  const handleSave = () => {
-    onSave(editing);
-    onOpenChange(false);
-  };
-
-  const colorEntries = Object.entries(editing.colors) as [keyof WeddingTemplate['colors'], string][];
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="text-slate-900">Edit Template</DialogTitle>
-          <DialogDescription className="text-slate-500">
-            Customize colors and fonts for {template.name}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-5 max-h-[60vh] overflow-y-auto pr-1">
-          {/* Colors */}
-          <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-slate-700">Colors</h4>
-            {colorEntries.map(([key, value]) => (
-              <div key={key} className="flex items-center gap-3">
-                <div
-                  className="w-8 h-8 rounded-md border border-slate-200 shrink-0"
-                  style={{ backgroundColor: value }}
-                />
-                <Label className="text-sm text-slate-600 w-20 shrink-0">{COLOR_LABELS[key]}</Label>
-                <Input
-                  value={value}
-                  onChange={(e) => updateColor(key, e.target.value)}
-                  className="flex-1 font-mono text-sm h-8"
-                  maxLength={7}
-                />
-                <input
-                  type="color"
-                  value={value}
-                  onChange={(e) => updateColor(key, e.target.value)}
-                  className="w-8 h-8 cursor-pointer rounded border border-slate-200 shrink-0"
-                />
-              </div>
-            ))}
-          </div>
-
-          {/* Fonts */}
-          <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-slate-700">Fonts</h4>
-            <div className="space-y-3">
-              {(['heading', 'body'] as const).map((key) => (
-                <div key={key} className="space-y-1.5">
-                  <Label className="text-sm text-slate-600">{key === 'heading' ? 'Heading' : 'Body'}</Label>
-                  <div
-                    className="max-h-[140px] overflow-y-auto rounded-lg border border-slate-200 bg-white"
-                    style={{ scrollbarWidth: 'thin', scrollbarColor: '#D4AF37 transparent' }}
-                  >
-                    {FONT_CATEGORIES.map((category) => (
-                      <div key={category}>
-                        <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm px-2.5 py-1">
-                          <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">{category}</span>
-                        </div>
-                        {TEMPLATE_FONT_OPTIONS
-                          .filter((f) => f.category === category)
-                          .map((font) => {
-                            const isSelected = editing.fonts[key] === font.value;
-                            return (
-                              <button
-                                key={font.value}
-                                type="button"
-                                onClick={() => updateFont(key, font.value)}
-                                className={`w-full text-left transition-colors duration-150 ${
-                                  isSelected
-                                    ? 'bg-slate-100 border-l-2 border-slate-800'
-                                    : 'border-l-2 border-transparent hover:bg-slate-50'
-                                }`}
-                              >
-                                <div className="px-2.5 py-1.5">
-                                  <p
-                                    className="text-sm text-slate-800 leading-snug truncate"
-                                    style={{ fontFamily: `'${font.value}', serif` }}
-                                  >
-                                    Wedding Title
-                                  </p>
-                                  <div className="flex items-center justify-between mt-0.5">
-                                    <span className={`text-[10px] ${isSelected ? 'text-slate-700 font-semibold' : 'text-slate-400'}`}>
-                                      {font.value}
-                                    </span>
-                                    {isSelected && <Check className="size-3 text-slate-700" strokeWidth={3} />}
-                                  </div>
-                                </div>
-                              </button>
-                            );
-                          })}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Live Mini Preview */}
-          <div className="space-y-2">
-            <h4 className="text-sm font-semibold text-slate-700">Preview</h4>
-            <div
-              className="rounded-lg border border-slate-200 p-4 space-y-2"
-              style={{ backgroundColor: editing.colors.bg }}
-            >
-              <p style={{ color: editing.colors.text, fontFamily: editing.fonts.heading, fontSize: '18px', fontWeight: 600 }}>
-                Wedding Title
-              </p>
-              <p style={{ color: editing.colors.muted, fontFamily: editing.fonts.body, fontSize: '13px' }}>
-                A beautiful celebration of love and togetherness
-              </p>
-              <div className="flex gap-2 pt-1">
-                <span
-                  className="px-3 py-1 rounded-full text-xs font-medium"
-                  style={{ backgroundColor: editing.colors.accent, color: editing.colors.bg }}
-                >
-                  RSVP
-                </span>
-                <span
-                  className="px-3 py-1 rounded-full text-xs font-medium"
-                  style={{ backgroundColor: editing.colors.secondary, color: editing.colors.bg }}
-                >
-                  Details
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="border-slate-200">
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSave}
-            className="bg-charcoal-ink text-paper-cream hover:opacity-90 transition-opacity"
-          >
-            <Save className="h-4 w-4 mr-2" />
-            Save Changes
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ── Preview Dialog (mockup) ────────────────────────────────────────────────
-
-function PreviewTemplateDialog({
-  template,
-  open,
-  onOpenChange,
-}: {
-  template: WeddingTemplate;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const c = template.colors;
-  const isLight = isLightColor(c.bg);
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl p-0 overflow-hidden" showCloseButton={false}>
-        {/* Mock phone frame */}
-        <div className="flex flex-col h-[560px]">
-          {/* Browser bar */}
-          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-200 bg-slate-50 shrink-0">
-            <div className="flex gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
-              <div className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-              <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
-            </div>
-            <div className="flex-1 mx-4">
-              <div className="bg-white rounded-md border border-slate-200 px-3 py-1 text-xs text-slate-400 text-center">
-                dreamweavers.sg/wedding-preview
-              </div>
-            </div>
-            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => onOpenChange(false)}>
-              <span className="sr-only">Close</span>
-              ✕
-            </Button>
-          </div>
-
-          {/* Mock site content */}
-          <div
-            className="flex-1 overflow-y-auto"
-            style={{ backgroundColor: c.bg }}
-          >
-            <div className="px-6 py-10 space-y-8 max-w-md mx-auto">
-              {/* Header */}
-              <div className="text-center space-y-3">
-                <div
-                  className="inline-block w-12 h-px mb-2"
-                  style={{ backgroundColor: c.accent }}
-                />
-                <p
-                  className="text-xs tracking-[0.3em] uppercase font-medium"
-                  style={{ color: c.muted }}
-                >
-                  We're getting married
-                </p>
-                <h2
-                  className="text-3xl font-semibold leading-tight"
-                  style={{ color: c.text, fontFamily: template.fonts.heading }}
-                >
-                  Sarah & James
-                </h2>
-                <div
-                  className="inline-block w-12 h-px mt-2"
-                  style={{ backgroundColor: c.accent }}
-                />
-              </div>
-
-              {/* Date card */}
-              <div
-                className="rounded-xl p-5 text-center"
-                style={{ backgroundColor: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.08)' }}
-              >
-                <p className="text-4xl font-bold" style={{ color: c.accent, fontFamily: template.fonts.heading }}>
-                  14
-                </p>
-                <p className="text-sm font-medium mt-1" style={{ color: c.text }}>
-                  February 2027
-                </p>
-                <p className="text-xs mt-0.5" style={{ color: c.muted, fontFamily: template.fonts.body }}>
-                  Singapore
-                </p>
-              </div>
-
-              {/* Navigation pills */}
-              <div className="flex justify-center gap-2">
-                {['Home', 'Schedule', 'RSVP', 'Story'].map((item) => (
-                  <span
-                    key={item}
-                    className="px-3 py-1.5 rounded-full text-xs font-medium cursor-default"
-                    style={{
-                      backgroundColor: item === 'Home' ? c.accent : 'transparent',
-                      color: item === 'Home' ? (isLightColor(c.accent) ? c.text : '#FFFFFF') : c.muted,
-                      border: `1px solid ${item === 'Home' ? c.accent : c.muted}`,
-                    }}
-                  >
-                    {item}
-                  </span>
-                ))}
-              </div>
-
-              {/* Content blocks */}
-              <div className="space-y-4">
-                <div
-                  className="rounded-lg p-4"
-                  style={{ backgroundColor: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.08)' }}
-                >
-                  <h3
-                    className="text-sm font-semibold mb-2"
-                    style={{ color: c.text, fontFamily: template.fonts.heading }}
-                  >
-                    Our Love Story
-                  </h3>
-                  <p className="text-xs leading-relaxed" style={{ color: c.muted, fontFamily: template.fonts.body }}>
-                    From a chance encounter at a cozy bookshop to this beautiful day,
-                    our journey has been nothing short of magical...
-                  </p>
-                </div>
-
-                <div
-                  className="rounded-lg p-4"
-                  style={{ backgroundColor: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.08)' }}
-                >
-                  <h3
-                    className="text-sm font-semibold mb-2"
-                    style={{ color: c.text, fontFamily: template.fonts.heading }}
-                  >
-                    Event Details
-                  </h3>
-                  <div className="space-y-2">
-                    {['Ceremony · 10:00 AM', 'Reception · 6:00 PM'].map((line) => (
-                      <p key={line} className="text-xs" style={{ color: c.muted, fontFamily: template.fonts.body }}>
-                        {line}
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* CTA Button */}
-              <div className="text-center pt-2">
-                <button
-                  className="px-8 py-2.5 rounded-full text-sm font-semibold transition-opacity hover:opacity-90"
-                  style={{ backgroundColor: c.accent, color: isLightColor(c.accent) ? c.text : '#FFFFFF' }}
-                >
-                  RSVP Now
-                </button>
-              </div>
-
-              {/* Footer */}
-              <div className="text-center pt-4 border-t" style={{ borderColor: c.muted + '40' }}>
-                <p className="text-xs" style={{ color: c.muted }}>
-                  Made with love · Dreamweavers
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ── Expanded Preview (color labels) ────────────────────────────────────────
-
-function ExpandedPreview({
-  template,
-  open,
-  onOpenChange,
-}: {
-  template: WeddingTemplate;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const colorEntries = Object.entries(template.colors) as [keyof WeddingTemplate['colors'], string][];
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-slate-900">{template.name}</DialogTitle>
-          <DialogDescription className="text-slate-500">{template.description}</DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          {/* Large color swatches with labels */}
-          <div className="space-y-2">
-            <h4 className="text-sm font-semibold text-slate-700">Color Palette</h4>
-            <div className="grid grid-cols-5 gap-3">
-              {colorEntries.map(([key, value]) => {
-                const light = isLightColor(value);
-                return (
-                  <div key={key} className="flex flex-col items-center gap-1.5">
-                    <div
-                      className="w-full aspect-square rounded-lg border border-slate-200 shadow-sm flex items-center justify-center"
-                      style={{ backgroundColor: value }}
-                    >
-                      <span
-                        className="text-[9px] font-mono font-medium opacity-80"
-                        style={{ color: light ? '#374151' : '#F9FAFB' }}
-                      >
-                        {value}
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-slate-600 font-medium text-center">
-                      {COLOR_LABELS[key]}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Font pairing */}
-          <div className="space-y-2">
-            <h4 className="text-sm font-semibold text-slate-700">Font Pairing</h4>
-            <div className="flex gap-4 p-3 bg-slate-50 rounded-lg">
-              <div className="flex-1">
-                <p className="text-xs text-slate-400 mb-1">Heading</p>
-                <p className="text-sm font-semibold text-slate-800" style={{ fontFamily: template.fonts.heading }}>
-                  {template.fonts.heading}
-                </p>
-              </div>
-              <div className="w-px bg-slate-200" />
-              <div className="flex-1">
-                <p className="text-xs text-slate-400 mb-1">Body</p>
-                <p className="text-sm text-slate-600" style={{ fontFamily: template.fonts.body }}>
-                  {template.fonts.body}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Mini preview strip */}
-          <div
-            className="rounded-lg border border-slate-200 p-4 space-y-2"
-            style={{ backgroundColor: template.colors.bg }}
-          >
-            <p style={{ color: template.colors.text, fontFamily: template.fonts.heading, fontSize: '16px', fontWeight: 600 }}>
-              Sarah & James
-            </p>
-            <p style={{ color: template.colors.muted, fontFamily: template.fonts.body, fontSize: '12px' }}>
-              A beautiful celebration of love
-            </p>
-            <div className="flex gap-2 pt-1">
-              <span
-                className="px-2.5 py-0.5 rounded-full text-[10px] font-medium"
-                style={{ backgroundColor: template.colors.accent, color: isLightColor(template.colors.accent) ? template.colors.text : '#fff' }}
-              >
-                Primary
-              </span>
-              <span
-                className="px-2.5 py-0.5 rounded-full text-[10px] font-medium"
-                style={{ backgroundColor: template.colors.secondary, color: isLightColor(template.colors.secondary) ? template.colors.text : '#fff' }}
-              >
-                Secondary
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="border-slate-200">
-            Close
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ── Main Component ─────────────────────────────────────────────────────────
 
 export default function MasterTemplates() {
-  const [templates, setTemplates] = useState<WeddingTemplate[]>(DEFAULT_TEMPLATES);
+  const { setPage, setEditingTemplateId } = useCMSStore();
+  const [templates, setTemplates] = useState<ContentTemplate[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ContentTemplate | null>(null);
+  const [editTarget, setEditTarget] = useState<ContentTemplate | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editData, setEditData] = useState<{
+    name: string;
+    description: string;
+    content: { section: string; fieldKey: string; fieldValue: string; fieldType: string }[];
+    schedule: { eventType: string; title: string; description: string | null; startTime: string; endTime: string | null; location: string | null; sortOrder: number }[];
+    faqs: { question: string; answer: string; sortOrder: number; isActive: boolean }[];
+    stories: { title: string; content: string; date: string | null; imageUrl: string | null; sortOrder: number }[];
+    theme: { colors: { bg: string; text: string; accent: string; secondary: string; muted: string }; fonts: { heading: string; body: string } };
+  } | null>(null);
+  const [editTab, setEditTab] = useState<'details' | 'content' | 'schedule' | 'faqs' | 'stories' | 'theme'>('details');
   const [saving, setSaving] = useState(false);
 
-  // Dialog states
-  const [editTemplate, setEditTemplate] = useState<WeddingTemplate | null>(null);
-  const [previewTemplate, setPreviewTemplate] = useState<WeddingTemplate | null>(null);
-  const [expandedTemplate, setExpandedTemplate] = useState<WeddingTemplate | null>(null);
+  // Create form
+  const [newName, setNewName] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [cloneWeddingId, setCloneWeddingId] = useState('');
+  const [weddings, setWeddings] = useState<Wedding[]>([]);
+  const [creating, setCreating] = useState(false);
 
-  // Load persisted templates from SystemSetting
   const fetchTemplates = useCallback(async () => {
     try {
       setLoading(true);
-      const settings = await loadSettings();
-      const defaultId = settings['default_template'] || 'classic-elegance';
-
-      // Rebuild templates from defaults + any persisted overrides
-      const rebuilt: WeddingTemplate[] = DEFAULT_TEMPLATES.map((def) => {
-        const stored = settings[`template_${def.id}`];
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored);
-            return {
-              ...def,
-              ...parsed,
-              isDefault: def.id === defaultId,
-            };
-          } catch {
-            return { ...def, isDefault: def.id === defaultId };
-          }
-        }
-        return { ...def, isDefault: def.id === defaultId };
-      });
-
-      setTemplates(rebuilt);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      const res = await fetch('/api/master/content-templates?XTransformPort=3000');
+      if (res.ok) {
+        const data = await res.json();
+        setTemplates(data.templates || []);
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load templates', variant: 'destructive' });
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const fetchWeddings = useCallback(async () => {
+    try {
+      const res = await fetch('/api/master/weddings?page=1&limit=100&XTransformPort=3000');
+      if (res.ok) {
+        const data = await res.json();
+        setWeddings((data.weddings || []).map((w: { id: string; coupleName: string; slug: string }) => ({
+          id: w.id, coupleName: w.coupleName, slug: w.slug,
+        })));
+      }
+    } catch {
+      // silently fail
     }
   }, []);
 
@@ -649,78 +106,112 @@ export default function MasterTemplates() {
     fetchTemplates();
   }, [fetchTemplates]);
 
-  // Persist a single template to SystemSetting
-  const persistTemplate = async (t: WeddingTemplate) => {
-    const { isDefault, ...data } = t;
-    await saveSettings({ [`template_${t.id}`]: JSON.stringify(data) });
-  };
+  useEffect(() => {
+    if (createOpen) fetchWeddings();
+  }, [createOpen, fetchWeddings]);
 
-  // Toggle active state
-  const handleToggleActive = async (id: string) => {
-    const updated = templates.map((t) =>
-      t.id === id ? { ...t, isActive: !t.isActive } : t
-    );
-    setTemplates(updated);
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newName.trim()) return;
     try {
-      const target = updated.find((t) => t.id === id);
-      if (target) await persistTemplate(target);
-      toast({ title: 'Success', description: `${target?.name} ${target?.isActive ? 'enabled' : 'disabled'}` });
+      setCreating(true);
+      const res = await fetch('/api/master/content-templates?XTransformPort=3000', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newName.trim(),
+          description: newDescription.trim() || undefined,
+          cloneFromWeddingId: cloneWeddingId || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to create template');
+      }
+      toast({ title: 'Template Created', description: `${newName} has been created.` });
+      setNewName('');
+      setNewDescription('');
+      setCloneWeddingId('');
+      setCreateOpen(false);
+      fetchTemplates();
     } catch (err) {
-      toast({ title: 'Error', description: 'Failed to update template', variant: 'destructive' });
-      setTemplates(templates);
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to create template', variant: 'destructive' });
+    } finally {
+      setCreating(false);
     }
-  };
+  }
 
-  // Set as default
-  const handleSetDefault = async (id: string) => {
-    const updated = templates.map((t) => ({ ...t, isDefault: t.id === id }));
-    setTemplates(updated);
+  async function handleSetDefault(template: ContentTemplate) {
     try {
-      await saveSettings({ default_template: id });
-      const name = templates.find((t) => t.id === id)?.name;
-      toast({ title: 'Success', description: `${name} set as default template` });
-    } catch (err) {
+      const res = await fetch(`/api/master/content-templates/${template.id}/set-default?XTransformPort=3000`, { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to set default');
+      toast({ title: 'Default Set', description: `${template.name} is now the default template. New couple accounts will use this template. Existing accounts are unchanged.` });
+      fetchTemplates();
+    } catch {
       toast({ title: 'Error', description: 'Failed to set default template', variant: 'destructive' });
-      setTemplates(templates);
     }
-  };
+  }
 
-  // Save edited template
-  const handleSaveEdit = async (updated: WeddingTemplate) => {
-    const newTemplates = templates.map((t) => (t.id === updated.id ? updated : t));
-    setTemplates(newTemplates);
+  async function openEdit(template: ContentTemplate) {
+    // Navigate to the full-page template editor
+    setEditingTemplateId(template.id);
+    setPage('template-editor');
+  }
+
+  async function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editTarget || !editData) return;
     try {
       setSaving(true);
-      await persistTemplate(updated);
-      toast({ title: 'Success', description: `${updated.name} updated successfully` });
+      const res = await fetch('/api/master/content-templates?XTransformPort=3000', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editTarget.id,
+          name: editData.name,
+          description: editData.description,
+          content: JSON.stringify(editData.content),
+          schedule: JSON.stringify(editData.schedule),
+          faqs: JSON.stringify(editData.faqs),
+          stories: JSON.stringify(editData.stories),
+          theme: JSON.stringify(editData.theme),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to save template');
+      }
+      toast({ title: 'Template Saved', description: `${editData.name} has been updated.` });
+      setEditOpen(false);
+      setEditTarget(null);
+      setEditData(null);
+      fetchTemplates();
     } catch (err) {
-      toast({ title: 'Error', description: 'Failed to save template changes', variant: 'destructive' });
-      setTemplates(templates);
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to save template', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
-  };
+  }
 
-  // Reset template to defaults
-  const handleReset = async (id: string) => {
-    const def = DEFAULT_TEMPLATES.find((t) => t.id === id);
-    if (!def) return;
-    const newTemplates = templates.map((t) => (t.id === id ? { ...def, isDefault: t.isDefault } : t));
-    setTemplates(newTemplates);
+  async function handleDelete(template: ContentTemplate) {
     try {
-      await persistTemplate({ ...def, isDefault: newTemplates.find((t) => t.id === id)?.isDefault ?? false });
-      toast({ title: 'Success', description: `${def.name} reset to defaults` });
+      const res = await fetch(`/api/master/content-templates?id=${template.id}&XTransformPort=3000`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to delete template');
+      }
+      toast({ title: 'Template Deleted', description: `${template.name} has been removed.` });
+      setDeleteTarget(null);
+      fetchTemplates();
     } catch (err) {
-      toast({ title: 'Error', description: 'Failed to reset template', variant: 'destructive' });
-      setTemplates(templates);
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to delete template', variant: 'destructive' });
     }
-  };
+  }
 
-  if (error) {
+  if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-        <p className="text-sm font-medium text-red-500">Error loading templates</p>
-        <p className="text-xs mt-1">{error}</p>
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="size-6 animate-spin text-cinematic-gold" />
       </div>
     );
   }
@@ -728,164 +219,466 @@ export default function MasterTemplates() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">Content Templates</h2>
-          <p className="text-slate-500 mt-1">
-            Manage wedding site themes and color palettes
-          </p>
+          <p className="text-sm text-slate-500 mt-1">Manage default content templates for new couple accounts</p>
         </div>
-        <div className="flex items-center gap-2 text-xs text-slate-400">
-          <Palette className="h-4 w-4" />
-          <span>{templates.filter((t) => t.isActive).length} of {templates.length} active</span>
+        <Button onClick={() => setCreateOpen(true)} className="bg-slate-900 text-white hover:bg-slate-800">
+          <Plus className="size-4 mr-2" />
+          New Template
+        </Button>
+      </div>
+
+      {/* Templates table */}
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[50px]"></TableHead>
+                <TableHead>Template</TableHead>
+                <TableHead>Content</TableHead>
+                <TableHead>Theme</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {templates.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-12 text-slate-400">
+                    No templates yet. Click "New Template" to create one.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                templates.map((t) => (
+                  <TableRow key={t.id}>
+                    <TableCell>
+                      {t.isDefault ? (
+                        <div className="flex items-center justify-center w-7 h-7 rounded-full bg-amber-50 border border-amber-200">
+                          <Star className="size-3.5 text-amber-500 fill-amber-400" />
+                        </div>
+                      ) : (
+                        <FileText className="size-4 text-slate-300" />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-slate-900">{t.name}</p>
+                          {t.isDefault && <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-xs">DEFAULT</Badge>}
+                          {!t.isActive && <Badge variant="outline" className="text-xs text-slate-400">Inactive</Badge>}
+                        </div>
+                        {t.description && <p className="text-xs text-slate-400 mt-0.5">{t.description}</p>}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+                        <span className="flex items-center gap-1" title="Content sections"><FileText className="size-3" />{t.contentCount}</span>
+                        <span className="flex items-center gap-1" title="Schedule items"><Calendar className="size-3" />{t.scheduleCount}</span>
+                        <span className="flex items-center gap-1" title="FAQs"><HelpCircle className="size-3" />{t.faqCount}</span>
+                        <span className="flex items-center gap-1" title="Stories"><BookOpen className="size-3" />{t.storyCount}</span>
+                        <span className="flex items-center gap-1" title="Media"><ImageIcon className="size-3" />{t.mediaCount}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-4 h-4 rounded-full border border-slate-200" style={{ backgroundColor: t.theme.colors.bg }} title="Background" />
+                        <div className="w-4 h-4 rounded-full border border-slate-200" style={{ backgroundColor: t.theme.colors.accent }} title="Accent" />
+                        <div className="w-4 h-4 rounded-full border border-slate-200" style={{ backgroundColor: t.theme.colors.text }} title="Text" />
+                        <span className="text-xs text-slate-400 ml-1">{t.theme.fonts.heading}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEdit(t)}
+                          title="Edit template"
+                        >
+                          <Pencil className="size-4 text-slate-500" />
+                        </Button>
+                        {!t.isDefault && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleSetDefault(t)}
+                            title="Set as default"
+                          >
+                            <Star className="size-4 text-slate-400" />
+                          </Button>
+                        )}
+                        {!t.isDefault && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeleteTarget(t)}
+                            title="Delete template"
+                          >
+                            <Trash2 className="size-4 text-red-400" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Info banner */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 shrink-0">
+            <FileText className="size-4 text-blue-600" />
+          </div>
+          <div className="text-sm text-blue-800">
+            <p className="font-medium mb-1">How Content Templates work</p>
+            <ul className="space-y-1 text-xs text-blue-700">
+              <li>• The <strong>default</strong> template (⭐) is automatically cloned into every newly created couple account</li>
+              <li>• <strong>Apply to All</strong> overwrites content on weddings that haven't been customized by the couple</li>
+              <li>• Couples who manually edited their theme are protected from bulk overwrite</li>
+              <li>• Create seasonal variants (Summer, Winter, etc.) and switch the default anytime</li>
+              <li>• Images use local placeholder paths — couples upload their own</li>
+            </ul>
+          </div>
         </div>
       </div>
 
-      {/* Templates Grid */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <TemplateCardSkeleton key={i} />
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {templates.map((template) => (
-            <Card
-              key={template.id}
-              className={`border-slate-200 rounded-xl bg-white shadow-sm overflow-hidden transition-all hover:shadow-md cursor-pointer group ${
-                !template.isActive ? 'opacity-60' : ''
-              }`}
-              onClick={() => setExpandedTemplate(template)}
-            >
-              <CardContent className="p-5 space-y-4">
-                {/* Top row: Name + Badge */}
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-base font-semibold text-slate-900 truncate group-hover:text-slate-700 transition-colors">
-                    {template.name}
-                  </h3>
-                  {template.isDefault && (
-                    <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100 shrink-0">
-                      <Star className="h-3 w-3 mr-1" />
-                      Default
-                    </Badge>
-                  )}
-                </div>
+      {/* Create Template Dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Create Content Template</DialogTitle>
+            <DialogDescription>
+              Create a new template from scratch, or clone an existing wedding's content.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreate} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="template-name" className="text-xs uppercase tracking-wider text-slate-500">Template Name</Label>
+              <Input
+                id="template-name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="e.g. Summer Garden"
+                required
+                disabled={creating}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="template-desc" className="text-xs uppercase tracking-wider text-slate-500">Description (optional)</Label>
+              <Input
+                id="template-desc"
+                value={newDescription}
+                onChange={(e) => setNewDescription(e.target.value)}
+                placeholder="e.g. Bright, airy summer wedding style"
+                disabled={creating}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider text-slate-500">Clone from Wedding (optional)</Label>
+              <Select value={cloneWeddingId} onValueChange={setCloneWeddingId} disabled={creating}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Start from scratch (empty template)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {weddings.map((w) => (
+                    <SelectItem key={w.id} value={w.id}>{w.coupleName} ({w.slug})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-400 mt-1">
+                Cloning extracts all content, schedule, FAQs, stories, and media from the selected wedding.
+                Base64 images are replaced with local placeholder paths.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>Cancel</Button>
+              <Button type="submit" disabled={creating || !newName.trim()}>
+                {creating ? <><Loader2 className="size-4 mr-2 animate-spin" />Creating...</> : 'Create Template'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-                {/* Color swatches */}
-                <div className="flex gap-2">
-                  {Object.values(template.colors).map((color, i) => (
-                    <ColorSwatch key={i} color={color} />
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Delete Template</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{deleteTarget?.name}"? This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => deleteTarget && handleDelete(deleteTarget)}>
+              <Trash2 className="size-4 mr-2" />
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Template Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Template</DialogTitle>
+            <DialogDescription>Update template details, content, schedule, FAQs, stories, and theme.</DialogDescription>
+          </DialogHeader>
+          {editData && (
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              {/* Tab selector */}
+              <div className="flex gap-1 border-b border-slate-200 pb-2">
+                {(['details', 'content', 'schedule', 'faqs', 'stories', 'theme'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setEditTab(tab)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors capitalize ${
+                      editTab === tab ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+
+              {/* Details tab */}
+              {editTab === 'details' && (
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs uppercase tracking-wider text-slate-500">Template Name</Label>
+                    <Input
+                      value={editData.name}
+                      onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                      required
+                      disabled={saving}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs uppercase tracking-wider text-slate-500">Description</Label>
+                    <Input
+                      value={editData.description}
+                      onChange={(e) => setEditData({ ...editData, description: e.target.value })}
+                      disabled={saving}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Content tab */}
+              {editTab === 'content' && (
+                <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                  {editData.content.map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-3 gap-2 items-start">
+                      <div className="col-span-1">
+                        <Badge variant="outline" className="text-xs">{item.section}</Badge>
+                        <p className="text-xs text-slate-400 mt-1">{item.fieldKey}</p>
+                      </div>
+                      <Input
+                        className="col-span-2 text-sm"
+                        value={item.fieldValue}
+                        onChange={(e) => {
+                          const updated = [...editData.content];
+                          updated[idx] = { ...item, fieldValue: e.target.value };
+                          setEditData({ ...editData, content: updated });
+                        }}
+                        disabled={saving}
+                      />
+                    </div>
                   ))}
                 </div>
+              )}
 
-                {/* Description */}
-                <p className="text-sm text-slate-500 leading-relaxed line-clamp-2">
-                  {template.description}
-                </p>
-
-                {/* Font info */}
-                <div className="flex items-center gap-3 text-xs text-slate-400">
-                  <span className="font-medium">{template.fonts.heading}</span>
-                  <span className="text-slate-300">/</span>
-                  <span>{template.fonts.body}</span>
+              {/* Schedule tab */}
+              {editTab === 'schedule' && (
+                <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                  {editData.schedule.map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-2 gap-2 items-start border-b border-slate-50 pb-2">
+                      <Input
+                        className="text-sm"
+                        value={item.title}
+                        placeholder="Title"
+                        onChange={(e) => {
+                          const updated = [...editData.schedule];
+                          updated[idx] = { ...item, title: e.target.value };
+                          setEditData({ ...editData, schedule: updated });
+                        }}
+                        disabled={saving}
+                      />
+                      <Input
+                        className="text-sm"
+                        value={item.startTime}
+                        placeholder="Time (e.g. 16:00)"
+                        onChange={(e) => {
+                          const updated = [...editData.schedule];
+                          updated[idx] = { ...item, startTime: e.target.value };
+                          setEditData({ ...editData, schedule: updated });
+                        }}
+                        disabled={saving}
+                      />
+                      <Input
+                        className="col-span-2 text-sm"
+                        value={item.location || ''}
+                        placeholder="Location"
+                        onChange={(e) => {
+                          const updated = [...editData.schedule];
+                          updated[idx] = { ...item, location: e.target.value };
+                          setEditData({ ...editData, schedule: updated });
+                        }}
+                        disabled={saving}
+                      />
+                    </div>
+                  ))}
                 </div>
+              )}
 
-                {/* Actions row */}
-                <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={template.isActive}
-                      onCheckedChange={() => handleToggleActive(template.id)}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                    <span className="text-xs text-slate-500">
-                      {template.isActive ? 'Active' : 'Inactive'}
-                    </span>
+              {/* FAQs tab */}
+              {editTab === 'faqs' && (
+                <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                  {editData.faqs.map((item, idx) => (
+                    <div key={idx} className="space-y-1 border-b border-slate-50 pb-2">
+                      <Input
+                        className="text-sm font-medium"
+                        value={item.question}
+                        placeholder="Question"
+                        onChange={(e) => {
+                          const updated = [...editData.faqs];
+                          updated[idx] = { ...item, question: e.target.value };
+                          setEditData({ ...editData, faqs: updated });
+                        }}
+                        disabled={saving}
+                      />
+                      <textarea
+                        className="w-full text-sm border border-slate-200 rounded px-2 py-1.5"
+                        value={item.answer}
+                        placeholder="Answer"
+                        rows={2}
+                        onChange={(e) => {
+                          const updated = [...editData.faqs];
+                          updated[idx] = { ...item, answer: e.target.value };
+                          setEditData({ ...editData, faqs: updated });
+                        }}
+                        disabled={saving}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Stories tab */}
+              {editTab === 'stories' && (
+                <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                  {editData.stories.map((item, idx) => (
+                    <div key={idx} className="space-y-1 border-b border-slate-50 pb-2">
+                      <Input
+                        className="text-sm font-medium"
+                        value={item.title}
+                        placeholder="Title"
+                        onChange={(e) => {
+                          const updated = [...editData.stories];
+                          updated[idx] = { ...item, title: e.target.value };
+                          setEditData({ ...editData, stories: updated });
+                        }}
+                        disabled={saving}
+                      />
+                      <Input
+                        className="text-sm"
+                        value={item.date || ''}
+                        placeholder="Date (e.g. March 2023)"
+                        onChange={(e) => {
+                          const updated = [...editData.stories];
+                          updated[idx] = { ...item, date: e.target.value };
+                          setEditData({ ...editData, stories: updated });
+                        }}
+                        disabled={saving}
+                      />
+                      <textarea
+                        className="w-full text-sm border border-slate-200 rounded px-2 py-1.5"
+                        value={item.content}
+                        placeholder="Story content"
+                        rows={3}
+                        onChange={(e) => {
+                          const updated = [...editData.stories];
+                          updated[idx] = { ...item, content: e.target.value };
+                          setEditData({ ...editData, stories: updated });
+                        }}
+                        disabled={saving}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Theme tab */}
+              {editTab === 'theme' && (
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-xs uppercase tracking-wider text-slate-500 mb-2 block">Colors</Label>
+                    <div className="grid grid-cols-5 gap-3">
+                      {(['bg', 'text', 'accent', 'secondary', 'muted'] as const).map((key) => (
+                        <div key={key} className="text-center">
+                          <Label className="text-xs text-slate-400 capitalize">{key}</Label>
+                          <input
+                            type="color"
+                            value={editData.theme.colors[key]}
+                            onChange={(e) => {
+                              setEditData({
+                                ...editData,
+                                theme: {
+                                  ...editData.theme,
+                                  colors: { ...editData.theme.colors, [key]: e.target.value },
+                                },
+                              });
+                            }}
+                            className="w-full h-10 rounded border border-slate-200 cursor-pointer"
+                            disabled={saving}
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </div>
-
-                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                    {!template.isDefault && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-2 text-xs text-slate-500 hover:text-amber-700 hover:bg-amber-50"
-                        onClick={() => handleSetDefault(template.id)}
-                        title="Set as default"
-                      >
-                        <Star className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 text-xs text-slate-500 hover:text-slate-700"
-                      onClick={() => setPreviewTemplate(template)}
-                      title="Preview guest site"
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 text-xs text-slate-500 hover:text-slate-700"
-                      onClick={() => setEditTemplate(template)}
-                      title="Edit template"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 text-xs text-slate-500 hover:text-slate-700"
-                      onClick={() => handleReset(template.id)}
-                      title="Reset to defaults"
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" />
-                    </Button>
+                  <div>
+                    <Label className="text-xs uppercase tracking-wider text-slate-500 mb-2 block">Fonts</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs text-slate-400">Heading</Label>
+                        <Input
+                          value={editData.theme.fonts.heading}
+                          onChange={(e) => setEditData({ ...editData, theme: { ...editData.theme, fonts: { ...editData.theme.fonts, heading: e.target.value } } })}
+                          disabled={saving}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-slate-400">Body</Label>
+                        <Input
+                          value={editData.theme.fonts.body}
+                          onChange={(e) => setEditData({ ...editData, theme: { ...editData.theme, fonts: { ...editData.theme.fonts, body: e.target.value } } })}
+                          disabled={saving}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+              )}
 
-      {/* Info note */}
-      {!loading && (
-        <p className="text-xs text-slate-400 text-center">
-          Click any template card to view its full color palette and font details.
-          Templates are persisted via System Settings.
-        </p>
-      )}
-
-      {/* Edit Dialog */}
-      {editTemplate && (
-        <EditTemplateDialog
-          template={editTemplate}
-          open={!!editTemplate}
-          onOpenChange={(open) => { if (!open) setEditTemplate(null); }}
-          onSave={handleSaveEdit}
-        />
-      )}
-
-      {/* Preview Dialog */}
-      {previewTemplate && (
-        <PreviewTemplateDialog
-          template={previewTemplate}
-          open={!!previewTemplate}
-          onOpenChange={(open) => { if (!open) setPreviewTemplate(null); }}
-        />
-      )}
-
-      {/* Expanded Preview Dialog */}
-      {expandedTemplate && (
-        <ExpandedPreview
-          template={expandedTemplate}
-          open={!!expandedTemplate}
-          onOpenChange={(open) => { if (!open) setExpandedTemplate(null); }}
-        />
-      )}
+              <DialogFooter className="pt-4">
+                <Button type="button" variant="outline" onClick={() => setEditOpen(false)} disabled={saving}>Cancel</Button>
+                <Button type="submit" disabled={saving}>
+                  {saving ? <><Loader2 className="size-4 mr-2 animate-spin" />Saving...</> : 'Save Changes'}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

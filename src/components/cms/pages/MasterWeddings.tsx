@@ -60,6 +60,7 @@ import {
 } from '@/components/ui/select';
 // useCMSStore import removed — selectWedding was dead code
 import WeddingCreationWizard from './WeddingCreationWizard';
+import { normalizePlatformRole } from '@/lib/permissions';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -255,17 +256,20 @@ export default function MasterWeddings() {
 
   // Staff users for consultant/coordinator assignment
   const [staff, setStaff] = useState<StaffUser[]>([]);
-  const consultants = staff.filter((s) => s.role === 'ADMIN_1');
-  const coordinators = staff.filter((s) => s.role === 'ADMIN_2');
+  const consultants = staff.filter((s) => normalizePlatformRole(s.role) === 'ACCOUNT_MANAGER_1');
+  const coordinators = staff.filter((s) => normalizePlatformRole(s.role) === 'ACCOUNT_MANAGER_2');
 
-  // Fetch staff users (consultants ADMIN_1 + coordinators ADMIN_2)
+  // Fetch staff users (consultants ACCOUNT_MANAGER_1 + coordinators ACCOUNT_MANAGER_2)
   const fetchStaff = useCallback(async () => {
     try {
       const res = await fetch('/api/master/users?XTransformPort=3000');
       if (res.ok) {
         const data = await res.json();
         const all: StaffUser[] = data.users ?? [];
-        setStaff(all.filter((u) => u.role === 'ADMIN_1' || u.role === 'ADMIN_2'));
+        setStaff(all.filter((u) => {
+          const normalized = normalizePlatformRole(u.role);
+          return normalized === 'ACCOUNT_MANAGER_1' || normalized === 'ACCOUNT_MANAGER_2';
+        }));
       }
     } catch {
       // silently fail — dropdowns will just be empty
@@ -1013,7 +1017,7 @@ export default function MasterWeddings() {
                 </Select>
                 {consultants.length === 0 && (
                   <p className="text-xs text-amber-600">
-                    No ADMIN_1 users. Add staff in the Team page.
+                    No Account Manager (Senior) users. Add staff in the Team page.
                   </p>
                 )}
               </div>
@@ -1037,7 +1041,7 @@ export default function MasterWeddings() {
                 </Select>
                 {coordinators.length === 0 && (
                   <p className="text-xs text-amber-600">
-                    No ADMIN_2 users. Add staff in the Team page.
+                    No Account Manager (Junior) users. Add staff in the Team page.
                   </p>
                 )}
               </div>

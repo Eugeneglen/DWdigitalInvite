@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { authenticateRequest, requireMasterAdmin, createAuditLog } from '@/lib/auth-middleware';
+import { authenticateRequest, createAuditLog } from '@/lib/auth-middleware';
+import { hasPlatformPermission } from '@/lib/permissions';
 import { FEATURE_KEYS } from '@/lib/auth';
 
 // ============================================
@@ -15,9 +16,8 @@ export async function GET(request: NextRequest) {
       return Response.json({ success: false, error: error || 'Authentication required' }, { status: 401 });
     }
 
-    const authError = requireMasterAdmin(user);
-    if (authError) {
-      return Response.json({ success: false, error: authError }, { status: 403 });
+    if (!(await hasPlatformPermission(user.userId, user.role, 'platform:weddings:read'))) {
+      return Response.json({ success: false, error: 'Access denied. Admin privileges required.' }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -106,9 +106,8 @@ export async function POST(request: NextRequest) {
       return Response.json({ success: false, error: error || 'Authentication required' }, { status: 401 });
     }
 
-    const authError = requireMasterAdmin(user);
-    if (authError) {
-      return Response.json({ success: false, error: authError }, { status: 403 });
+    if (!(await hasPlatformPermission(user.userId, user.role, 'platform:weddings:write'))) {
+      return Response.json({ success: false, error: 'Access denied. Admin privileges required.' }, { status: 403 });
     }
 
     const body = await request.json();

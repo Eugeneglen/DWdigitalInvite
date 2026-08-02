@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { authenticateRequest, requireTenantAccess, createAuditLog } from '@/lib/auth-middleware';
+import { authenticateRequest, createAuditLog } from '@/lib/auth-middleware';
+import { hasWeddingPermission } from '@/lib/permissions';
 
 // ============================================
 // GET — Get wedding content as settings (key-value via WeddingContent)
@@ -18,9 +19,9 @@ export async function GET(
 
     const { id: weddingId } = await params;
 
-    const accessError = await requireTenantAccess(user, weddingId, 'viewer');
-    if (accessError) {
-      return Response.json({ success: false, error: accessError }, { status: 403 });
+    const canAccess = await hasWeddingPermission(user.userId, user.role, weddingId, 'wedding:read');
+    if (!canAccess) {
+      return Response.json({ success: false, error: 'Access denied. You do not have access to this wedding.' }, { status: 403 });
     }
 
     const account = await db.weddingAccount.findUnique({
@@ -79,9 +80,9 @@ export async function PUT(
 
     const { id: weddingId } = await params;
 
-    const accessError = await requireTenantAccess(user, weddingId, 'admin');
-    if (accessError) {
-      return Response.json({ success: false, error: accessError }, { status: 403 });
+    const canAccess = await hasWeddingPermission(user.userId, user.role, weddingId, 'wedding:settings:write');
+    if (!canAccess) {
+      return Response.json({ success: false, error: 'Access denied. You do not have permission to edit wedding settings.' }, { status: 403 });
     }
 
     const account = await db.weddingAccount.findUnique({

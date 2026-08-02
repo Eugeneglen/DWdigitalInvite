@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
-import { authenticateRequest, requireMasterAdmin } from '@/lib/auth-middleware';
+import { authenticateRequest } from '@/lib/auth-middleware';
+import { hasPlatformPermission } from '@/lib/permissions';
 
 // ============================================
 // GET — All wedding features across all weddings (global view)
@@ -13,6 +14,11 @@ export async function GET(request: Request) {
     const { user, error } = await authenticateRequest(request);
     if (error || !user) {
       return Response.json({ success: false, error: error || 'Authentication required' }, { status: 401 });
+    }
+
+    // Phase 3b: Added role check (was missing — security gap fixed)
+    if (!(await hasPlatformPermission(user.userId, user.role, 'platform:weddings:read'))) {
+      return Response.json({ success: false, error: 'Access denied. Admin privileges required.' }, { status: 403 });
     }
 
     // Aggregate feature keys across all weddings
@@ -55,9 +61,8 @@ export async function PATCH(request: Request) {
       return Response.json({ success: false, error: error || 'Authentication required' }, { status: 401 });
     }
 
-    const authError = requireMasterAdmin(user);
-    if (authError) {
-      return Response.json({ success: false, error: authError }, { status: 403 });
+    if (!(await hasPlatformPermission(user.userId, user.role, 'platform:templates:manage'))) {
+      return Response.json({ success: false, error: 'Access denied. Admin privileges required.' }, { status: 403 });
     }
 
     // Global feature toggles are not supported.

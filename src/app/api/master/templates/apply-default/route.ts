@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getServerSession } from '@/lib/auth';
+import { hasPlatformPermission } from '@/lib/permissions';
 import { DEFAULT_TEMPLATES } from '@/lib/wedding-templates';
 
 // POST /api/master/templates/apply-default
@@ -12,7 +13,7 @@ import { DEFAULT_TEMPLATES } from '@/lib/wedding-templates';
 export async function POST() {
   try {
     const session = await getServerSession();
-    if (!session?.user || session.user.role !== 'SUPER_ADMIN') {
+    if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:templates:manage'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

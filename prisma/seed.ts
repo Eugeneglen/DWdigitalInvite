@@ -135,6 +135,27 @@ async function seed() {
   console.log(`✅ Wedding #3: ${wedding3.coupleName} (${wedding3.slug}) — ${wedding3.status}/${wedding3.plan}`);
 
   // ============================================================
+  // 4b. USER_WEDDING_ROLE — Per-wedding role assignments (Tier 2 + Tier 3)
+  //     Mirrors the ownerId FK into the new UserWeddingRole junction table
+  //     so the new permission layer (Phase 3) has data to read.
+  //     Existing ownerId/consultantId/coordinatorId FKs are kept for
+  //     backward compatibility until Phase 3c cleanup.
+  // ============================================================
+  const weddingRoleAssignments = [
+    { userId: couple.id, weddingId: wedding1.id, role: 'COUPLE' as const },
+    // Weddings #2 and #3 are unowned (no ownerId) — no role rows needed
+  ];
+
+  for (const a of weddingRoleAssignments) {
+    await db.userWeddingRole.upsert({
+      where: { userId_weddingId_role: { userId: a.userId, weddingId: a.weddingId, role: a.role } },
+      update: {},
+      create: { userId: a.userId, weddingId: a.weddingId, role: a.role },
+    });
+  }
+  console.log(`✅ UserWeddingRole: ${weddingRoleAssignments.length} role assignments seeded`);
+
+  // ============================================================
   // 5. FEATURES — Wedding #1 gets all 11 features enabled.
   //    Weddings #2 and #3 get the 10 default wizard features.
   // ============================================================
@@ -403,11 +424,16 @@ async function seed() {
   console.log('RSVPs: 3 (Jerine Lim, Lim Eugene, Eugene Lim)');
   console.log('Wishes: 1 (Lim — "Cngrats")');
   console.log('Content sections: 9/9 (including getting-there)');
+
+  await db.$disconnect();
 }
 
+// Exit 0 on success, exit 1 on failure — so the Dockerfile CMD `&&` chain
+// stops (and the server does NOT start) when seeding genuinely fails, instead
+// of silently continuing with an empty database.
 seed()
+  .then(() => process.exit(0))
   .catch((e) => {
     console.error('Seed failed:', e);
     process.exit(1);
-  })
-  .finally(() => process.exit(0));
+  });

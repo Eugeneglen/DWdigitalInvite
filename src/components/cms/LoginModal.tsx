@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Loader2, LogOut, Eye, EyeOff, Info, KeyRound, Mail, ArrowLeft } from 'lucide-react';
 import { useAuthModalStore } from '@/store/useAuthModalStore';
+import { normalizePlatformRole } from '@/lib/permissions';
 
 type AuthView = 'login' | 'forgot-password';
 
@@ -114,8 +115,9 @@ export function LoginModal({ open, onOpenChange, variant = 'default', targetRole
   };
 
   const currentRole = session?.user?.role;
-  const currentIsAdmin = currentRole === 'SUPER_ADMIN' || currentRole === 'ACCOUNT_MANAGER';
-  const currentIsCouple = currentRole === 'COUPLE';
+  const normalizedRole = normalizePlatformRole(currentRole || '');
+  const currentIsAdmin = normalizedRole === 'SUPER_ADMIN' || normalizedRole === 'ACCOUNT_MANAGER_1' || normalizedRole === 'ACCOUNT_MANAGER_2' || normalizedRole === 'SUPPORT';
+  const currentIsCouple = normalizedRole === 'COUPLE';
 
   // If a targetRole is specified and the current session's role doesn't match,
   // treat it as "not authenticated" so the standard login form is shown.
