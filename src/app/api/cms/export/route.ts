@@ -51,10 +51,18 @@ export async function GET(req: NextRequest) {
     const type = searchParams.get('type') ?? '';
 
     switch (type) {
-      // ── Guests ──────────────────────────────────────────────
+      // ── Guests (with RSVP data cross-populated) ─────────
       case 'guests': {
         const guests = await db.guest.findMany({
           where: { weddingId },
+          include: {
+            rsvps: {
+              orderBy: { createdAt: 'desc' },
+              take: 1, // most recent RSVP submission
+              include: { guests: true },
+            },
+            wishes: { select: { id: true, createdAt: true } },
+          },
           orderBy: { createdAt: 'desc' },
         });
 
@@ -73,10 +81,32 @@ export async function GET(req: NextRequest) {
             'Sent Via',
             'Sent At',
             'Created At',
+            'RSVP Submitted At',
+            'Attendance',
+            'Party Size',
+            'Wish Count',
           ]),
         ];
 
         for (const g of guests) {
+          const latestRsvp = g.rsvps[0];
+          const attendance = latestRsvp?.guests?.[0]?.attendance
+            ? (latestRsvp.guests[0].attendance === 'yes'
+                ? 'Attending'
+                : latestRsvp.guests[0].attendance === 'no'
+                  ? 'Declined'
+                  : 'Partial')
+            : '';
+          // Dietary: prefer Guest.dietaryNotes (synced by Fix #1),
+          // fall back to latest RSVP response dietary (legacy data)
+          const dietaryDisplay =
+            g.dietaryNotes ||
+            latestRsvp?.guests
+              ?.map((gr: { dietary: string | null }) => gr.dietary)
+              .filter((d: string | null): d is string => !!d)
+              .join('; ') ||
+            '';
+          const wishCount = g.wishes?.length ?? 0;
           rows.push(
             csvRow([
               g.name,
@@ -88,10 +118,14 @@ export async function GET(req: NextRequest) {
               g.rsvpStatus,
               g.plusOne ? 'Yes' : 'No',
               g.plusOneName,
-              g.dietaryNotes,
+              dietaryDisplay,
               g.sentVia,
               g.sentAt?.toISOString() ?? '',
               g.createdAt.toISOString(),
+              latestRsvp?.createdAt?.toISOString() ?? '',
+              attendance,
+              latestRsvp?.partySize ?? '',
+              wishCount || '',
             ])
           );
         }
@@ -99,11 +133,14 @@ export async function GET(req: NextRequest) {
         return csvResponse(`guests-export-${new Date().toISOString().slice(0, 10)}.csv`, rows);
       }
 
-      // ── RSVPs ───────────────────────────────────────────────
+      // ── RSVPs (with Guest data cross-populated) ──────────
       case 'rsvps': {
         const rsvps = await db.rSVPSubmission.findMany({
           where: { weddingId },
-          include: { guests: true },
+          include: {
+            guests: true,
+            guest: { select: { id: true, name: true, invitationCode: true, groupName: true, tableNumber: true } },
+          },
           orderBy: { createdAt: 'desc' },
         });
 
@@ -112,6 +149,10 @@ export async function GET(req: NextRequest) {
             'Submitted By',
             'Party Size',
             'Submitted At',
+            'Linked Guest Name',
+            'Invitation Code',
+            'Group',
+            'Table Number',
             'Guest Name',
             'Attendance',
             'Dietary',
@@ -119,6 +160,11 @@ export async function GET(req: NextRequest) {
         ];
 
         for (const r of rsvps) {
+          const linkedGuestName = r.guest?.name ?? '';
+          const invitationCode = r.guest?.invitationCode ?? '';
+          const groupName = r.guest?.groupName ?? '';
+          const tableNumber = r.guest?.tableNumber ?? '';
+
           if (r.guests.length > 0) {
             for (const g of r.guests) {
               rows.push(
@@ -126,6 +172,10 @@ export async function GET(req: NextRequest) {
                   `${r.firstName} ${r.lastName}`,
                   r.partySize,
                   r.createdAt.toISOString(),
+                  linkedGuestName,
+                  invitationCode,
+                  groupName,
+                  tableNumber,
                   g.name,
                   g.attendance === 'yes'
                     ? 'Attending'
@@ -142,6 +192,10 @@ export async function GET(req: NextRequest) {
                 `${r.firstName} ${r.lastName}`,
                 r.partySize,
                 r.createdAt.toISOString(),
+                linkedGuestName,
+                invitationCode,
+                groupName,
+                tableNumber,
                 '—',
                 '—',
                 '',
@@ -153,21 +207,24 @@ export async function GET(req: NextRequest) {
         return csvResponse(`rsvps-export-${new Date().toISOString().slice(0, 10)}.csv`, rows);
       }
 
-      // ── Wishes ──────────────────────────────────────────────
+      // ── Wishes (with Guest data cross-populated) ─────────
       case 'wishes': {
         const wishes = await db.wish.findMany({
           where: { weddingId },
+          include: { guest: { select: { id: true, name: true, invitationCode: true } } },
           orderBy: { createdAt: 'desc' },
         });
 
         const rows: string[] = [
-          csvRow(['Name', 'Relationship', 'Message', 'Image URL', 'Created At']),
+          csvRow(['Name', 'Linked Guest Name', 'Invitation Code', 'Relationship', 'Message', 'Image URL', 'Created At']),
         ];
 
         for (const w of wishes) {
           rows.push(
             csvRow([
               w.name,
+              w.guest?.name ?? '',
+              w.guest?.invitationCode ?? '',
               w.relationship,
               w.message,
               w.imageUrl,

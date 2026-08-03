@@ -83,7 +83,6 @@ export async function GET() {
       { key: 'schedule', label: 'Event schedule created', done: wedding.schedules.length > 0 },
       { key: 'story', label: 'Love story added', done: wedding.stories.length > 0 },
       { key: 'faqs', label: 'FAQs created', done: wedding.faqs.length > 0 },
-      { key: 'gallery', label: 'Gallery photos uploaded', done: wedding.media.filter((m) => m.category === 'gallery').length > 0 },
       { key: 'guests', label: 'Guest list added', done: totalGuests > 0 },
       { key: 'content', label: 'Section content written', done: filledSections >= 5 },
       { key: 'features', label: 'Features configured', done: wedding.features.some((f) => f.isEnabled) },
@@ -132,16 +131,34 @@ export async function GET() {
     });
     const confirmedHeadcount = attendingGuests + confirmedPlusOnes;
 
-    // 3. Dietary requirements count (guests with dietary notes)
-    const dietaryCount = await db.guest.count({
-      where: {
-        weddingId: wedding.id,
-        AND: [
-          { dietaryNotes: { not: null } },
-          { dietaryNotes: { not: '' } },
-        ],
-      },
-    });
+    // 3. Dietary requirements count
+    //    Counts guests with dietary either in Guest.dietaryNotes OR in their RSVP GuestResponse.dietary
+    const [guestsWithDietaryNotes, guestsRsvpsWithDietary] = await Promise.all([
+      db.guest.findMany({
+        where: { weddingId: wedding.id, dietaryNotes: { not: '' } },
+        select: { id: true },
+      }),
+      db.guest.findMany({
+        where: {
+          weddingId: wedding.id,
+          rsvps: {
+            some: {
+              guests: {
+                some: {
+                  dietary: { not: null, not: '' },
+                },
+              },
+            },
+          },
+        },
+        select: { id: true },
+      }),
+    ]);
+    const dietaryGuestIds = new Set([
+      ...guestsWithDietaryNotes.map((g) => g.id),
+      ...guestsRsvpsWithDietary.map((g) => g.id),
+    ]);
+    const dietaryCount = dietaryGuestIds.size;
 
     // 4. Pending follow-ups (guests who haven't responded)
     const pendingFollowUps = guestsByStatus.PENDING || 0;

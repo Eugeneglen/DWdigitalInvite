@@ -181,7 +181,7 @@ async function seed() {
   console.log(`✅ Features: ${w1Features.length} for wedding #1, ${wizardFeatures.length} each for #2 & #3`);
 
   // ============================================================
-  // 6. CONTENT — Wedding #1: full 9/9 content sections (matches production)
+  // 6. CONTENT — Wedding #1: full 10/10 content sections (matches production)
   //    Sections: global, hero, schedule, getting-there, story, qa, wishes,
   //              moments, tea-ceremony
   // ============================================================
@@ -238,6 +238,23 @@ async function seed() {
     // ── tea-ceremony ──
     { section: 'tea-ceremony', fieldKey: 'title', fieldValue: 'The Tea Ceremony', fieldType: 'TEXT' },
     { section: 'tea-ceremony', fieldKey: 'label', fieldValue: 'The Tradition', fieldType: 'TEXT' },
+
+    // ── rsvp (guest-facing form text) ──
+    { section: 'rsvp', fieldKey: 'deadline', fieldValue: '', fieldType: 'TEXT' },
+    { section: 'rsvp', fieldKey: 'thankYouMessage', fieldValue: "Your RSVP has been received. We can't wait to celebrate with you, {name}!", fieldType: 'TEXT' },
+    { section: 'rsvp', fieldKey: 'declinedMessage', fieldValue: "We're sorry you can't make it, {name}. Your kind response means a lot to us.", fieldType: 'TEXT' },
+    { section: 'rsvp', fieldKey: 'ceremonyName', fieldValue: 'Wedding Solemnisation', fieldType: 'TEXT' },
+    { section: 'rsvp', fieldKey: 'optYes', fieldValue: 'Yes!', fieldType: 'TEXT' },
+    { section: 'rsvp', fieldKey: 'optPartial', fieldValue: "Yes, but I won't be staying for the reception", fieldType: 'TEXT' },
+    { section: 'rsvp', fieldKey: 'optNo', fieldValue: "I'm sorry, I won't be able to make it", fieldType: 'TEXT' },
+    { section: 'rsvp', fieldKey: 'dietaryOptions', fieldValue: 'Halal,Vegetarian,No Seafood', fieldType: 'TEXT' },
+    { section: 'rsvp', fieldKey: 'step0Title', fieldValue: 'Enter your name to RSVP', fieldType: 'TEXT' },
+    { section: 'rsvp', fieldKey: 'step0Subtext', fieldValue: 'You can respond for more guests in the following steps.', fieldType: 'TEXT' },
+    { section: 'rsvp', fieldKey: 'step1Title', fieldValue: 'How many people are in your party?', fieldType: 'TEXT' },
+    { section: 'rsvp', fieldKey: 'step2Title', fieldValue: 'Confirm each guest and their dietary needs.', fieldType: 'TEXT' },
+    { section: 'rsvp', fieldKey: 'step2Subtext', fieldValue: 'Dietary selections are optional.', fieldType: 'TEXT' },
+    { section: 'rsvp', fieldKey: 'resultThankYou', fieldValue: 'Thank you', fieldType: 'TEXT' },
+    { section: 'rsvp', fieldKey: 'resultWeMissYou', fieldValue: "We'll Miss You", fieldType: 'TEXT' },
   ];
 
   for (const item of contentItems) {
@@ -245,7 +262,7 @@ async function seed() {
       data: { weddingId: wedding1.id, ...item },
     });
   }
-  console.log(`✅ ${contentItems.length} content items across 9 sections seeded`);
+  console.log(`✅ ${contentItems.length} content items across 10 sections seeded`);
 
   // ============================================================
   // 7. SCHEDULE — Wedding #1 (4 events, matches production)
@@ -316,8 +333,8 @@ async function seed() {
   //     #2 Eugene Lim (party 2, mixed) → no wedding (orphaned, as on prod)
   //     #3 Eugene Lim (party 1, attending) → no wedding (orphaned, as on prod)
   // ============================================================
-  await db.rSVPSubmission.deleteMany({});
   await db.guestResponse.deleteMany({});
+  await db.rSVPSubmission.deleteMany({});
 
   const rsvp1 = await db.rSVPSubmission.create({
     data: {
@@ -423,7 +440,7 @@ async function seed() {
   console.log('Weddings: 3 (1 ACTIVE + 2 DRAFT)');
   console.log('RSVPs: 3 (Jerine Lim, Lim Eugene, Eugene Lim)');
   console.log('Wishes: 1 (Lim — "Cngrats")');
-  console.log('Content sections: 9/9 (including getting-there)');
+  console.log('Content sections: 10/10 (including rsvp)');
 
   await db.$disconnect();
 }

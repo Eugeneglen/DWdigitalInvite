@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Loader2, Mail, Search, CheckCircle, XCircle, MinusCircle, Users, Heart, Download } from 'lucide-react';
+import { Loader2, Mail, Search, CheckCircle, XCircle, MinusCircle, Download, Link2, UserPlus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -19,8 +19,6 @@ import SectionContentFields, { type ContentField } from './SectionContentFields'
 const API_BASE = '/api/cms/rsvps?XTransformPort=3000';
 
 const RSVP_CONTENT_FIELDS: ContentField[] = [
-  { key: 'title', label: 'Section Title', type: 'text', placeholder: 'e.g. RSVP' },
-  { key: 'subtitle', label: 'Section Subtitle', type: 'text', placeholder: 'e.g. Kindly respond by 1st November 2027' },
   { key: 'deadline', label: 'RSVP Deadline', type: 'text', placeholder: 'e.g. 2027-11-01' },
   { key: 'thankYouMessage', label: 'Thank You Message', type: 'textarea', placeholder: 'Message shown after RSVP submission...' },
   { key: 'declinedMessage', label: 'Declined Message', type: 'textarea', placeholder: 'Message shown when guest declines...' },
@@ -45,6 +43,14 @@ interface GuestResponse {
   dietary: string | null;
 }
 
+interface LinkedGuest {
+  id: string;
+  name: string;
+  invitationCode: string;
+  groupName: string | null;
+  tableNumber: number | null;
+}
+
 interface RSVPItem {
   id: string;
   firstName: string;
@@ -52,6 +58,8 @@ interface RSVPItem {
   partySize: number;
   createdAt: string;
   guests: GuestResponse[];
+  guestId: string | null;
+  guest: LinkedGuest | null;
 }
 
 function computeStatus(guests: GuestResponse[]): { label: string; color: string; icon: React.ElementType } {
@@ -85,6 +93,7 @@ export default function CoupleRSVPs() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [linking, setLinking] = useState<string | null>(null); // tracks which RSVP is being processed
 
   const fetchRSVPs = useCallback(async () => {
     try {
@@ -121,16 +130,6 @@ export default function CoupleRSVPs() {
     fetchRSVPs();
   }, [fetchRSVPs]);
 
-  // Stats
-  const totalAttending = rsvps.reduce(
-    (acc, r) => acc + r.guests.filter((g) => g.attendance === 'yes').length,
-    0
-  );
-  const totalDeclined = rsvps.reduce(
-    (acc, r) => acc + r.guests.filter((g) => g.attendance === 'no').length,
-    0
-  );
-
   const handleExportCSV = async () => {
     try {
       setExporting(true);
@@ -150,6 +149,32 @@ export default function CoupleRSVPs() {
       toast({ title: 'Error', description: 'Export failed', variant: 'destructive' });
     } finally {
       setExporting(false);
+    }
+  };
+
+  // Create a new Guest record from an unmatched RSVP submission
+  const handleCreateGuest = async (rsvpId: string) => {
+    try {
+      setLinking(rsvpId);
+      const res = await fetch(API_BASE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rsvpId }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to create guest');
+      }
+      toast({ title: 'Success', description: 'Guest created from RSVP' });
+      fetchRSVPs(); // refresh the list
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Failed to create guest',
+        variant: 'destructive',
+      });
+    } finally {
+      setLinking(null);
     }
   };
 
@@ -179,33 +204,8 @@ export default function CoupleRSVPs() {
           className="border-charcoal-ink/15 text-charcoal-ink hover:border-cinematic-gold hover:text-cinematic-gold rounded px-4 py-2 text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300 shrink-0"
         >
           {exporting ? <Loader2 className="size-4 mr-1.5 animate-spin" /> : <Download className="size-4 mr-1.5" />}
-          Export CSV
+          Export Detail
         </Button>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-xl border border-charcoal-ink/5 bg-white p-4 text-center">
-          <p className="text-2xl font-bold text-charcoal-ink">{total}</p>
-          <p className="text-xs text-charcoal-ink/40 mt-0.5 font-medium uppercase tracking-wider">Submissions</p>
-        </div>
-        <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 text-center">
-          <p className="text-2xl font-bold text-emerald-700">{totalAttending}</p>
-          <p className="text-xs text-emerald-600/60 mt-0.5 font-medium uppercase tracking-wider">Attending</p>
-        </div>
-        <div className="rounded-xl border border-red-100 bg-red-50/50 p-4 text-center">
-          <p className="text-2xl font-bold text-red-600">{totalDeclined}</p>
-          <p className="text-xs text-red-500/60 mt-0.5 font-medium uppercase tracking-wider">Declined</p>
-        </div>
-        <div className="rounded-xl border border-charcoal-ink/5 bg-white p-4 text-center">
-          <div className="flex items-center justify-center gap-1.5">
-            <Users className="size-4 text-charcoal-ink/40" />
-            <p className="text-2xl font-bold text-charcoal-ink">
-              {total > 0 ? Math.round((totalAttending / Math.max(totalAttending + totalDeclined, 1)) * 100) : 0}%
-            </p>
-          </div>
-          <p className="text-xs text-charcoal-ink/40 mt-0.5 font-medium uppercase tracking-wider">Attendance Rate</p>
-        </div>
       </div>
 
       {/* Search + Filter */}
@@ -268,13 +268,32 @@ export default function CoupleRSVPs() {
                         <p className="text-xs text-charcoal-ink/40">{formatDate(rsvp.createdAt)}</p>
                       </div>
                     </div>
-                    <Badge
-                      variant="outline"
-                      className={`text-[10px] font-medium flex items-center gap-1 ${status.color}`}
-                    >
-                      <StatusIcon className="size-3" />
-                      {status.label}
-                    </Badge>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {rsvp.guest ? (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] font-medium flex items-center gap-1 bg-cinematic-gold/5 text-cinematic-gold border-cinematic-gold/20"
+                        >
+                          <Link2 className="size-3" />
+                          {rsvp.guest.name}
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] font-medium flex items-center gap-1 bg-amber-50 text-amber-600 border-amber-200"
+                        >
+                          <MinusCircle className="size-3" />
+                          Unmatched
+                        </Badge>
+                      )}
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] font-medium flex items-center gap-1 ${status.color}`}
+                      >
+                        <StatusIcon className="size-3" />
+                        {status.label}
+                      </Badge>
+                    </div>
                   </div>
 
                   {/* Guest responses */}
@@ -307,6 +326,26 @@ export default function CoupleRSVPs() {
                       </span>
                     </div>
                   </div>
+
+                  {/* Action buttons for unmatched RSVPs */}
+                  {!rsvp.guest && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleCreateGuest(rsvp.id)}
+                        disabled={linking === rsvp.id}
+                        className="h-7 text-[11px] border-charcoal-ink/10 text-charcoal-ink/60 hover:border-cinematic-gold hover:text-cinematic-gold"
+                      >
+                        {linking === rsvp.id ? (
+                          <Loader2 className="size-3 mr-1 animate-spin" />
+                        ) : (
+                          <UserPlus className="size-3 mr-1" />
+                        )}
+                        Create Guest from RSVP
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );

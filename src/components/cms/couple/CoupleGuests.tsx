@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Loader2, Plus, Pencil, Trash2, Users, Search, Mail, Phone, UserPlus, Download, Upload, FileSpreadsheet, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, Users, Search, Mail, Phone, UserPlus, Download, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, UtensilsCrossed } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,18 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   PARTIAL: { label: 'Partial', color: 'bg-sky-50 text-sky-700 border-sky-200' },
 };
 
+interface RsvpGuestResponse {
+  dietary: string | null;
+  name: string;
+  attendance: string;
+}
+
+interface RsvpSubmissionBrief {
+  id: string;
+  createdAt: string;
+  guests: RsvpGuestResponse[];
+}
+
 interface GuestItem {
   id: string;
   name: string;
@@ -50,7 +62,8 @@ interface GuestItem {
   dietaryNotes: string | null;
   sentVia: string | null;
   sentAt: string | null;
-  _count?: { rsvps: number };
+  _count?: { rsvps: number; wishes: number };
+  rsvps?: RsvpSubmissionBrief[];
 }
 
 interface FormData {
@@ -216,14 +229,11 @@ export default function CoupleGuests() {
       if (params.length > 0) url += '&' + params.join('&');
 
       const res = await fetch(url);
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({}));
-        throw new Error(errBody.details || errBody.error || 'Failed to load guests');
-      }
+      if (!res.ok) throw new Error('Failed to load guests');
       const data = await res.json();
       setGuests(data.guests ?? []);
-    } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to load guest list', variant: 'destructive' });
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load guest list', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -427,12 +437,6 @@ export default function CoupleGuests() {
     }
   };
 
-  // Summary stats
-  const totalGuests = guests.length;
-  const attending = guests.filter((g) => g.rsvpStatus === 'ATTENDING').length;
-  const pending = guests.filter((g) => g.rsvpStatus === 'PENDING').length;
-  const declined = guests.filter((g) => g.rsvpStatus === 'DECLINED').length;
-
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -449,7 +453,8 @@ export default function CoupleGuests() {
         <div>
           <h2 className="text-xl font-semibold text-charcoal-ink">Guest Management</h2>
           <p className="text-sm text-charcoal-ink/50 mt-1">
-            Manage your guest list, track RSVPs, and send invitations.
+            Manage your guest list, track RSVPs, and send invitations.{' '}
+            <span className="text-charcoal-ink/70 font-medium">{guests.length} guest{guests.length !== 1 ? 's' : ''}</span>
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -481,26 +486,6 @@ export default function CoupleGuests() {
       </div>
 
       <Separator className="bg-champagne-silk" />
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-xl border border-charcoal-ink/5 bg-white p-4 text-center">
-          <p className="text-2xl font-bold text-charcoal-ink">{totalGuests}</p>
-          <p className="text-xs text-charcoal-ink/40 mt-0.5 font-medium uppercase tracking-wider">Total</p>
-        </div>
-        <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 text-center">
-          <p className="text-2xl font-bold text-emerald-700">{attending}</p>
-          <p className="text-xs text-emerald-600/60 mt-0.5 font-medium uppercase tracking-wider">Attending</p>
-        </div>
-        <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-4 text-center">
-          <p className="text-2xl font-bold text-amber-700">{pending}</p>
-          <p className="text-xs text-amber-600/60 mt-0.5 font-medium uppercase tracking-wider">Pending</p>
-        </div>
-        <div className="rounded-xl border border-red-100 bg-red-50/50 p-4 text-center">
-          <p className="text-2xl font-bold text-red-600">{declined}</p>
-          <p className="text-xs text-red-500/60 mt-0.5 font-medium uppercase tracking-wider">Declined</p>
-        </div>
-      </div>
 
       {/* Search + Filter */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -601,11 +586,20 @@ export default function CoupleGuests() {
                           Plus one: {guest.plusOneName}
                         </p>
                       )}
-                      {guest.dietaryNotes && (
-                        <p className="text-xs text-charcoal-ink/40 mt-0.5">
-                          Dietary: {guest.dietaryNotes}
-                        </p>
-                      )}
+                      {(() => {
+                        const rsvpDietary = guest.rsvps?.[0]?.guests
+                          ?.map((g) => g.dietary)
+                          .filter((d): d is string => !!d && d.trim().length > 0)
+                          .join('; ');
+                        const effectiveDietary = guest.dietaryNotes || rsvpDietary;
+                        if (!effectiveDietary) return null;
+                        return (
+                          <p className="text-xs text-red-600 font-medium mt-0.5 flex items-center gap-1">
+                            <UtensilsCrossed className="size-3" />
+                            Dietary: {effectiveDietary}
+                          </p>
+                        );
+                      })()}
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">

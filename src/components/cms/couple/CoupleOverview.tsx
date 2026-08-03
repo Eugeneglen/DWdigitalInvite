@@ -14,6 +14,7 @@ import {
   Utensils,
   AlertCircle,
   UserCheck,
+  Users,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -100,7 +101,6 @@ const CHECKLIST_PAGE_MAP: Record<string, CoupleCMSPage> = {
   schedule: 'schedule',
   story: 'story',
   faqs: 'faqs',
-  gallery: 'images',
   guests: 'guests',
   content: 'content',
   features: 'features',
@@ -427,9 +427,31 @@ export default function CoupleOverview() {
         </div>
       )}
 
-      {/* 3. Snapshot KPIs — 6 cards, mode-aware (2x3 on mobile, 3x2 on md+) */}
+      {/* 3. Snapshot KPIs — 7 cards, mode-aware (2x4 on mobile, 3+3+1 on md+) */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        {/* KPI 1: Days until wedding (both modes) */}
+        {/* KPI 1: Total Guests (both modes) */}
+        <Card className="py-0">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-cinematic-gold/10 text-cinematic-gold shrink-0">
+              <Users className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+                Total Guests
+              </p>
+              <p className="text-xl font-bold text-charcoal-ink leading-tight">
+                {guests.total}
+              </p>
+              <p className="text-[11px] text-charcoal-ink/40">
+                {guests.totalWithPlusOne > guests.total
+                  ? `incl. ${guests.totalWithPlusOne - guests.total} plus-one${guests.totalWithPlusOne - guests.total !== 1 ? 's' : ''}`
+                  : 'on your list'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* KPI 2: Days until wedding (both modes) */}
         <Card className="py-0">
           <CardContent className="p-4 flex items-center gap-3">
             <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-cinematic-gold/10 text-cinematic-gold shrink-0">
@@ -449,7 +471,7 @@ export default function CoupleOverview() {
           </CardContent>
         </Card>
 
-        {/* KPI 2: Mode-aware — Confirmed headcount (RELIABLE) or RSVPs received (EMPTY/INCOMPLETE) */}
+        {/* KPI 3: Mode-aware — Confirmed headcount (RELIABLE) or RSVPs received (EMPTY/INCOMPLETE) */}
         {isReliable ? (
           <Card className="py-0">
             <CardContent className="p-4 flex items-center gap-3">
@@ -492,7 +514,7 @@ export default function CoupleOverview() {
           </Card>
         )}
 
-        {/* KPI 3: Mode-aware — Response rate (RELIABLE) or Declined (EMPTY/INCOMPLETE) */}
+        {/* KPI 4: Mode-aware — Response rate (RELIABLE) or Declined (EMPTY/INCOMPLETE) */}
         {isReliable ? (
           <Card className="py-0">
             <CardContent className="p-4 flex items-center gap-3">
@@ -533,7 +555,7 @@ export default function CoupleOverview() {
           </Card>
         )}
 
-        {/* KPI 4: Mode-aware — Pending follow-ups (RELIABLE) or Unmatched RSVPs (EMPTY/INCOMPLETE) */}
+        {/* KPI 5: Mode-aware — Pending follow-ups (RELIABLE) or Unmatched RSVPs (EMPTY/INCOMPLETE) */}
         {isReliable ? (
           <Card
             className="py-0 cursor-pointer hover:border-cinematic-gold/30 transition-colors"
@@ -580,7 +602,7 @@ export default function CoupleOverview() {
           </Card>
         )}
 
-        {/* KPI 5: Dietary requirements (both modes) */}
+        {/* KPI 6: Dietary requirements (both modes) */}
         <Card className="py-0">
           <CardContent className="p-4 flex items-center gap-3">
             <div className={`flex items-center justify-center h-10 w-10 rounded-lg shrink-0 ${dietaryCount > 0 ? 'bg-violet-50 text-violet-600' : 'bg-cinematic-gold/10 text-cinematic-gold'}`}>
@@ -600,7 +622,7 @@ export default function CoupleOverview() {
           </CardContent>
         </Card>
 
-        {/* KPI 6: New wishes this week (both modes) */}
+        {/* KPI 7: New wishes this week (both modes) */}
         <Card className="py-0">
           <CardContent className="p-4 flex items-center gap-3">
             <div className={`flex items-center justify-center h-10 w-10 rounded-lg shrink-0 ${newWishesThisWeek > 0 ? 'bg-rose-50 text-rose-500' : 'bg-cinematic-gold/10 text-cinematic-gold'}`}>
