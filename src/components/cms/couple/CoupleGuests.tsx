@@ -216,11 +216,14 @@ export default function CoupleGuests() {
       if (params.length > 0) url += '&' + params.join('&');
 
       const res = await fetch(url);
-      if (!res.ok) throw new Error('Failed to load guests');
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.details || errBody.error || 'Failed to load guests');
+      }
       const data = await res.json();
       setGuests(data.guests ?? []);
-    } catch {
-      toast({ title: 'Error', description: 'Failed to load guest list', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to load guest list', variant: 'destructive' });
     } finally {
       setLoading(false);
     }

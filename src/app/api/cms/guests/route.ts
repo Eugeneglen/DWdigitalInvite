@@ -109,19 +109,20 @@ export async function GET(req: NextRequest) {
       where.groupName = group;
     }
 
+    // NOTE: _count include removed — it generates a correlated subquery per guest
+    // on PostgreSQL with no index on RSVPSubmission.guestId, causing timeouts on
+    // constrained Railway instances. The frontend does not use this count.
     const guests = await db.guest.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       take: 200,
-      include: {
-        _count: { select: { rsvps: true } },
-      },
     });
 
     return NextResponse.json({ guests });
   } catch (error) {
-    console.error('Get guests error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('Get guests error:', msg, error instanceof Error ? error.stack : '');
+    return NextResponse.json({ error: 'Failed to fetch guests', details: msg }, { status: 500 });
   }
 }
 
