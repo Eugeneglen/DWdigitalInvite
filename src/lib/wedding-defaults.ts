@@ -8,8 +8,9 @@
  * Only hero/title and hero/dateDisplay are substituted with the new
  * couple's details. Everything else is copied verbatim from the template.
  *
- * Images are stored as local paths (not base64) in the template, keeping
- * it lightweight. Couples replace them with their own uploads.
+ * Images are stored as absolute production URLs or external hosted URLs
+ * (not base64) in the template, keeping it lightweight. Couples replace
+ * them with their own uploads.
  */
 
 import { db } from '@/lib/db';
@@ -213,6 +214,21 @@ export async function seedDefaultWeddingContent(info: WeddingCreateInfo): Promis
       update: { fieldValue: item.fieldValue },
       create: { weddingId, ...item },
     });
+  }
+
+  // ── 7. Apply hero/banner URLs from content to WeddingAccount columns ──
+  // The template stores hero/banner URLs as content items (section='hero',
+  // fieldKey='heroImageUrl'|'bannerUrl'|'heroVideoUrl'). The live site reads
+  // these from WeddingAccount columns, so we must copy them there.
+  const heroImage = contentItems.find((c) => c.section === 'hero' && c.fieldKey === 'heroImageUrl');
+  const banner = contentItems.find((c) => c.section === 'hero' && c.fieldKey === 'bannerUrl');
+  const heroVideo = contentItems.find((c) => c.section === 'hero' && c.fieldKey === 'heroVideoUrl');
+  const accountUpdate: Record<string, string | null> = {};
+  if (heroImage?.fieldValue) accountUpdate.heroImageUrl = heroImage.fieldValue;
+  if (banner?.fieldValue) accountUpdate.bannerUrl = banner.fieldValue;
+  if (heroVideo?.fieldValue) accountUpdate.heroVideoUrl = heroVideo.fieldValue;
+  if (Object.keys(accountUpdate).length > 0) {
+    await db.weddingAccount.update({ where: { id: weddingId }, data: accountUpdate });
   }
 
   return {

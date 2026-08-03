@@ -5,6 +5,30 @@ import { db } from '@/lib/db';
 import { hasPlatformPermission } from '@/lib/permissions';
 import { z } from 'zod/v4';
 
+// ── Production asset base URL ────────────────────────────────────
+// When replacing base64 images during cloning, use absolute URLs
+// pointing to the production deployment so images resolve on ANY
+// environment (local dev, staging, production).
+const PRODUCTION_BASE = 'https://dwdigitalinvite-production.up.railway.app';
+
+/**
+ * Smart placeholder resolver: maps a base64 image to the best
+ * matching placeholder image on the production server, based on
+ * which section/field it belongs to.
+ */
+function resolveImagePlaceholder(section: string, fieldKey: string, fallback: string): string {
+  const key = fieldKey.toLowerCase();
+  const sec = section.toLowerCase();
+  // Map known image fields to their production placeholder
+  if (key.includes('heroimageurl') || key.includes('hero')) return `${PRODUCTION_BASE}/wedding-images/hero-portrait.png`;
+  if (key.includes('banner')) return `${PRODUCTION_BASE}/wedding-images/banner-bg.png`;
+  if (key.includes('venue') || key.includes('ceremonyvenue')) return `${PRODUCTION_BASE}/wedding-images/ceremony-venue.png`;
+  if (key.includes('teaceremony')) return `${PRODUCTION_BASE}/wedding-images/tea-ceremony.png`;
+  // Story images — cycle through milestones by order
+  if (sec === 'story' || sec === 'moments') return `${PRODUCTION_BASE}/wedding-images/story-hero.png`;
+  return `${PRODUCTION_BASE}${fallback}`;
+}
+
 // GET /api/master/content-templates — list all content templates
 export async function GET(req: NextRequest) {
   try {
@@ -91,11 +115,11 @@ export async function POST(req: NextRequest) {
         select: { section: true, fieldKey: true, fieldValue: true, fieldType: true },
         orderBy: [{ section: 'asc' }, { fieldKey: 'asc' }],
       });
-      // Replace base64 with placeholder
+      // Replace base64 images with production placeholder URLs
       const contentCleaned = contentItems.map((item) => ({
         ...item,
         fieldValue: item.fieldValue?.startsWith('data:')
-          ? '/wedding-images/hero-portrait.png'
+          ? resolveImagePlaceholder(item.section, item.fieldKey, '/wedding-images/hero-portrait.png')
           : item.fieldValue,
       }));
 
@@ -118,7 +142,9 @@ export async function POST(req: NextRequest) {
       });
       const storiesCleaned = storyItems.map((item) => ({
         ...item,
-        imageUrl: item.imageUrl?.startsWith('data:') ? '/wedding-images/story-hero.png' : item.imageUrl,
+        imageUrl: item.imageUrl?.startsWith('data:')
+          ? resolveImagePlaceholder('story', 'imageUrl', '/wedding-images/story-hero.png')
+          : item.imageUrl,
       }));
 
       const mediaItems = await db.weddingMedia.findMany({
@@ -126,21 +152,86 @@ export async function POST(req: NextRequest) {
         select: { url: true, thumbnailUrl: true, fileName: true, fileType: true, category: true, sortOrder: true },
         orderBy: { sortOrder: 'asc' },
       });
-      const mediaCleaned = mediaItems.map((item) => ({
-        ...item,
-        url: item.url?.startsWith('data:') ? '/wedding-images/gallery-1.png' : item.url,
-        thumbnailUrl: item.thumbnailUrl?.startsWith('data:') ? '/wedding-images/gallery-1.png' : item.thumbnailUrl,
-      }));
+      // Gallery: cycle through gallery-N.png based on sort order
+      const mediaCleaned = mediaItems.map((item, idx) => {
+        const galleryNum = (idx % 7) + 1; // gallery-1 through gallery-7
+        const galleryUrl = `${PRODUCTION_BASE}/wedding-images/gallery-${galleryNum}.png`;
+        return {
+          ...item,
+          url: item.url?.startsWith('data:') ? galleryUrl : item.url,
+          thumbnailUrl: item.thumbnailUrl?.startsWith('data:') ? galleryUrl : item.thumbnailUrl,
+        };
+      });
 
       contentData = JSON.stringify(contentCleaned);
       scheduleData = JSON.stringify(scheduleItems);
       faqsData = JSON.stringify(faqItems);
       storiesData = JSON.stringify(storiesCleaned);
       mediaData = JSON.stringify(mediaCleaned);
+
+      // ── Extract theme from wedding's global section content ────────
+      // The wedding stores theme values as WeddingContent rows with
+      // section='global' and fieldKeys like backgroundColor, textColor, etc.
+      // When a template is applied to a new wedding (wedding-defaults.ts),
+      // these rows are upserted from the template's `theme` column.
+      // Clone must do the reverse: reconstruct the theme JSON from these rows.
+      const globalItems = contentItems.filter((c) => c.section === 'global');
+      const getField = (key: string) => globalItems.find((c) => c.fieldKey === key)?.fieldValue || '';
+
+      // Extract whatever theme values exist; fall back to defaults for
+      // the rest. This handles weddings that only partially customized
+      // their theme (e.g. only changed the background color).
       themeData = JSON.stringify({
-        colors: { bg: '#FDF8F0', text: '#2C2C2C', accent: '#D4AF37', secondary: '#8B7355', muted: '#A09888' },
-        fonts: { heading: 'Playfair Display', body: 'Lato' },
+        colors: {
+          bg: getField('backgroundColor') || '#FDF8F0',
+          text: getField('textColor') || '#2C2C2C',
+          accent: getField('accentColor') || '#D4AF37',
+          secondary: getField('secondaryColor') || '#8B7355',
+          muted: getField('mutedColor') || '#A09888',
+        },
+        fonts: {
+          heading: getField('fontFamily') || 'Playfair Display',
+          body: getField('bodyFont') || 'Lato',
+        },
       });
+
+      // ── Inject hero/banner URLs from WeddingAccount into content ───
+      // The live site reads hero/banner from WeddingAccount columns, not
+      // WeddingContent. We inject them into the content JSON so the
+      // template editor can display them, and they get applied to new
+      // weddings via the content-clone path.
+      if (wedding.heroImageUrl || wedding.bannerUrl || wedding.heroVideoUrl) {
+        const contentArr = JSON.parse(contentData);
+        if (wedding.heroImageUrl) {
+          contentArr.push({
+            section: 'hero',
+            fieldKey: 'heroImageUrl',
+            fieldValue: wedding.heroImageUrl.startsWith('data:')
+              ? resolveImagePlaceholder('hero', 'heroImageUrl', '/wedding-images/hero-portrait.png')
+              : wedding.heroImageUrl,
+            fieldType: 'IMAGE',
+          });
+        }
+        if (wedding.bannerUrl) {
+          contentArr.push({
+            section: 'hero',
+            fieldKey: 'bannerUrl',
+            fieldValue: wedding.bannerUrl.startsWith('data:')
+              ? resolveImagePlaceholder('hero', 'bannerUrl', '/wedding-images/banner-bg.png')
+              : wedding.bannerUrl,
+            fieldType: 'IMAGE',
+          });
+        }
+        if (wedding.heroVideoUrl) {
+          contentArr.push({
+            section: 'hero',
+            fieldKey: 'heroVideoUrl',
+            fieldValue: wedding.heroVideoUrl,
+            fieldType: 'TEXT',
+          });
+        }
+        contentData = JSON.stringify(contentArr);
+      }
     } else {
       // Create empty template
       contentData = JSON.stringify([]);
@@ -188,7 +279,7 @@ export async function POST(req: NextRequest) {
 const updateTemplateSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(2).optional(),
-  description: z.string().optional(),
+  description: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
   content: z.string().optional(),   // JSON string of content items
   schedule: z.string().optional(),  // JSON string of schedule items

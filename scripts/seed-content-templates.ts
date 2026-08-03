@@ -6,6 +6,12 @@
  * (to keep the template lightweight), and stores everything as JSON in the
  * ContentTemplate table.
  *
+ * Theme is extracted from the wedding's `global` section WeddingContent rows
+ * (matching the reverse of wedding-defaults.ts apply logic).
+ *
+ * Hero/banner URLs from WeddingAccount columns are injected into the content
+ * JSON so they get applied to new weddings.
+ *
  * Idempotent — uses upsert by name.
  *
  * Usage: bun run scripts/seed-content-templates.ts
@@ -15,6 +21,7 @@ import { PrismaClient } from '@prisma/client';
 const db = new PrismaClient();
 
 const GOLD_STANDARD_SLUG = 'eleanor-james-2027';
+const TEMPLATE_NAME = 'Gold Standard Template';
 
 // Local image paths to replace base64 data URLs
 const LOCAL_IMAGE_MAP: Record<string, string> = {
@@ -40,8 +47,8 @@ const LOCAL_IMAGE_MAP: Record<string, string> = {
   schedule_2: '/wedding-images/celebration-venue.png',
 };
 
-// Classic Elegance theme (from src/lib/wedding-templates.ts)
-const CLASSIC_ELEGANCE_THEME = {
+// Fallback theme used only when the wedding has NO global section content
+const FALLBACK_THEME = {
   colors: {
     bg: '#FDF8F0',
     text: '#2C2C2C',
@@ -55,22 +62,6 @@ const CLASSIC_ELEGANCE_THEME = {
   },
 };
 
-/**
- * Replace base64 data URLs with local image paths.
- * If the value is a base64 data URL (starts with "data:"), replace with the
- * corresponding local path. Otherwise keep the original value.
- */
-function replaceBase64Images(value: string): string {
-  if (!value) return value;
-  // Check if it's a base64 data URL
-  if (value.startsWith('data:image/')) {
-    // Can't identify which image it is from base64, return a generic placeholder
-    // The specific replacements happen in the structured extraction below
-    return '/wedding-images/hero-portrait.png';
-  }
-  return value;
-}
-
 async function main() {
   console.log('━'.repeat(60));
   console.log('Seeding ContentTemplate from gold standard wedding');
@@ -78,7 +69,7 @@ async function main() {
 
   const goldStandard = await db.weddingAccount.findUnique({
     where: { slug: GOLD_STANDARD_SLUG },
-    select: { id: true },
+    select: { id: true, heroImageUrl: true, bannerUrl: true, heroVideoUrl: true },
   });
 
   if (!goldStandard) {
@@ -96,10 +87,10 @@ async function main() {
   // Replace base64 images with local paths
   const contentCleaned = contentItems.map((item) => {
     let fieldValue = item.fieldValue;
-    if (item.section === 'hero' && item.fieldKey === 'teaCeremonyImage' && fieldValue.startsWith('data:')) {
+    if (item.section === 'hero' && item.fieldKey === 'teaCeremonyImage' && fieldValue?.startsWith('data:')) {
       fieldValue = LOCAL_IMAGE_MAP.tea_ceremony;
     }
-    if (item.section === 'getting-there' && item.fieldKey === 'venueImage' && fieldValue.startsWith('data:')) {
+    if (item.section === 'getting-there' && item.fieldKey === 'venueImage' && fieldValue?.startsWith('data:')) {
       fieldValue = LOCAL_IMAGE_MAP.venue;
     }
     return { section: item.section, fieldKey: item.fieldKey, fieldValue, fieldType: item.fieldType };
@@ -161,9 +152,74 @@ async function main() {
   });
   console.log(`  ✓ Media: ${mediaCleaned.length} items`);
 
-  // ── 6. Upsert the ContentTemplate ─────────────────────────────────────
+  // ── 6. Extract theme from wedding's global section content ────────────
+  // The wedding stores theme values as WeddingContent rows with
+  // section='global' and fieldKeys like backgroundColor, textColor, etc.
+  // This is the reverse of wedding-defaults.ts step 6.
+  const globalItems = contentCleaned.filter((c) => c.section === 'global');
+  const getField = (key: string) => globalItems.find((c) => c.fieldKey === key)?.fieldValue || '';
+
+  const extractedBg = getField('backgroundColor');
+  const extractedText = getField('textColor');
+  const extractedAccent = getField('accentColor');
+
+  // Use extracted values if the primary background color exists; fall back
+  // the rest to defaults. This handles weddings that only partially
+  // customized their theme (e.g. only changed the background).
+  const themeData = {
+    colors: {
+      bg: extractedBg || FALLBACK_THEME.colors.bg,
+      text: getField('textColor') || FALLBACK_THEME.colors.text,
+      accent: getField('accentColor') || FALLBACK_THEME.colors.accent,
+      secondary: getField('secondaryColor') || FALLBACK_THEME.colors.secondary,
+      muted: getField('mutedColor') || FALLBACK_THEME.colors.muted,
+    },
+    fonts: {
+      heading: getField('fontFamily') || FALLBACK_THEME.fonts.heading,
+      body: getField('bodyFont') || FALLBACK_THEME.fonts.body,
+    },
+  };
+  console.log(`  ✓ Theme: bg=${themeData.colors.bg} accent=${themeData.colors.accent} font=${themeData.fonts.heading}`);
+
+  // ── 7. Inject hero/banner URLs from WeddingAccount into content ─────────
+  // The live site reads hero/banner from WeddingAccount columns, not
+  // WeddingContent. We inject them so the template editor can display them
+  // and they get applied to new weddings via wedding-defaults.ts step 7.
+  if (goldStandard.heroImageUrl) {
+    contentCleaned.push({
+      section: 'hero',
+      fieldKey: 'heroImageUrl',
+      fieldValue: goldStandard.heroImageUrl.startsWith('data:')
+        ? LOCAL_IMAGE_MAP.moments_1 // placeholder for base64
+        : goldStandard.heroImageUrl,
+      fieldType: 'IMAGE',
+    });
+    console.log(`  ✓ Hero image URL injected`);
+  }
+  if (goldStandard.bannerUrl) {
+    contentCleaned.push({
+      section: 'hero',
+      fieldKey: 'bannerUrl',
+      fieldValue: goldStandard.bannerUrl.startsWith('data:')
+        ? LOCAL_IMAGE_MAP.moments_1
+        : goldStandard.bannerUrl,
+      fieldType: 'IMAGE',
+    });
+    console.log(`  ✓ Banner URL injected`);
+  }
+  if (goldStandard.heroVideoUrl) {
+    contentCleaned.push({
+      section: 'hero',
+      fieldKey: 'heroVideoUrl',
+      fieldValue: goldStandard.heroVideoUrl,
+      fieldType: 'TEXT',
+    });
+    console.log(`  ✓ Hero video URL injected`);
+  }
+
+  // ── 8. Upsert the ContentTemplate ─────────────────────────────────────
   const template = await db.contentTemplate.upsert({
-    where: { name: 'Classic Elegance' },
+    where: { name: TEMPLATE_NAME },
     update: {
       description: 'Timeless cream and gold palette with elegant serif typography. The default template for all new couples.',
       isDefault: true,
@@ -174,10 +230,10 @@ async function main() {
       faqs: JSON.stringify(faqItems),
       stories: JSON.stringify(storiesCleaned),
       media: JSON.stringify(mediaCleaned),
-      theme: JSON.stringify(CLASSIC_ELEGANCE_THEME),
+      theme: JSON.stringify(themeData),
     },
     create: {
-      name: 'Classic Elegance',
+      name: TEMPLATE_NAME,
       description: 'Timeless cream and gold palette with elegant serif typography. The default template for all new couples.',
       isDefault: true,
       isActive: true,
@@ -187,7 +243,7 @@ async function main() {
       faqs: JSON.stringify(faqItems),
       stories: JSON.stringify(storiesCleaned),
       media: JSON.stringify(mediaCleaned),
-      theme: JSON.stringify(CLASSIC_ELEGANCE_THEME),
+      theme: JSON.stringify(themeData),
     },
   });
 
@@ -198,7 +254,7 @@ async function main() {
   console.log(`   FAQs: ${faqItems.length} items`);
   console.log(`   Stories: ${storiesCleaned.length} items`);
   console.log(`   Media: ${mediaCleaned.length} items`);
-  console.log(`   Theme: Classic Elegance colors + fonts`);
+  console.log(`   Theme: bg=${themeData.colors.bg} accent=${themeData.colors.accent}`);
   console.log(`   Images: local paths (no base64 data stored in template)`);
 
   await db.$disconnect();
