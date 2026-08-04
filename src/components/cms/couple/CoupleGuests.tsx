@@ -109,6 +109,7 @@ interface ParsedRow {
 interface ImportResult {
   success: boolean;
   created: number;
+  updated: number;
   skipped: number;
   errors: Array<{ row: number; name: string; error: string }>;
 }
@@ -811,9 +812,15 @@ export default function CoupleGuests() {
                   <p className="text-sm font-semibold text-emerald-800">
                     Successfully imported {importResult.created} guest{importResult.created !== 1 ? 's' : ''}
                   </p>
+                  {importResult.updated > 0 && (
+                    <p className="text-xs text-sky-600/70 mt-0.5">
+                      {importResult.updated} existing guest{importResult.updated !== 1 ? 's' : ''} matched &amp; updated
+                      {importResult.created === 0 && ' (no new guests added)'}
+                    </p>
+                  )}
                   {importResult.skipped > 0 && (
-                    <p className="text-xs text-emerald-600/70 mt-0.5">
-                      {importResult.skipped} guest{importResult.skipped !== 1 ? 's were' : ' was'} skipped (duplicates)
+                    <p className="text-xs text-amber-600/70 mt-0.5">
+                      {importResult.skipped} row{importResult.skipped !== 1 ? 's' : ''} skipped due to errors
                     </p>
                   )}
                 </div>
