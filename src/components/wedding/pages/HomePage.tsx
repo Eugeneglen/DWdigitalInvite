@@ -6,6 +6,7 @@ import { usePublicWedding } from '@/hooks/usePublicWedding'
 import { useWeddingSlug } from '@/hooks/useWeddingSlug';;
 import { useLiveWeddingData } from '@/hooks/useLiveWeddingData';
 import { useImageAutoContrast } from '@/hooks/useImageAutoContrast';
+import { useHeroAutoContrast } from '@/hooks/useHeroAutoContrast';
 
 const FALLBACK_HERO_IMG =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuBeAe38AA5-0h4B5MmgQCqv54oQXyPMGznDKaw2sJI_FnTbB_yXXWOpirFlFycj_2VI02IVLouUTt86Y1J7Ls-bRsMOHPAcfSqruVoh87sfhw3vi2Z6t1C7ogCLtkvF6QbJkwuV0av8pXTrUeAAi6ymnZpvyOr8qVjTNNorAOmqRrW_fohX_xlkscmBh39K4Wtvs6TH0Nvb_X3LQQRD9W_sySN_iWbWw9O0au8u1jO-hSekE9pSGNo5zsTz3o9PWy5xbzc6lq3knkIy';
@@ -75,6 +76,9 @@ export default function HomePage() {
   // banner IMAGE pixels (not the page background) to pick text colour.
   const { textColor: bannerTextColor, subtitleColor: bannerSubtitleColor, textShadow: bannerTextShadow } = useImageAutoContrast(bannerUrl);
   const heroVideoUrl = data?.wedding.heroVideoUrl || null;
+
+  // Hero section auto-contrast — samples the BOTTOM of the image where text sits
+  const heroContrast = useHeroAutoContrast(heroImgUrl, heroVideoUrl);
   const coupleName = getField('hero', 'title') || data?.wedding.coupleName || FALLBACK_COUPLE_NAME;
   const heroSubtitle = getField('hero', 'subtitle', '');
   const dateText = getField('hero', 'dateDisplay') || formatDate(data?.wedding.weddingDate);
@@ -189,17 +193,45 @@ export default function HomePage() {
             )}
           </div>
 
+          {/* Bottom gradient overlay — ensures text readability on busy images */}
+          <div
+            className="absolute inset-0 z-[1] pointer-events-none"
+            style={{
+              background: heroContrast.isDark
+                ? 'linear-gradient(to bottom, rgba(0,0,0,0) 30%, rgba(0,0,0,0.55) 100%)'
+                : 'linear-gradient(to bottom, rgba(255,255,255,0) 30%, rgba(255,255,255,0.6) 100%)',
+            }}
+          />
+
           {/* Content Overlay */}
           <div className="relative z-10 w-full px-8 md:px-24 pb-20 md:pb-32 flex flex-col items-center text-center">
             {/* Master Date Badge */}
-            <div className="animate-fade-in delay-100 mb-8 inline-flex items-center justify-center border border-champagne-silk px-6 py-2 rounded-full bg-paper-cream/10 backdrop-blur-sm">
-              <span className="font-label-sm text-label-sm leading-label-sm text-paper-cream tracking-[0.2em] uppercase font-semibold">
+            <div
+              className="animate-fade-in delay-100 mb-8 inline-flex items-center justify-center border px-6 py-2 rounded-full backdrop-blur-sm"
+              style={{
+                borderColor: heroContrast.borderColor,
+                backgroundColor: heroContrast.cardBg,
+              }}
+            >
+              <span
+                className="font-label-sm text-label-sm leading-label-sm tracking-[0.2em] uppercase font-semibold"
+                style={{
+                  color: heroContrast.textColor,
+                  textShadow: heroContrast.textShadow,
+                }}
+              >
                 {dateText}
               </span>
             </div>
 
             {/* Description */}
-            <p className="animate-slide-up delay-300 font-body-md text-body-md leading-body-md text-paper-cream/80 max-w-md mx-auto mb-12 italic">
+            <p
+              className="animate-slide-up delay-300 font-body-md text-body-md leading-body-md max-w-md mx-auto mb-12 italic"
+              style={{
+                color: heroContrast.textColorMuted,
+                textShadow: heroContrast.textShadow,
+              }}
+            >
               {heroDescription}
             </p>
 
@@ -211,11 +243,30 @@ export default function HomePage() {
                 { value: countdown.mins, label: 'MINS' },
                 { value: countdown.secs, label: 'SECS' },
               ].map((item) => (
-                <div key={item.label} className="flex flex-col items-center justify-center rounded-lg border border-champagne-silk bg-paper-cream/10 backdrop-blur-sm py-4 md:py-5">
-                  <span className="font-display-hero text-3xl md:text-4xl font-bold text-paper-cream leading-none">
+                <div
+                  key={item.label}
+                  className="flex flex-col items-center justify-center rounded-lg border backdrop-blur-sm py-4 md:py-5"
+                  style={{
+                    borderColor: heroContrast.borderColor,
+                    backgroundColor: heroContrast.cardBg,
+                  }}
+                >
+                  <span
+                    className="font-display-hero text-3xl md:text-4xl font-bold leading-none"
+                    style={{
+                      color: heroContrast.textColor,
+                      textShadow: heroContrast.textShadowStrong,
+                    }}
+                  >
                     {String(item.value).padStart(2, '0')}
                   </span>
-                  <span className="font-label-sm text-[9px] md:text-[10px] text-paper-cream/80 tracking-widest uppercase mt-2 font-semibold">
+                  <span
+                    className="font-label-sm text-[9px] md:text-[10px] tracking-widest uppercase mt-2 font-semibold"
+                    style={{
+                      color: heroContrast.textColorMuted,
+                      textShadow: heroContrast.textShadow,
+                    }}
+                  >
                     {item.label}
                   </span>
                 </div>
@@ -226,13 +277,17 @@ export default function HomePage() {
           {/* Live RSVP Counter */}
           {isConnected && displayRsvpCount > 0 && (
             <div
-              className={`mt-6 animate-fade-in flex items-center justify-center gap-2 transition-all duration-500 ${
+              className={`relative z-10 mt-6 animate-fade-in flex items-center justify-center gap-2 transition-all duration-500 ${
                 rsvpFlash ? 'scale-105' : 'scale-100'
               }`}
+              style={{ textShadow: heroContrast.textShadow }}
             >
               <span className="text-base">🎉</span>
-              <span className="font-label-sm text-label-sm text-paper-cream/90 tracking-wide">
-                <span className="font-bold text-paper-cream">{displayRsvpCount}</span>{' '}
+              <span
+                className="font-label-sm text-label-sm tracking-wide"
+                style={{ color: heroContrast.textColorMuted }}
+              >
+                <span className="font-bold" style={{ color: heroContrast.textColor }}>{displayRsvpCount}</span>{' '}
                 {displayRsvpCount === 1 ? 'guest has' : 'guests have'} RSVP'd
               </span>
               <span className="relative flex h-2 w-2 ml-1">
@@ -243,9 +298,22 @@ export default function HomePage() {
           )}
 
           {/* Scroll Indicator */}
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 animate-fade-in delay-400 flex flex-col items-center opacity-70">
-            <span className="font-label-sm text-[10px] text-paper-cream tracking-widest mb-2 uppercase font-semibold">Scroll</span>
-            <span className="material-symbols-outlined text-paper-cream animate-bounce">arrow_downward</span>
+          <div
+            className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 animate-fade-in delay-400 flex flex-col items-center opacity-70"
+            style={{ textShadow: heroContrast.textShadow }}
+          >
+            <span
+              className="font-label-sm text-[10px] tracking-widest mb-2 uppercase font-semibold"
+              style={{ color: heroContrast.textColorMuted }}
+            >
+              Scroll
+            </span>
+            <span
+              className="material-symbols-outlined animate-bounce"
+              style={{ color: heroContrast.textColorMuted }}
+            >
+              arrow_downward
+            </span>
           </div>
         </section>
 
