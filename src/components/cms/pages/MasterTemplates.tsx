@@ -40,12 +40,6 @@ interface ContentTemplate {
   updatedAt: string;
 }
 
-interface Wedding {
-  id: string;
-  coupleName: string;
-  slug: string;
-}
-
 export default function MasterTemplates() {
   const { setPage, setEditingTemplateId } = useCMSStore();
   const [templates, setTemplates] = useState<ContentTemplate[]>([]);
@@ -69,8 +63,7 @@ export default function MasterTemplates() {
   // Create form
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
-  const [cloneWeddingId, setCloneWeddingId] = useState('');
-  const [weddings, setWeddings] = useState<Wedding[]>([]);
+  const [cloneFromTemplateId, setCloneFromTemplateId] = useState('');
   const [creating, setCreating] = useState(false);
 
   const fetchTemplates = useCallback(async () => {
@@ -88,27 +81,9 @@ export default function MasterTemplates() {
     }
   }, []);
 
-  const fetchWeddings = useCallback(async () => {
-    try {
-      const res = await fetch('/api/master/weddings?page=1&limit=100&XTransformPort=3000');
-      if (res.ok) {
-        const data = await res.json();
-        setWeddings((data.weddings || []).map((w: { id: string; coupleName: string; slug: string }) => ({
-          id: w.id, coupleName: w.coupleName, slug: w.slug,
-        })));
-      }
-    } catch {
-      // silently fail
-    }
-  }, []);
-
   useEffect(() => {
     fetchTemplates();
   }, [fetchTemplates]);
-
-  useEffect(() => {
-    if (createOpen) fetchWeddings();
-  }, [createOpen, fetchWeddings]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -121,7 +96,7 @@ export default function MasterTemplates() {
         body: JSON.stringify({
           name: newName.trim(),
           description: newDescription.trim() || undefined,
-          cloneFromWeddingId: cloneWeddingId || undefined,
+          cloneFromTemplateId: cloneFromTemplateId || undefined,
         }),
       });
       if (!res.ok) {
@@ -131,7 +106,7 @@ export default function MasterTemplates() {
       toast({ title: 'Template Created', description: `${newName} has been created.` });
       setNewName('');
       setNewDescription('');
-      setCloneWeddingId('');
+      setCloneFromTemplateId('');
       setCreateOpen(false);
       fetchTemplates();
     } catch (err) {
@@ -354,7 +329,7 @@ export default function MasterTemplates() {
           <DialogHeader>
             <DialogTitle>Create Content Template</DialogTitle>
             <DialogDescription>
-              Create a new template from scratch, or clone an existing wedding's content.
+              Create a new template from scratch, or clone an existing template as a starting point.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-4">
@@ -380,20 +355,19 @@ export default function MasterTemplates() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wider text-slate-500">Clone from Wedding (optional)</Label>
-              <Select value={cloneWeddingId} onValueChange={setCloneWeddingId} disabled={creating}>
+              <Label className="text-xs uppercase tracking-wider text-slate-500">Clone from Template (optional)</Label>
+              <Select value={cloneFromTemplateId} onValueChange={setCloneFromTemplateId} disabled={creating}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Start from scratch (empty template)" />
                 </SelectTrigger>
                 <SelectContent>
-                  {weddings.map((w) => (
-                    <SelectItem key={w.id} value={w.id}>{w.coupleName} ({w.slug})</SelectItem>
+                  {templates.filter((t) => t.id !== undefined).map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}{t.description ? ` — ${t.description}` : ''}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <p className="text-xs text-slate-400 mt-1">
-                Cloning extracts all content, schedule, FAQs, stories, and media from the selected wedding.
-                Base64 images are replaced with local placeholder paths.
+                Cloning copies all content, schedule, FAQs, stories, media, and theme from the selected template.
               </p>
             </div>
             <DialogFooter>
