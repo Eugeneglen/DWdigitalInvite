@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { Loader2, KeyRound, Check, X } from 'lucide-react';
 import {
   Dialog,
@@ -21,6 +22,9 @@ interface ChangePasswordModalProps {
 }
 
 export function ChangePasswordModal({ open, onSuccess }: ChangePasswordModalProps) {
+  const { data: session } = useSession();
+  const isForcedChange = session?.user?.mustChangePassword === true;
+
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -36,7 +40,8 @@ export function ChangePasswordModal({ open, onSuccess }: ChangePasswordModalProp
 
   const allRulesPassed = ruleChecks.every((r) => r.passed);
   const passwordsMatch = newPassword === confirmPassword && newPassword.length > 0;
-  const canSubmit = allRulesPassed && passwordsMatch && currentPassword.length > 0 && !loading;
+  const canSubmit = allRulesPassed && passwordsMatch && !loading
+    && (isForcedChange || currentPassword.length > 0);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,7 +52,7 @@ export function ChangePasswordModal({ open, onSuccess }: ChangePasswordModalProp
       const res = await fetch('/api/auth/change-password?XTransformPort=3000', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentPassword, newPassword }),
+        body: JSON.stringify({ currentPassword: currentPassword || undefined, newPassword }),
       });
 
       if (!res.ok) {
@@ -103,12 +108,15 @@ export function ChangePasswordModal({ open, onSuccess }: ChangePasswordModalProp
                 Change Your Password
               </DialogTitle>
               <DialogDescription className="text-[13px] text-charcoal-ink/50 mt-2">
-                For security, you must set a new password before continuing.
+                {isForcedChange
+                  ? 'Your account was created with a system-assigned password. Please set your own password to continue.'
+                  : 'For security, please verify your current password and set a new one.'}
               </DialogDescription>
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="space-y-5 mt-6">
-              {/* Current Password */}
+              {/* Current Password — hidden for forced changes (system-assigned password) */}
+              {!isForcedChange && (
               <div>
                 <Label className="block text-[11px] tracking-[0.18em] uppercase font-semibold mb-2 text-charcoal-ink/50">
                   Current Password
@@ -134,6 +142,7 @@ export function ChangePasswordModal({ open, onSuccess }: ChangePasswordModalProp
                   </button>
                 </div>
               </div>
+              )}
 
               {/* New Password */}
               <div>

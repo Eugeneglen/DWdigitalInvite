@@ -8,16 +8,17 @@ import { validatePassword } from '@/lib/password-policy';
  * POST /api/auth/change-password
  *
  * Allows an authenticated user to change their password.
- * Used for the "first-time login password change" flow — when
- * mustChangePassword is true, the user is forced to call this endpoint
- * before they can access the CMS.
+ * Two modes:
  *
- * Body: { currentPassword: string, newPassword: string }
+ * 1. FORCED (mustChangePassword=true): The password was system-assigned.
+ *    The "Current Password" field is optional — if omitted, the system-assigned
+ *    password is accepted without verification. The user only needs to provide
+ *    a new password that meets the policy.
  *
- * Validates:
- *   - currentPassword matches the stored hash
- *   - newPassword meets the market gold standard policy
- *     (min 8, upper, lower, number, special)
+ * 2. VOLUNTARY (mustChangePassword=false): Standard password change.
+ *    The user MUST provide their current password to prove identity.
+ *
+ * Body: { currentPassword?: string, newPassword: string }
  *
  * On success:
  *   - Updates the password hash
@@ -40,9 +41,9 @@ export async function POST(req: NextRequest) {
       newPassword?: string;
     };
 
-    if (!currentPassword || !newPassword) {
+    if (!newPassword) {
       return NextResponse.json(
-        { error: 'Current password and new password are required.' },
+        { error: 'New password is required.' },
         { status: 400 },
       );
     }
@@ -57,12 +58,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User not found.' }, { status: 404 });
     }
 
-    // Verify current password
-    const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
-    if (!isValid) {
+    // Verify current password — skip if this is a forced first-time change
+    // (mustChangePassword=true) and the user left it blank. The password was
+    // system-assigned, so the user may not know it.
+    if (currentPassword) {
+      const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!isValid) {
+        return NextResponse.json(
+          { error: 'Current password is incorrect.' },
+          { status: 403 },
+        );
+      }
+    } else if (!user.mustChangePassword) {
+      // Voluntary change requires current password
       return NextResponse.json(
-        { error: 'Current password is incorrect.' },
-        { status: 403 },
+        { error: 'Current password is required.' },
+        { status: 400 },
       );
     }
 
