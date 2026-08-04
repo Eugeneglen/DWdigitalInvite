@@ -56,6 +56,10 @@ export function getUserAgent(request: Request): string | null {
 // ── Robust secret resolution ────────────────────────────────────────────────
 // Turbopack route handlers sometimes don't receive process.env from .env.
 // This fallback reads the .env file directly to guarantee the secret is available.
+// In non-production, if all sources fail, generates a dev secret so the app
+// never crashes with "ikm must be at least one byte in length".
+let _devSecret: string | undefined;
+
 export function resolveSecret(): string | undefined {
   // 1. Try process.env (normal Next.js behavior)
   if (process.env.NEXTAUTH_SECRET) return process.env.NEXTAUTH_SECRET;
@@ -70,7 +74,19 @@ export function resolveSecret(): string | undefined {
     const jwtMatch = content.match(/^JWT_SECRET=(.+)$/m);
     if (jwtMatch?.[1]?.trim()) return jwtMatch[1].trim();
   } catch {
-    // .env not readable — fail gracefully
+    // .env not readable — continue to dev fallback
+  }
+
+  // 3. Dev-only fallback: generate a persistent random secret so the app
+  //    works even when the sandbox wipes .env. Deterministic per process
+  //    so sessions survive within the same dev server run.
+  //    NEVER reached in production (Railway sets NEXTAUTH_SECRET in env vars).
+  if (process.env.NODE_ENV !== 'production') {
+    if (!_devSecret) {
+      _devSecret = 'dev-local-secret-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+      console.warn('[auth] NEXTAUTH_SECRET not found — using dev fallback. Sessions will break on server restart. Fix: add NEXTAUTH_SECRET to .env');
+    }
+    return _devSecret;
   }
 
   return undefined;
