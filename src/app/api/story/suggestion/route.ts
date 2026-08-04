@@ -5,13 +5,8 @@ import { db } from '@/lib/db';
 const suggestionSchema = z.object({
   name: z.string().min(1, 'Suggestion is required'),
   suggestedBy: z.string().min(1, 'Your name is required'),
+  weddingSlug: z.string().min(1, 'Wedding slug is required'),
 });
-
-async function getDefaultTenantId(): Promise<string> {
-  const tenant = await db.tenant.findFirst({ where: { status: 'active' } });
-  if (!tenant) throw new Error('No active tenant found');
-  return tenant.id;
-}
 
 export async function POST(request: Request) {
   try {
@@ -25,11 +20,21 @@ export async function POST(request: Request) {
       );
     }
 
-    const { name, suggestedBy } = parsed.data;
-    const tenantId = await getDefaultTenantId();
+    const { name, suggestedBy, weddingSlug } = parsed.data;
+
+    const wedding = await db.weddingAccount.findUnique({
+      where: { slug: weddingSlug },
+    });
+
+    if (!wedding) {
+      return NextResponse.json(
+        { error: 'Wedding not found' },
+        { status: 404 }
+      );
+    }
 
     const suggestion = await db.honeymoonSuggestion.create({
-      data: { tenantId, name, suggestedBy },
+      data: { weddingId: wedding.id, name, suggestedBy },
     });
 
     return NextResponse.json({ success: true, id: suggestion.id });

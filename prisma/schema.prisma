@@ -159,6 +159,8 @@ model WeddingAccount {
   auditLogs     AuditLog[]
   notifications Notification[]
   members       UserWeddingRole[]   // Tier 2 + Tier 3 per-wedding role assignments
+  honeymoonVotes      HoneymoonVote[]
+  honeymoonSuggestions HoneymoonSuggestion[]
 
   // Indexes for Admin CMS search + filter performance at scale
   @@index([coupleName])       // Search by couple name
@@ -404,4 +406,28 @@ model Notification {
   link      String?         // optional deep link within CMS
   isRead    Boolean         @default(false)
   createdAt DateTime        @default(now())
+}
+
+// ============================================================
+// HONEYMOON VOTING (Story Page live voting)
+// ============================================================
+model HoneymoonVote {
+  id           String          @id @default(cuid())
+  weddingId    String
+  wedding      WeddingAccount  @relation(fields: [weddingId], references: [id], onDelete: Cascade)
+  destination  String
+  voterName    String
+  createdAt    DateTime        @default(now())
+  @@unique([weddingId, destination, voterName])
+  @@index([weddingId])
+}
+
+model HoneymoonSuggestion {
+  id           String          @id @default(cuid())
+  weddingId    String
+  wedding      WeddingAccount  @relation(fields: [weddingId], references: [id], onDelete: Cascade)
+  name         String
+  suggestedBy  String
+  createdAt    DateTime        @default(now())
+  @@index([weddingId])
 }

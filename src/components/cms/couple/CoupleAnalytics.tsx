@@ -17,6 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
+import HoneymoonVoteAnalytics from './HoneymoonVoteAnalytics';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -598,6 +599,9 @@ export default function CoupleAnalytics() {
           )}
         </CardContent>
       </Card>
+
+      {/* ── After the \u201cI Do\u201d — Live Honeymoon Voting ──── */}
+      <HoneymoonVoteAnalytics />
 
       {/* ── Phase 5: Unmatched RSVPs (submissions with no guestId link) ── */}
       <Card className="border-charcoal-ink/5 rounded-xl bg-white shadow-none">

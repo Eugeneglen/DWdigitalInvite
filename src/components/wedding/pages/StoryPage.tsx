@@ -76,10 +76,13 @@ function formatStoryDate(dateStr: string | null | undefined): string {
 
 export default function StoryPage() {
   const mainRef = useRef<HTMLElement>(null);
+  const voterNameRef = useRef<string | null>(null);
   const [votes, setVotes] = useState<Record<number, boolean>>({});
   const [suggestion, setSuggestion] = useState('');
   const [submitted, setSubmitted] = useState(false);
-  const { data, getField } = usePublicWedding(useWeddingSlug());
+  const [dbVoteCounts, setDbVoteCounts] = useState<Record<string, number>>({});
+  const weddingSlug = useWeddingSlug();
+  const { data, getField } = usePublicWedding(weddingSlug);
 
   const subtitle = getField('story', 'subtitle', FALLBACK_SUBTITLE);
   const stories = (data?.stories && data.stories.length > 0) ? data.stories : [];
@@ -100,17 +103,74 @@ export default function StoryPage() {
   const honeymoonVotes = safeParseJSON<Record<string, number>>(getField('story', 'honeymoonVotes', ''), {});
   const honeymoonEyebrow = getField('story', 'honeymoonEyebrow', "AFTER THE 'I DO'");
 
-  const handleVote = useCallback((index: number) => {
+  const handleVote = useCallback(async (index: number) => {
     setVotes((prev) => {
       if (prev[index]) return prev;
       return { ...prev, [index]: true };
     });
-  }, []);
 
-  const handleSubmit = useCallback(() => {
+    if (votes[index]) return;
+
+    if (!voterNameRef.current) {
+      const name = window.prompt('Your name');
+      if (!name) return;
+      voterNameRef.current = name;
+    }
+
+    const destName = destinations[index]?.name;
+    if (!destName) return;
+
+    try {
+      await fetch('/api/story/vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ destination: destName, voterName: voterNameRef.current, weddingSlug }),
+      });
+      // Refresh vote counts from DB
+      const res = await fetch(`/api/story/votes?weddingSlug=${encodeURIComponent(weddingSlug)}`);
+      if (res.ok) {
+        const json = await res.json();
+        setDbVoteCounts(json.votes ?? {});
+      }
+    } catch {
+      // Silently fail — local state already updated
+    }
+  }, [votes, destinations, weddingSlug]);
+
+  const handleSubmit = useCallback(async () => {
     if (!suggestion.trim() || submitted) return;
     setSubmitted(true);
-  }, [suggestion, submitted]);
+
+    if (!voterNameRef.current) {
+      const name = window.prompt('Your name');
+      if (!name) {
+        setSubmitted(false);
+        return;
+      }
+      voterNameRef.current = name;
+    }
+
+    try {
+      await fetch('/api/story/suggestion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: suggestion.trim(), suggestedBy: voterNameRef.current, weddingSlug }),
+      });
+    } catch {
+      // Silently fail — local UI already shows submitted
+    }
+  }, [suggestion, submitted, weddingSlug]);
+
+  // Fetch existing votes from DB on mount
+  useEffect(() => {
+    if (!weddingSlug) return;
+    fetch(`/api/story/votes?weddingSlug=${encodeURIComponent(weddingSlug)}`)
+      .then((res) => res.json())
+      .then((json) => {
+        setDbVoteCounts(json.votes ?? {});
+      })
+      .catch(() => {});
+  }, [weddingSlug]);
 
   useEffect(() => {
     const container = mainRef.current;
@@ -136,7 +196,7 @@ export default function StoryPage() {
   const getVoteCount = (index: number) => {
     const destName = destinations[index]?.name;
     if (!destName) return 0;
-    const dbVotes = honeymoonVotes[destName] ?? 0;
+    const dbVotes = dbVoteCounts[destName] ?? 0;
     const localVote = votes[index] ? 1 : 0;
     return dbVotes + localVote;
   };

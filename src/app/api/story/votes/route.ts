@@ -1,19 +1,32 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
-async function getDefaultTenantId(): Promise<string> {
-  const tenant = await db.tenant.findFirst({ where: { status: 'active' } });
-  if (!tenant) throw new Error('No active tenant found');
-  return tenant.id;
-}
-
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const tenantId = await getDefaultTenantId();
+    const { searchParams } = new URL(request.url);
+    const weddingSlug = searchParams.get('weddingSlug');
+
+    if (!weddingSlug) {
+      return NextResponse.json(
+        { error: 'weddingSlug query parameter is required' },
+        { status: 400 }
+      );
+    }
+
+    const wedding = await db.weddingAccount.findUnique({
+      where: { slug: weddingSlug },
+    });
+
+    if (!wedding) {
+      return NextResponse.json(
+        { error: 'Wedding not found' },
+        { status: 404 }
+      );
+    }
 
     const voteCounts = await db.honeymoonVote.groupBy({
       by: ['destination'],
-      where: { tenantId },
+      where: { weddingId: wedding.id },
       _count: { destination: true },
       orderBy: { _count: { destination: 'desc' } },
     });
@@ -24,7 +37,7 @@ export async function GET() {
     }));
 
     const suggestions = await db.honeymoonSuggestion.findMany({
-      where: { tenantId },
+      where: { weddingId: wedding.id },
       orderBy: { createdAt: 'desc' },
       select: {
         name: true,

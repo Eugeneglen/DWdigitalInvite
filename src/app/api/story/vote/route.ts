@@ -5,13 +5,8 @@ import { db } from '@/lib/db';
 const voteSchema = z.object({
   destination: z.string().min(1, 'Destination is required'),
   voterName: z.string().min(1, 'Your name is required'),
+  weddingSlug: z.string().min(1, 'Wedding slug is required'),
 });
-
-async function getDefaultTenantId(): Promise<string> {
-  const tenant = await db.tenant.findFirst({ where: { status: 'active' } });
-  if (!tenant) throw new Error('No active tenant found');
-  return tenant.id;
-}
 
 export async function POST(request: Request) {
   try {
@@ -25,11 +20,21 @@ export async function POST(request: Request) {
       );
     }
 
-    const { destination, voterName } = parsed.data;
-    const tenantId = await getDefaultTenantId();
+    const { destination, voterName, weddingSlug } = parsed.data;
+
+    const wedding = await db.weddingAccount.findUnique({
+      where: { slug: weddingSlug },
+    });
+
+    if (!wedding) {
+      return NextResponse.json(
+        { error: 'Wedding not found' },
+        { status: 404 }
+      );
+    }
 
     const existing = await db.honeymoonVote.findFirst({
-      where: { destination, voterName, tenantId },
+      where: { weddingId: wedding.id, destination, voterName },
     });
 
     if (existing) {
@@ -40,7 +45,7 @@ export async function POST(request: Request) {
     }
 
     await db.honeymoonVote.create({
-      data: { tenantId, destination, voterName },
+      data: { weddingId: wedding.id, destination, voterName },
     });
 
     return NextResponse.json({ success: true });
