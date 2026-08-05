@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { Loader2, Heart, MapPin, CalendarDays, Clock, Save } from 'lucide-react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Loader2, Heart, MapPin, CalendarDays, Clock, Save, Map, Upload } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { useCoupleCMSStore } from '@/store/useCoupleCMSStore';
 import { invalidateWeddingCache } from '@/hooks/usePublicWedding';
+import MirrorImageUpload from './MirrorImageUpload';
 
 interface WeddingData {
   id: string;
@@ -28,6 +29,12 @@ interface WeddingData {
 }
 
 const API_BASE = '/api/cms/wedding?XTransformPort=3000';
+const CONTENT_API = '/api/cms/content?XTransformPort=3000';
+
+const MAP_TYPE_OPTIONS = [
+  { value: 'google-map', label: 'Google Map', icon: Map },
+  { value: 'custom-map', label: 'Upload Custom Map', icon: Upload },
+] as const;
 
 export default function CoupleDetails() {
   const [wedding, setWedding] = useState<WeddingData | null>(null);
@@ -43,6 +50,8 @@ export default function CoupleDetails() {
   const [venue, setVenue] = useState('');
   const [venueAddress, setVenueAddress] = useState('');
   const [googleMapsUrl, setGoogleMapsUrl] = useState('');
+  const [mapType, setMapType] = useState('google-map');
+  const [customMapImage, setCustomMapImage] = useState('');
 
   const fetchWedding = async () => {
     try {
@@ -69,6 +78,19 @@ export default function CoupleDetails() {
       setVenue(w.venue ?? '');
       setVenueAddress(w.venueAddress ?? '');
       setGoogleMapsUrl(w.googleMapsUrl ?? '');
+
+      // Fetch content fields for map type and custom map image
+      try {
+        const contentRes = await fetch(`${CONTENT_API}&section=getting-there`);
+        if (contentRes.ok) {
+          const contentData = await contentRes.json();
+          const items: Array<{ fieldKey: string; fieldValue: string }> = contentData.content || [];
+          const mt = items.find(i => i.fieldKey === 'mapType');
+          const cm = items.find(i => i.fieldKey === 'customMapImage');
+          if (mt) setMapType(mt.fieldValue || 'google-map');
+          if (cm) setCustomMapImage(cm.fieldValue || '');
+        }
+      } catch { /* non-critical */ }
     } catch {
       toast({ title: 'Error', description: 'Failed to load wedding details', variant: 'destructive' });
     } finally {
@@ -78,6 +100,15 @@ export default function CoupleDetails() {
 
   useEffect(() => {
     fetchWedding();
+  }, []);
+
+  const saveContent = useCallback(async (items: Array<{ section: string; fieldKey: string; fieldValue: string; fieldType: string }>) => {
+    const res = await fetch(CONTENT_API, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    });
+    if (!res.ok) throw new Error('Failed to save content');
   }, []);
 
   const handleSave = async () => {
@@ -112,6 +143,13 @@ export default function CoupleDetails() {
       const updatedWedding = data.wedding as WeddingData;
       setWedding(updatedWedding);
       useCoupleCMSStore.getState().setWeddingData(updatedWedding);
+
+      // Save map type content fields
+      await saveContent([
+        { section: 'getting-there', fieldKey: 'mapType', fieldValue: mapType, fieldType: 'TEXT' },
+        { section: 'getting-there', fieldKey: 'customMapImage', fieldValue: customMapImage, fieldType: 'TEXT' },
+      ]);
+
       invalidateWeddingCache();
       toast({ title: 'Success', description: 'Wedding details saved successfully' });
     } catch (err) {
@@ -272,18 +310,58 @@ export default function CoupleDetails() {
               className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20 resize-none"
             />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="googleMapsUrl" className="text-sm font-medium text-charcoal-ink/70">
-              Google Maps URL
+          {/* Map Type Selector */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-charcoal-ink/70">
+              Map Type
             </Label>
-            <Input
-              id="googleMapsUrl"
-              value={googleMapsUrl}
-              onChange={(e) => setGoogleMapsUrl(e.target.value)}
-              placeholder="https://maps.google.com/..."
-              className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
-            />
+            <div className="flex gap-3">
+              {MAP_TYPE_OPTIONS.map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setMapType(value)}
+                  className={`flex-1 flex items-center justify-center gap-2 rounded-lg border-2 px-4 py-3 text-sm font-medium transition-all duration-200 ${
+                    mapType === value
+                      ? 'border-cinematic-gold bg-cinematic-gold/5 text-charcoal-ink'
+                      : 'border-charcoal-ink/10 text-charcoal-ink/50 hover:border-charcoal-ink/20 hover:text-charcoal-ink/70'
+                  }`}
+                >
+                  <Icon className="size-4" />
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* Google Maps URL — shown when Google Map is selected */}
+          {mapType === 'google-map' && (
+            <div className="space-y-1.5">
+              <Label htmlFor="googleMapsUrl" className="text-sm font-medium text-charcoal-ink/70">
+                Google Maps URL
+              </Label>
+              <Input
+                id="googleMapsUrl"
+                value={googleMapsUrl}
+                onChange={(e) => setGoogleMapsUrl(e.target.value)}
+                placeholder="https://maps.google.com/..."
+                className="border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+              />
+            </div>
+          )}
+
+          {/* Custom Map Upload — shown when Upload Custom Map is selected */}
+          {mapType === 'custom-map' && (
+            <MirrorImageUpload
+              value={customMapImage}
+              onChange={setCustomMapImage}
+              onRemove={() => setCustomMapImage('')}
+              label="Custom Map Image"
+              helperText="Upload a JPG, PNG, or WebP image of your venue map"
+              aspectClass="aspect-[4/3]"
+              accept="image/jpeg,image/png,image/webp"
+            />
+          )}
         </CardContent>
       </Card>
 

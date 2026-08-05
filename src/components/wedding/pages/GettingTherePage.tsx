@@ -22,6 +22,10 @@ export default function GettingTherePage() {
   const parkingNote = getField('getting-there', 'parkingNote', '');
 
   const googleMapsUrl = data?.wedding.googleMapsUrl;
+  const mapType = getField('getting-there', 'mapType', 'google-map');
+  const customMapImage = getField('getting-there', 'customMapImage', '');
+  const isCustomMap = mapType === 'custom-map' && customMapImage;
+
   const mapsEmbedUrl = googleMapsUrl
     ? googleMapsUrl.replace(/\/$/, '') + '/embed'
     : `https://maps.google.com/maps?q=${encodeURIComponent(venueName + ' ' + venueAddress)}&t=&z=16&ie=UTF8&iwloc=&output=embed`;
@@ -133,26 +137,36 @@ export default function GettingTherePage() {
               FIND YOUR WAY
             </h3>
             <div className="relative rounded-lg overflow-hidden border border-charcoal-ink/10">
-              <iframe
-                src={mapsEmbedUrl}
-                width="100%"
-                height="280"
-                style={{ border: 0 }}
-                allowFullScreen
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                title={`${venueName} Location`}
-                className="w-full"
-              />
-              <a
-                href={mapsLinkUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="absolute top-3 left-3 flex items-center gap-1.5 bg-white border border-charcoal-ink/10 rounded-md px-3 py-1.5 text-[13px] font-medium text-charcoal-ink hover:bg-charcoal-ink/5 transition-colors duration-200 shadow-sm"
-              >
-                <span className="material-symbols-outlined text-charcoal-ink" style={{ fontSize: '18px' }}>open_in_new</span>
-                Open in Maps
-              </a>
+              {isCustomMap ? (
+                <img
+                  src={customMapImage}
+                  alt={`${venueName} Venue Map`}
+                  className="w-full h-[280px] object-contain bg-paper-cream"
+                />
+              ) : (
+                <>
+                  <iframe
+                    src={mapsEmbedUrl}
+                    width="100%"
+                    height="280"
+                    style={{ border: 0 }}
+                    allowFullScreen
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    title={`${venueName} Location`}
+                    className="w-full"
+                  />
+                  <a
+                    href={mapsLinkUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="absolute top-3 left-3 flex items-center gap-1.5 bg-white border border-charcoal-ink/10 rounded-md px-3 py-1.5 text-[13px] font-medium text-charcoal-ink hover:bg-charcoal-ink/5 transition-colors duration-200 shadow-sm"
+                  >
+                    <span className="material-symbols-outlined text-charcoal-ink" style={{ fontSize: '18px' }}>open_in_new</span>
+                    Open in Maps
+                  </a>
+                </>
+              )}
             </div>
           </div>
         </section>
