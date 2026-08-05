@@ -83,7 +83,7 @@ export default function InlineImageUpload({
             />
             {/* Hover overlay */}
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-center justify-center gap-2">
-              <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+              <span className="text-white text-xs font-medium opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                 Replace
               </span>
             </div>
@@ -95,7 +95,7 @@ export default function InlineImageUpload({
                   e.stopPropagation();
                   onRemove();
                 }}
-                className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 text-white hover:bg-red-500 transition-colors"
+                className="absolute top-2 right-2 p-2.5 rounded-full bg-black/50 text-white hover:bg-red-500 transition-colors"
                 title="Remove image"
               >
                 <X className="size-3.5" />

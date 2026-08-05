@@ -103,7 +103,7 @@ export default function MirrorImageUpload({
               size="sm"
               onClick={openPicker}
               disabled={uploading}
-              className="h-7 text-[11px] gap-1.5 border-charcoal-ink/15 hover:border-cinematic-gold hover:text-cinematic-gold"
+              className="h-9 text-[11px] gap-1.5 border-charcoal-ink/15 hover:border-cinematic-gold hover:text-cinematic-gold"
             >
               <Replace className="size-3" />
               Replace
@@ -114,7 +114,7 @@ export default function MirrorImageUpload({
               size="sm"
               onClick={onRemove}
               disabled={uploading}
-              className="h-7 text-[11px] gap-1.5 text-charcoal-ink/50 hover:text-red-500 hover:bg-red-50"
+              className="h-9 text-[11px] gap-1.5 text-charcoal-ink/50 hover:text-red-500 hover:bg-red-50"
             >
               <X className="size-3" />
               Remove

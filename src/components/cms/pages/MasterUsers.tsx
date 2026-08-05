@@ -566,10 +566,10 @@ export default function MasterUsers() {
                 <TableHeader>
                   <TableRow className="border-slate-200 bg-slate-50/50 hover:bg-slate-50/50">
                     <TableHead className="text-slate-600 font-semibold">Name</TableHead>
-                    <TableHead className="text-slate-600 font-semibold">Email</TableHead>
-                    <TableHead className="text-slate-600 font-semibold">Role</TableHead>
+                    <TableHead className="text-slate-600 font-semibold hidden md:table-cell">Email</TableHead>
+                    <TableHead className="text-slate-600 font-semibold hidden md:table-cell">Role</TableHead>
                     <TableHead className="text-slate-600 font-semibold">Status</TableHead>
-                    <TableHead className="text-slate-600 font-semibold">Last Login</TableHead>
+                    <TableHead className="text-slate-600 font-semibold hidden md:table-cell">Last Login</TableHead>
                     <TableHead className="text-slate-600 font-semibold text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -602,12 +602,12 @@ export default function MasterUsers() {
                       </TableCell>
 
                       {/* Email */}
-                      <TableCell className="text-sm text-slate-600 max-w-[200px] truncate">
+                      <TableCell className="text-sm text-slate-600 max-w-[200px] truncate hidden md:table-cell">
                         {user.email}
                       </TableCell>
 
                       {/* Role */}
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         <Badge
                           variant="outline"
                           className={
@@ -634,7 +634,7 @@ export default function MasterUsers() {
                       </TableCell>
 
                       {/* Last Login */}
-                      <TableCell className="text-sm text-slate-500">
+                      <TableCell className="text-sm text-slate-500 hidden md:table-cell">
                         {relativeTime(user.lastLoginAt)}
                       </TableCell>
 
@@ -644,7 +644,7 @@ export default function MasterUsers() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8"
+                            className="h-9 w-9"
                             onClick={() => openEdit(user)}
                           >
                             <Pencil className="h-4 w-4 text-slate-500" />
@@ -653,7 +653,7 @@ export default function MasterUsers() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8"
+                            className="h-9 w-9"
                             onClick={() => openReset(user)}
                             title="Reset password"
                           >
@@ -663,7 +663,7 @@ export default function MasterUsers() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8"
+                            className="h-9 w-9"
                             onClick={() => openDelete(user)}
                             disabled={user.isActive === false}
                           >

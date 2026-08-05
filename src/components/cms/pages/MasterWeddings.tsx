@@ -518,7 +518,7 @@ export default function MasterWeddings() {
       {/* Header Row */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2 flex-1 flex-wrap">
-          <div className="relative flex-1 min-w-[200px] max-w-md">
+          <div className="relative flex-1 min-w-0 sm:min-w-[200px] max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Search by couple name, bride, groom, slug, job number, or venue..."
@@ -528,7 +528,7 @@ export default function MasterWeddings() {
             />
           </div>
           <Select value={statusFilter || 'all'} onValueChange={(v) => setStatusFilter(v === 'all' ? '' : v)}>
-            <SelectTrigger className="w-[140px] border-slate-200 bg-white">
+            <SelectTrigger className="w-full sm:w-[140px] sm:min-w-0 border-slate-200 bg-white">
               <SelectValue placeholder="All Status" />
             </SelectTrigger>
             <SelectContent>
@@ -541,7 +541,7 @@ export default function MasterWeddings() {
             </SelectContent>
           </Select>
           <Select value={planFilter || 'all'} onValueChange={(v) => setPlanFilter(v === 'all' ? '' : v)}>
-            <SelectTrigger className="w-[130px] border-slate-200 bg-white">
+            <SelectTrigger className="w-full sm:w-[130px] sm:min-w-0 border-slate-200 bg-white">
               <SelectValue placeholder="All Packages" />
             </SelectTrigger>
             <SelectContent>
@@ -579,19 +579,19 @@ export default function MasterWeddings() {
                   <TableHead className="text-slate-600 font-semibold">
                     Wedding Date
                   </TableHead>
-                  <TableHead className="text-slate-600 font-semibold">
+                  <TableHead className="text-slate-600 font-semibold hidden md:table-cell">
                     Wedding Venue
                   </TableHead>
-                  <TableHead className="text-slate-600 font-semibold">
+                  <TableHead className="text-slate-600 font-semibold hidden md:table-cell">
                     Job Number
                   </TableHead>
                   <TableHead className="text-slate-600 font-semibold">
                     Status
                   </TableHead>
-                  <TableHead className="text-slate-600 font-semibold">
+                  <TableHead className="text-slate-600 font-semibold hidden lg:table-cell">
                     Plan
                   </TableHead>
-                  <TableHead className="text-slate-600 font-semibold">
+                  <TableHead className="text-slate-600 font-semibold hidden md:table-cell">
                     Consultant
                   </TableHead>
                   <TableHead className="text-slate-600 font-semibold text-right">
@@ -624,12 +624,12 @@ export default function MasterWeddings() {
                     </TableCell>
 
                     {/* Wedding Venue */}
-                    <TableCell className="text-sm text-slate-600 max-w-[160px] truncate">
+                    <TableCell className="text-sm text-slate-600 max-w-[160px] truncate hidden md:table-cell">
                       {truncate(w.venue, 24)}
                     </TableCell>
 
                     {/* Job Number */}
-                    <TableCell className="text-sm text-slate-600 font-mono">
+                    <TableCell className="text-sm text-slate-600 font-mono hidden md:table-cell">
                       {w.jobNumber ?? '—'}
                     </TableCell>
 
@@ -647,7 +647,7 @@ export default function MasterWeddings() {
                     </TableCell>
 
                     {/* Plan */}
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       <Badge
                         variant="outline"
                         className={
@@ -660,7 +660,7 @@ export default function MasterWeddings() {
                     </TableCell>
 
                     {/* Consultant */}
-                    <TableCell className="text-sm text-slate-600">
+                    <TableCell className="text-sm text-slate-600 hidden md:table-cell">
                       {w.consultant?.name ?? '—'}
                     </TableCell>
 

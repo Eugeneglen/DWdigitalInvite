@@ -238,7 +238,7 @@ export default function SectionImageUpload({ category, label, maxImages }: Secti
               />
               {/* Hover overlay */}
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200 flex items-center justify-center">
-                <Eye className="size-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                <Eye className="size-6 text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200" />
               </div>
             </div>
 
@@ -253,7 +253,7 @@ export default function SectionImageUpload({ category, label, maxImages }: Secti
                   size="sm"
                   onClick={() => handleDelete(item.id)}
                   disabled={deleting === item.id}
-                  className="h-7 w-7 p-0 text-charcoal-ink/40 hover:text-red-500 hover:bg-red-50"
+                  className="h-9 w-9 p-0 text-charcoal-ink/40 hover:text-red-500 hover:bg-red-50"
                   title="Delete"
                 >
                   {deleting === item.id ? (

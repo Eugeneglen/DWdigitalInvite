@@ -245,7 +245,7 @@ export default function CoupleTeam() {
           members.map((member) => (
             <Card key={member.id}>
               <CardContent className="flex items-center justify-between py-4">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 min-w-0">
                   {/* Avatar */}
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-charcoal-ink/5 text-sm font-medium text-charcoal-ink/60">
                     {member.name
@@ -256,15 +256,15 @@ export default function CoupleTeam() {
                       .toUpperCase()}
                   </div>
                   {/* Details */}
-                  <div>
+                  <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium text-charcoal-ink">{member.name}</p>
                       {member.userId === session?.user?.id && (
                         <span className="text-xs text-charcoal-ink/40">(You)</span>
                       )}
                     </div>
-                    <p className="text-xs text-charcoal-ink/50 flex items-center gap-1 mt-0.5">
-                      <Mail className="size-3" />
+                    <p className="text-xs text-charcoal-ink/50 flex items-center gap-1 mt-0.5 truncate">
+                      <Mail className="size-3 shrink-0" />
                       {member.email}
                     </p>
                   </div>

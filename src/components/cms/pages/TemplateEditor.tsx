@@ -341,7 +341,7 @@ function SimpleImageGallery({ media, onAdd, onRemove, maxImages, aspectClass, la
             size="sm"
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
-            className="h-8 text-xs gap-1.5 bg-charcoal-ink text-paper-cream hover:bg-charcoal-ink/90 shrink-0"
+            className="h-9 text-xs gap-1.5 bg-charcoal-ink text-paper-cream hover:bg-charcoal-ink/90 shrink-0"
           >
             {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <ImagePlus className="size-3.5" />}
             Add Image
@@ -364,13 +364,13 @@ function SimpleImageGallery({ media, onAdd, onRemove, maxImages, aspectClass, la
             >
               <img src={item.url} alt={item.fileName} className="w-full h-full object-cover" loading="lazy" />
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors duration-200 flex items-center justify-center gap-2">
-                <Eye className="size-5 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                <Eye className="size-5 text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200" />
               </div>
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); handleRemove(idx); }}
                 disabled={deleting === idx}
-                className="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/50 text-white hover:bg-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                className="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/50 text-white hover:bg-red-500 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                 title="Delete image"
               >
                 {deleting === idx ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
@@ -498,7 +498,7 @@ function TemplateColorPicker({ value, onChange, label, defaultColor }: TemplateC
               </div>
             )}
             <span
-              className="absolute -top-7 left-1/2 -translate-x-1/2 text-[10px] font-medium px-1.5 py-0.5 rounded bg-charcoal-ink text-paper-cream opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10"
+              className="absolute -top-7 left-1/2 -translate-x-1/2 text-[10px] font-medium px-1.5 py-0.5 rounded bg-charcoal-ink text-paper-cream opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10"
             >
               {preset.label}
             </span>
@@ -1075,7 +1075,7 @@ export default function TemplateEditor() {
   return (
     <div className="space-y-6 pb-20">
       {/* Header with Back + Preview + Save */}
-      <div className="flex items-center justify-between sticky top-0 z-10 bg-white/80 backdrop-blur-md py-3 -mx-4 px-4 border-b border-slate-100">
+      <div className="flex items-center justify-between flex-wrap gap-y-2 sticky top-0 z-10 bg-white/80 backdrop-blur-md py-3 -mx-4 px-4 border-b border-slate-100">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={handleBack}>
             <ArrowLeft className="size-4 mr-1" />
@@ -1083,8 +1083,8 @@ export default function TemplateEditor() {
           </Button>
           <Separator orientation="vertical" className="h-6" />
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">{data.name}</h2>
-            <p className="text-xs text-slate-400">Content Template Editor</p>
+            <h2 className="text-lg font-semibold text-slate-900 truncate max-w-[140px] sm:max-w-none">{data.name}</h2>
+            <p className="text-xs text-slate-400 hidden sm:block">Content Template Editor</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -1705,10 +1705,10 @@ export default function TemplateEditor() {
                         {item.description && <p className="text-xs text-charcoal-ink/40 mt-1">{item.description}</p>}
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5" onClick={() => openEditSchedule(idx)} title="Edit event">
+                        <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5" onClick={() => openEditSchedule(idx)} title="Edit event">
                           <Pencil className="size-3.5" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-charcoal-ink/40 hover:text-red-500 hover:bg-red-50" onClick={() => deleteSchedule(idx)} title="Delete event">
+                        <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-charcoal-ink/40 hover:text-red-500 hover:bg-red-50" onClick={() => deleteSchedule(idx)} title="Delete event">
                           <Trash2 className="size-3.5" />
                         </Button>
                       </div>
@@ -1860,10 +1860,10 @@ export default function TemplateEditor() {
                           )}
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5" onClick={() => openEditStory(idx)} title="Edit chapter">
+                          <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5" onClick={() => openEditStory(idx)} title="Edit chapter">
                             <Pencil className="size-3.5" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-charcoal-ink/40 hover:text-red-500 hover:bg-red-50" onClick={() => deleteStory(idx)} title="Delete chapter">
+                          <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-charcoal-ink/40 hover:text-red-500 hover:bg-red-50" onClick={() => deleteStory(idx)} title="Delete chapter">
                             <Trash2 className="size-3.5" />
                           </Button>
                         </div>
@@ -1939,7 +1939,7 @@ export default function TemplateEditor() {
                           <p className="text-sm font-medium text-charcoal-ink">{t.q}</p>
                           <p className="text-xs text-charcoal-ink/50">{t.a}</p>
                         </div>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-charcoal-ink/40 hover:text-red-500" onClick={() => {
+                        <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-charcoal-ink/40 hover:text-red-500" onClick={() => {
                           const updated = tidbits.filter((_: unknown, i: number) => i !== idx);
                           setContentField('story', 'tidbits', JSON.stringify(updated), 'JSON');
                         }}>
@@ -1995,7 +1995,7 @@ export default function TemplateEditor() {
                     return dests.map((d: { name: string }, idx: number) => (
                       <div key={idx} className="flex items-center gap-2 p-2 rounded border border-charcoal-ink/10">
                         <span className="flex-1 text-sm text-charcoal-ink">{d.name}</span>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-charcoal-ink/40 hover:text-red-500" onClick={() => {
+                        <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-charcoal-ink/40 hover:text-red-500" onClick={() => {
                           const updated = dests.filter((_: unknown, i: number) => i !== idx);
                           setContentField('story', 'honeymoonDestinations', JSON.stringify(updated), 'JSON');
                         }}>
@@ -2102,7 +2102,7 @@ export default function TemplateEditor() {
                           variant="ghost"
                           size="sm"
                           onClick={() => toggleFaqActive(idx)}
-                          className={`h-8 w-8 p-0 ${
+                          className={`h-9 w-9 p-0 ${
                             item.isActive
                               ? 'text-cinematic-gold hover:bg-cinematic-gold/5'
                               : 'text-charcoal-ink/30 hover:text-cinematic-gold hover:bg-cinematic-gold/5'
@@ -2111,10 +2111,10 @@ export default function TemplateEditor() {
                         >
                           {item.isActive ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5" onClick={() => openEditFaq(idx)} title="Edit FAQ">
+                        <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5" onClick={() => openEditFaq(idx)} title="Edit FAQ">
                           <Pencil className="size-3.5" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-charcoal-ink/40 hover:text-red-500 hover:bg-red-50" onClick={() => deleteFaq(idx)} title="Delete FAQ">
+                        <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-charcoal-ink/40 hover:text-red-500 hover:bg-red-50" onClick={() => deleteFaq(idx)} title="Delete FAQ">
                           <Trash2 className="size-3.5" />
                         </Button>
                       </div>
@@ -2317,7 +2317,7 @@ export default function TemplateEditor() {
               <Label className="text-xs uppercase tracking-wider text-charcoal-ink/50">Description</Label>
               <Textarea value={scheduleForm.description || ''} onChange={(e) => setScheduleForm({ ...scheduleForm, description: e.target.value })} placeholder="Exchange of vows and rings" rows={2} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs uppercase tracking-wider text-charcoal-ink/50">Start Time</Label>
                 <Input type="time" value={scheduleForm.startTime} onChange={(e) => setScheduleForm({ ...scheduleForm, startTime: e.target.value })} />
@@ -2410,7 +2410,7 @@ export default function TemplateEditor() {
 
       {/* ── Sticky bottom save bar (P2-15) ────────────────────────────────── */}
       {dirty && (
-        <div className="sticky bottom-0 flex items-center justify-between gap-4 py-3 px-6 -mx-4 bg-white/95 backdrop-blur-md border-t border-charcoal-ink/10 z-20">
+        <div className="sticky bottom-0 flex items-center justify-between flex-wrap gap-y-2 gap-4 py-3 px-6 -mx-4 bg-white/95 backdrop-blur-md border-t border-charcoal-ink/10 z-20">
           <div className="flex items-center gap-2">
             <span className="size-2 rounded-full bg-cinematic-gold animate-pulse" />
             <p className="text-sm text-charcoal-ink/70">

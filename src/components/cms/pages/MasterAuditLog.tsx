@@ -225,7 +225,7 @@ export default function MasterAuditLog() {
 
       {/* Filters — Row 1: Search + Action + Entity */}
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
+        <div className="relative flex-1 min-w-0 sm:min-w-[200px] max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
             placeholder="Search by user, entity, action, or details..."
@@ -235,7 +235,7 @@ export default function MasterAuditLog() {
           />
         </div>
         <Select value={actionFilter || 'all'} onValueChange={(v) => setActionFilter(v === 'all' ? '' : v)}>
-          <SelectTrigger className="w-[140px] border-slate-200 bg-white">
+          <SelectTrigger className="w-full sm:w-[140px] sm:min-w-0 border-slate-200 bg-white">
             <SelectValue placeholder="All Actions" />
           </SelectTrigger>
           <SelectContent>
@@ -246,7 +246,7 @@ export default function MasterAuditLog() {
           </SelectContent>
         </Select>
         <Select value={entityFilter || 'all'} onValueChange={(v) => setEntityFilter(v === 'all' ? '' : v)}>
-          <SelectTrigger className="w-[170px] border-slate-200 bg-white">
+          <SelectTrigger className="w-full sm:w-[170px] sm:min-w-0 border-slate-200 bg-white">
             <SelectValue placeholder="All Entities" />
           </SelectTrigger>
           <SelectContent>
@@ -263,7 +263,7 @@ export default function MasterAuditLog() {
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-slate-500">User</Label>
           <Select value={userFilter || 'all'} onValueChange={(v) => setUserFilter(v === 'all' ? '' : v)}>
-            <SelectTrigger className="w-[200px] border-slate-200 bg-white">
+            <SelectTrigger className="w-full sm:w-[200px] sm:min-w-0 border-slate-200 bg-white">
               <SelectValue placeholder="All Users" />
             </SelectTrigger>
             <SelectContent>
@@ -280,7 +280,7 @@ export default function MasterAuditLog() {
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-slate-500">Wedding</Label>
           <Select value={weddingFilter || 'all'} onValueChange={(v) => setWeddingFilter(v === 'all' ? '' : v)}>
-            <SelectTrigger className="w-[220px] border-slate-200 bg-white">
+            <SelectTrigger className="w-full sm:w-[220px] sm:min-w-0 border-slate-200 bg-white">
               <SelectValue placeholder="All Weddings" />
             </SelectTrigger>
             <SelectContent>
@@ -298,7 +298,7 @@ export default function MasterAuditLog() {
           <Label className="text-xs text-slate-500">From Date</Label>
           <Input
             type="date"
-            className="w-[160px] border-slate-200 bg-white"
+            className="w-full sm:w-[160px] sm:min-w-0 border-slate-200 bg-white"
             value={fromDate}
             onChange={(e) => setFromDate(e.target.value)}
           />
@@ -308,7 +308,7 @@ export default function MasterAuditLog() {
           <Label className="text-xs text-slate-500">To Date</Label>
           <Input
             type="date"
-            className="w-[160px] border-slate-200 bg-white"
+            className="w-full sm:w-[160px] sm:min-w-0 border-slate-200 bg-white"
             value={toDate}
             onChange={(e) => setToDate(e.target.value)}
           />
@@ -360,8 +360,8 @@ export default function MasterAuditLog() {
                   <TableHead className="text-xs font-medium text-slate-500">Time</TableHead>
                   <TableHead className="text-xs font-medium text-slate-500">User</TableHead>
                   <TableHead className="text-xs font-medium text-slate-500">Action</TableHead>
-                  <TableHead className="text-xs font-medium text-slate-500">Entity</TableHead>
-                  <TableHead className="text-xs font-medium text-slate-500">Details</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-500 hidden md:table-cell">Entity</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-500 hidden md:table-cell">Details</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -381,8 +381,8 @@ export default function MasterAuditLog() {
                         {log.action}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-sm text-slate-600">{log.entity || '—'}</TableCell>
-                    <TableCell className="text-xs text-slate-500 max-w-[300px] truncate">
+                    <TableCell className="text-sm text-slate-600 hidden md:table-cell">{log.entity || '—'}</TableCell>
+                    <TableCell className="text-xs text-slate-500 max-w-[300px] truncate hidden md:table-cell">
                       {formatDetails(log.details)}
                     </TableCell>
                   </TableRow>

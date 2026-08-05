@@ -293,7 +293,7 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
                 </Button>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Login ID</Label>
                 <div className="flex items-center gap-2 mt-1">
@@ -317,7 +317,7 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Job Number</Label>
                 <p className="text-sm font-medium text-charcoal-ink mt-1">{c.jobNumber}</p>
@@ -390,7 +390,7 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
           {/* Step 1: Customer Information */}
           {step === 0 && (
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Bride&apos;s Name *</Label>
                   <Input value={form.brideName} onChange={(e) => setForm({ ...form, brideName: e.target.value, coupleName: e.target.value && form.groomName ? `${e.target.value} & ${form.groomName}` : form.coupleName })} placeholder="Eleanor" className="border-charcoal-ink/10" />
@@ -404,7 +404,7 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
                 <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Couple Name (Display) *</Label>
                 <Input value={form.coupleName} onChange={(e) => setForm({ ...form, coupleName: e.target.value })} placeholder="Eleanor & James" className="border-charcoal-ink/10" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Couple Email * (Login ID)</Label>
                   <Input type="email" value={form.coupleEmail} onChange={(e) => setForm({ ...form, coupleEmail: e.target.value })} placeholder="eleanor@wedding.com" className="border-charcoal-ink/10" />
@@ -414,7 +414,7 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
                   <Input value={form.couplePhone} onChange={(e) => setForm({ ...form, couplePhone: e.target.value })} placeholder="+65 9123 4567" className="border-charcoal-ink/10" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Wedding Date *</Label>
                   <Popover>
@@ -450,7 +450,7 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
                   <Input type="time" value={form.weddingTime} onChange={(e) => setForm({ ...form, weddingTime: e.target.value })} className="border-charcoal-ink/10" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Wedding Venue</Label>
                   <Input value={form.venue} onChange={(e) => setForm({ ...form, venue: e.target.value })} placeholder="The Fullerton Hotel" className="border-charcoal-ink/10" />
@@ -460,7 +460,7 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
                   <Input value={form.venueAddress} onChange={(e) => setForm({ ...form, venueAddress: e.target.value })} placeholder="38 Cuscaden Road, Singapore 249731" className="border-charcoal-ink/10" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Google Maps URL</Label>
                   <Input value={form.googleMapsUrl} onChange={(e) => setForm({ ...form, googleMapsUrl: e.target.value })} placeholder="https://maps.google.com/..." className="border-charcoal-ink/10" />
@@ -478,7 +478,7 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
             <div className="space-y-4">
               <div>
                 <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider mb-2 block">Select Package</Label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {['GOLD', 'PLATINUM', 'DIAMOND'].map((pkg) => (
                     <button
                       key={pkg}
@@ -496,7 +496,7 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
                 <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider mb-2 block">
                   Features (auto-applied from {form.plan}, admin can override)
                 </Label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {ALL_FEATURES.map((feature) => {
                     const enabled = form.features.includes(feature.key);
                     return (
@@ -575,7 +575,7 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
           {step === 3 && (
             <div className="space-y-3">
               <div className="bg-paper-cream rounded-lg p-4 space-y-2 text-sm">
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div><span className="text-charcoal-ink/50">Couple:</span> <span className="font-medium text-charcoal-ink">{form.coupleName}</span></div>
                   <div><span className="text-charcoal-ink/50">Email:</span> <span className="font-medium text-charcoal-ink">{form.coupleEmail}</span></div>
                   <div><span className="text-charcoal-ink/50">Mobile:</span> <span className="font-medium text-charcoal-ink">{form.couplePhone || '—'}</span></div>

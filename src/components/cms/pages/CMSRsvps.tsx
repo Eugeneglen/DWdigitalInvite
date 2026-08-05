@@ -187,7 +187,7 @@ export default function CMSRsvps({ selectedTenantId, authUser }: CMSRsvpsProps) 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-foreground">RSVP Management</h2>
           <p className="text-muted-foreground text-sm mt-1">View and manage guest RSVP submissions</p>
@@ -236,7 +236,7 @@ export default function CMSRsvps({ selectedTenantId, authUser }: CMSRsvpsProps) 
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-end">
-        <div className="flex-1 min-w-[200px]">
+        <div className="flex-1 min-w-0 sm:min-w-[200px]">
           <label className="text-xs font-medium text-muted-foreground mb-1 block">Search Name</label>
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -248,7 +248,7 @@ export default function CMSRsvps({ selectedTenantId, authUser }: CMSRsvpsProps) 
             />
           </div>
         </div>
-        <div className="w-[160px]">
+        <div className="w-full sm:w-[160px] sm:min-w-0">
           <label className="text-xs font-medium text-muted-foreground mb-1 block">Attendance</label>
           <Select value={attendance} onValueChange={setAttendance}>
             <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
@@ -260,11 +260,11 @@ export default function CMSRsvps({ selectedTenantId, authUser }: CMSRsvpsProps) 
             </SelectContent>
           </Select>
         </div>
-        <div className="w-[150px]">
+        <div className="w-full sm:w-[150px] sm:min-w-0">
           <label className="text-xs font-medium text-muted-foreground mb-1 block">From</label>
           <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-9" />
         </div>
-        <div className="w-[150px]">
+        <div className="w-full sm:w-[150px] sm:min-w-0">
           <label className="text-xs font-medium text-muted-foreground mb-1 block">To</label>
           <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-9" />
         </div>
@@ -350,7 +350,7 @@ export default function CMSRsvps({ selectedTenantId, authUser }: CMSRsvpsProps) 
 
       {/* Pagination */}
       {!loading && totalPages > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-muted-foreground">
             Showing {Math.min((page - 1) * limit + 1, total)}–{Math.min(page * limit, total)} of {total}
           </p>

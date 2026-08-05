@@ -238,7 +238,7 @@ export default function CMSAnalytics({ selectedTenantId, authUser }: PageProps) 
               </Button>
             ))}
           </div>
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="flex items-center gap-2 mt-2 sm:mt-0 sm:ml-auto">
             <div className="space-y-1">
               <Label className="text-xs font-medium text-gray-500">From</Label>
               <Input
@@ -473,7 +473,7 @@ export default function CMSAnalytics({ selectedTenantId, authUser }: PageProps) 
                         type="category"
                         dataKey="name"
                         tick={{ fontSize: 12, fill: '#2C2C2C' }}
-                        width={120}
+                        width={80}
                       />
                       <Tooltip contentStyle={tooltipStyle} />
                       <Bar dataKey="count" fill={ROSE} radius={[0, 4, 4, 0]} name="Votes" />

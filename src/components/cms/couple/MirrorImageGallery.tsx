@@ -191,7 +191,7 @@ export default function MirrorImageGallery({
             size="sm"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="h-8 text-xs gap-1.5 bg-charcoal-ink text-paper-cream hover:bg-charcoal-ink/90 shrink-0"
+            className="h-9 text-xs gap-1.5 bg-charcoal-ink text-paper-cream hover:bg-charcoal-ink/90 shrink-0"
           >
             {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <ImagePlus className="size-3.5" />}
             Add Image
@@ -228,14 +228,14 @@ export default function MirrorImageGallery({
               />
               {/* Hover overlay */}
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors duration-200 flex items-center justify-center gap-2">
-                <Eye className="size-5 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                <Eye className="size-5 text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200" />
               </div>
               {/* Delete button (top-right, hover) */}
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
                 disabled={deleting === item.id}
-                className="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/50 text-white hover:bg-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                className="absolute top-1.5 right-1.5 p-2.5 rounded-full bg-black/50 text-white hover:bg-red-500 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                 title="Delete image"
               >
                 {deleting === item.id ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}

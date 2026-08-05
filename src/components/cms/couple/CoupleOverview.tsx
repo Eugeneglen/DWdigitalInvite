@@ -671,7 +671,7 @@ export default function CoupleOverview() {
                 </div>
 
                 {/* Mini stats row */}
-                <div className="grid grid-cols-4 gap-2 pt-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2">
                   <div className="text-center space-y-1">
                     <div className="flex items-center justify-center gap-1.5">
                       <span className="size-2 rounded-full bg-amber-400 shrink-0" />

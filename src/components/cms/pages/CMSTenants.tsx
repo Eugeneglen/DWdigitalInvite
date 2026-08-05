@@ -376,7 +376,7 @@ export default function CMSTenants() {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button variant="ghost" size="icon" className="h-9 w-9">
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -497,7 +497,7 @@ export default function CMSTenants() {
               {errors.eventType && <p className="text-xs text-red-600">{errors.eventType.message}</p>}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="couple1" className="text-sm font-medium text-charcoal-ink">Partner 1</Label>
                 <Input

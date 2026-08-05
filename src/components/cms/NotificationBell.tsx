@@ -227,7 +227,7 @@ export function NotificationBell({ variant = 'master' }: { variant?: 'master' | 
       {/* Dropdown */}
       {isOpen && (
         <div className={`
-          absolute right-0 top-full mt-2 w-80 sm:w-96 rounded-lg shadow-lg border z-50
+          absolute right-0 top-full mt-2 w-80 max-w-[calc(100vw-2rem)] sm:w-96 rounded-lg shadow-lg border z-50
           ${isMasterVariant
             ? 'bg-white border-slate-200'
             : 'bg-white border-champagne-silk'
@@ -341,11 +341,11 @@ export function NotificationBell({ variant = 'master' }: { variant?: 'master' | 
                       </div>
 
                       {/* Actions (visible on hover) */}
-                      <div className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         {!notification.isRead && (
                           <button
                             onClick={(e) => { e.stopPropagation(); handleMarkRead(notification.id); }}
-                            className="rounded p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                            className="rounded p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
                             title="Mark as read"
                           >
                             <Check className="size-3" />
@@ -353,7 +353,7 @@ export function NotificationBell({ variant = 'master' }: { variant?: 'master' | 
                         )}
                         <button
                           onClick={(e) => { e.stopPropagation(); handleDelete(notification.id); }}
-                          className="rounded p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                          className="rounded p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                           title="Delete"
                         >
                           <Trash2 className="size-3" />

@@ -458,7 +458,7 @@ export default function CoupleGuests() {
             <span className="text-charcoal-ink/70 font-medium">{guests.length} guest{guests.length !== 1 ? 's' : ''}</span>
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             onClick={openImportDialog}
             variant="outline"
@@ -608,7 +608,7 @@ export default function CoupleGuests() {
                         variant="ghost"
                         size="sm"
                         onClick={() => openEditDialog(guest)}
-                        className="h-8 w-8 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
+                        className="h-9 w-9 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
                       >
                         <Pencil className="size-3.5" />
                       </Button>
@@ -617,7 +617,7 @@ export default function CoupleGuests() {
                         size="sm"
                         onClick={() => handleDelete(guest.id)}
                         disabled={deleting === guest.id}
-                        className="h-8 w-8 p-0 text-charcoal-ink/40 hover:text-red-500 hover:bg-red-50"
+                        className="h-9 w-9 p-0 text-charcoal-ink/40 hover:text-red-500 hover:bg-red-50"
                       >
                         {deleting === guest.id ? (
                           <Loader2 className="size-3.5 animate-spin" />

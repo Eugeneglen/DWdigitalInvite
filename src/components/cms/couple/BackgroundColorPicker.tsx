@@ -147,7 +147,7 @@ export default function BackgroundColorPicker() {
                   key={preset.value}
                   onClick={() => saveColor(preset.value)}
                   className={`
-                    group relative h-8 rounded-md border transition-all duration-150
+                    group relative h-10 rounded-md border transition-all duration-150
                     ${isActive
                       ? 'border-cinematic-gold ring-2 ring-cinematic-gold/30 scale-105'
                       : 'border-charcoal-ink/10 hover:border-cinematic-gold/50 hover:scale-105'
@@ -168,7 +168,7 @@ export default function BackgroundColorPicker() {
                     </div>
                   )}
                   <span
-                    className="absolute -top-7 left-1/2 -translate-x-1/2 text-[10px] font-medium px-1.5 py-0.5 rounded bg-charcoal-ink text-paper-cream opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10"
+                    className="absolute -top-7 left-1/2 -translate-x-1/2 text-[10px] font-medium px-1.5 py-0.5 rounded bg-charcoal-ink text-paper-cream opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10"
                   >
                     {preset.label}
                   </span>

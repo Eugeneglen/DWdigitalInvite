@@ -104,7 +104,7 @@ function ExpandableDetails({ details }: { details: string }) {
         </button>
       )}
       {expanded && (
-        <pre className="text-[11px] bg-gray-50 border border-gray-200 rounded p-2 overflow-x-auto max-w-md text-gray-700 mt-1">
+        <pre className="text-[11px] bg-gray-50 border border-gray-200 rounded p-2 overflow-x-auto max-w-[200px] sm:max-w-md text-gray-700 mt-1">
           <code>{formatted}</code>
         </pre>
       )}

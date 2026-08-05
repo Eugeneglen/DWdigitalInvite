@@ -256,7 +256,7 @@ export default function CoupleRSVPs() {
               <Card key={rsvp.id} className="border-charcoal-ink/5 shadow-none hover:border-champagne-silk transition-colors duration-200">
                 <CardContent className="p-4">
                   {/* Header row */}
-                  <div className="flex items-start justify-between gap-4 mb-3">
+                  <div className="flex items-start justify-between gap-4 flex-wrap mb-3">
                     <div className="flex items-center gap-2.5">
                       <div className="flex items-center justify-center h-9 w-9 rounded-full bg-charcoal-ink/5 text-charcoal-ink text-sm font-semibold shrink-0">
                         {rsvp.firstName[0]}{rsvp.lastName[0]}

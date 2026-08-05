@@ -227,13 +227,14 @@ export default function MasterRoles() {
       {/* Roles table */}
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[50px]"></TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead>Tier</TableHead>
-                <TableHead>Permissions</TableHead>
+                <TableHead className="hidden md:table-cell">Tier</TableHead>
+                <TableHead className="hidden md:table-cell">Permissions</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -253,12 +254,12 @@ export default function MasterRoles() {
                       <p className="text-xs text-slate-400 font-mono">{role.key}</p>
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden md:table-cell">
                     <Badge variant="outline" className="text-xs">
                       {TIER_LABELS[role.tier] || role.tier}
                     </Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden md:table-cell">
                     {role.permissions.includes('*') ? (
                       <Badge className="bg-cinematic-gold/15 text-cinematic-gold border-cinematic-gold/30">
                         All Permissions (Wildcard)
@@ -274,7 +275,7 @@ export default function MasterRoles() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-9 w-9"
                         onClick={() => openEdit(role)}
                       >
                         <Pencil className="h-4 w-4 text-slate-500" />
@@ -283,7 +284,7 @@ export default function MasterRoles() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-9 w-9"
                         onClick={() => handleDelete(role)}
                         disabled={role.isSystem}
                       >
@@ -296,6 +297,7 @@ export default function MasterRoles() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 

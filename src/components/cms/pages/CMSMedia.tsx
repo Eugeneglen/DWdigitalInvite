@@ -158,7 +158,7 @@ function MediaCard({
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 text-xs text-gray-500 hover:text-charcoal-ink flex-1"
+            className="h-9 text-xs text-gray-500 hover:text-charcoal-ink flex-1"
             onClick={() => onEdit(item)}
           >
             <Pencil className="h-3 w-3 mr-1" />
@@ -167,7 +167,7 @@ function MediaCard({
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 text-xs text-gray-500 hover:text-red-600 flex-1"
+            className="h-9 text-xs text-gray-500 hover:text-red-600 flex-1"
             onClick={() => onDelete(item)}
           >
             <Trash2 className="h-3 w-3 mr-1" />

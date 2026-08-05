@@ -102,7 +102,7 @@ function SortableBlockItem({
       <button
         {...attributes}
         {...listeners}
-        className="mt-0.5 shrink-0 cursor-grab text-charcoal-ink/25 hover:text-charcoal-ink/50 focus:outline-none active:cursor-grabbing"
+        className="mt-0.5 shrink-0 cursor-grab text-charcoal-ink/25 hover:text-charcoal-ink/50 focus:outline-none active:cursor-grabbing p-2"
         aria-label="Drag to reorder block"
       >
         <GripVertical className="h-4 w-4" />
@@ -135,7 +135,7 @@ function SortableBlockItem({
           <TooltipTrigger asChild>
             <button
               onClick={() => deleteBlock(block.id)}
-              className="mt-0.5 shrink-0 rounded p-1 text-charcoal-ink/20 opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 focus:outline-none"
+              className="mt-0.5 shrink-0 rounded p-1 text-charcoal-ink/20 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-destructive/10 hover:text-destructive focus:outline-none"
               aria-label={`Delete block ${block.key}`}
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -265,7 +265,7 @@ function SortableSection({
         <button
           {...attributes}
           {...listeners}
-          className="shrink-0 cursor-grab text-charcoal-ink/20 hover:text-charcoal-ink/50 focus:outline-none active:cursor-grabbing"
+          className="shrink-0 cursor-grab text-charcoal-ink/20 hover:text-charcoal-ink/50 focus:outline-none active:cursor-grabbing p-2"
           aria-label="Drag to reorder section"
         >
           <GripVertical className="h-4 w-4" />
@@ -295,7 +295,7 @@ function SortableSection({
                 onChange={(e) => setSectionTitle(e.target.value)}
                 onBlur={handleTitleBlur}
                 onKeyDown={handleTitleKeyDown}
-                className="h-6 w-48 px-1 py-0 text-sm font-semibold font-[family-name:var(--font-inter)]"
+                className="h-6 w-full max-w-[192px] px-1 py-0 text-sm font-semibold font-[family-name:var(--font-inter)]"
                 onClick={(e) => e.stopPropagation()}
               />
             ) : (
@@ -328,7 +328,7 @@ function SortableSection({
             <TooltipTrigger asChild>
               <button
                 onClick={() => deleteSection(section.id)}
-                className="shrink-0 rounded p-1 text-charcoal-ink/20 transition-colors hover:bg-destructive/10 hover:text-destructive focus:outline-none"
+                className="shrink-0 rounded p-2.5 text-charcoal-ink/20 transition-colors hover:bg-destructive/10 hover:text-destructive focus:outline-none"
                 aria-label={`Delete section ${section.title}`}
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -607,7 +607,7 @@ function Sidebar({
             onClick={onCloseMobile}
           />
           {/* Drawer */}
-          <aside className="relative z-10 h-full w-[300px] bg-white shadow-xl animate-in slide-in-from-left duration-200">
+          <aside className="relative z-10 h-full w-[300px] max-w-[calc(100vw-2rem)] bg-white shadow-xl animate-in slide-in-from-left duration-200">
             {sidebarContent}
           </aside>
         </div>

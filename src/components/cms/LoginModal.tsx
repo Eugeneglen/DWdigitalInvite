@@ -256,7 +256,7 @@ export function LoginModal({ open, onOpenChange, variant = 'default', targetRole
           {/* Gold accent top bar */}
           <div className='h-[2px] bg-cinematic-gold' />
 
-          <div className="px-10 pt-10 pb-8">
+          <div className="px-6 sm:px-10 pt-10 pb-8">
             {/* ── Recovery view ──────────────────────────────────── */}
             {view === 'forgot-password' && renderForgotPassword()}
 
@@ -410,7 +410,7 @@ export function LoginModal({ open, onOpenChange, variant = 'default', targetRole
                           <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-0 top-1/2 -translate-y-1/2 p-2 transition-colors duration-200 text-charcoal-ink/30 hover:text-charcoal-ink/60"
+                            className="absolute right-0 top-1/2 -translate-y-1/2 p-2.5 transition-colors duration-200 text-charcoal-ink/30 hover:text-charcoal-ink/60"
                             tabIndex={-1}
                             aria-label={showPassword ? 'Hide password' : 'Show password'}
                           >
@@ -500,7 +500,7 @@ export function LoginModal({ open, onOpenChange, variant = 'default', targetRole
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-0 top-1/2 -translate-y-1/2 p-2 transition-colors duration-200 text-charcoal-ink/30 hover:text-charcoal-ink/60"
+                          className="absolute right-0 top-1/2 -translate-y-1/2 p-2.5 transition-colors duration-200 text-charcoal-ink/30 hover:text-charcoal-ink/60"
                           tabIndex={-1}
                           aria-label={showPassword ? 'Hide password' : 'Show password'}
                         >

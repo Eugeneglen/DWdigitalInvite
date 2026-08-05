@@ -556,7 +556,7 @@ export default function CoupleStory() {
                         variant="ghost"
                         size="sm"
                         onClick={() => openEditDialog(item)}
-                        className="h-8 w-8 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
+                        className="h-9 w-9 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
                         title="Edit chapter"
                       >
                         <Pencil className="size-3.5" />
@@ -566,7 +566,7 @@ export default function CoupleStory() {
                         size="sm"
                         onClick={() => handleDelete(item.id)}
                         disabled={deleting === item.id}
-                        className="h-8 w-8 p-0 text-charcoal-ink/40 hover:text-red-500 hover:bg-red-50"
+                        className="h-9 w-9 p-0 text-charcoal-ink/40 hover:text-red-500 hover:bg-red-50"
                         title="Delete chapter"
                       >
                         {deleting === item.id ? (
@@ -620,7 +620,7 @@ export default function CoupleStory() {
               <p className="text-xs text-charcoal-ink/40">Fun Q&amp;A facts about the couple</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
               <span className="text-[10px] text-charcoal-ink/40">
                 {contentFields['tidbitsEnabled'] !== 'false' ? 'Visible to guests' : 'Hidden from guests'}
@@ -689,12 +689,12 @@ export default function CoupleStory() {
                     <p className="text-sm font-semibold text-charcoal-ink">{item.q}</p>
                     <p className="text-xs text-charcoal-ink/50 mt-0.5 line-clamp-2">{item.a}</p>
                   </div>
-                  <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-0.5 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => openEditTidbit(idx)}
-                      className="h-7 w-7 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
+                      className="h-9 w-9 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
                     >
                       <Pencil className="size-3" />
                     </Button>
@@ -702,7 +702,7 @@ export default function CoupleStory() {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDeleteTidbit(idx)}
-                      className="h-7 w-7 p-0 text-charcoal-ink/40 hover:text-red-500 hover:bg-red-50"
+                      className="h-9 w-9 p-0 text-charcoal-ink/40 hover:text-red-500 hover:bg-red-50"
                     >
                       <Trash2 className="size-3" />
                     </Button>
@@ -729,7 +729,7 @@ export default function CoupleStory() {
               <p className="text-xs text-charcoal-ink/40">Let guests vote on your honeymoon destination</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
               <span className="text-[10px] text-charcoal-ink/40">
                 {contentFields['honeymoonEnabled'] !== 'false' ? 'Visible to guests' : 'Hidden from guests'}
@@ -818,12 +818,12 @@ export default function CoupleStory() {
                   className="flex items-center justify-between gap-2 p-3 rounded-lg border border-charcoal-ink/5 bg-white/50 hover:border-champagne-silk/50 transition-colors group"
                 >
                   <p className="text-sm font-medium text-charcoal-ink truncate">{item.name}</p>
-                  <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-0.5 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => openEditDestination(idx)}
-                      className="h-6 w-6 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
+                      className="h-9 w-9 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
                     >
                       <Pencil className="size-3" />
                     </Button>
@@ -831,7 +831,7 @@ export default function CoupleStory() {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDeleteDestination(idx)}
-                      className="h-6 w-6 p-0 text-charcoal-ink/40 hover:text-red-500 hover:bg-red-50"
+                      className="h-9 w-9 p-0 text-charcoal-ink/40 hover:text-red-500 hover:bg-red-50"
                     >
                       <Trash2 className="size-3" />
                     </Button>

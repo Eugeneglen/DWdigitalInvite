@@ -397,7 +397,7 @@ export default function CoupleAnalytics() {
               No guest groups defined
             </div>
           ) : (
-            <div className="max-h-72 overflow-y-auto">
+            <div className="max-h-72 overflow-y-auto overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-white">
                   <tr className="border-b border-champagne-silk">
@@ -410,10 +410,10 @@ export default function CoupleAnalytics() {
                     <th className="text-right py-2.5 px-3 text-[11px] font-medium text-emerald-600/60 uppercase tracking-wider">
                       Attending
                     </th>
-                    <th className="text-right py-2.5 px-3 text-[11px] font-medium text-red-500/60 uppercase tracking-wider">
+                    <th className="text-right py-2.5 px-3 text-[11px] font-medium text-red-500/60 uppercase tracking-wider hidden sm:table-cell">
                       Declined
                     </th>
-                    <th className="text-right py-2.5 px-3 text-[11px] font-medium text-amber-600/60 uppercase tracking-wider">
+                    <th className="text-right py-2.5 px-3 text-[11px] font-medium text-amber-600/60 uppercase tracking-wider hidden sm:table-cell">
                       Pending
                     </th>
                     <th className="text-right py-2.5 pl-3 text-[11px] font-medium text-charcoal-ink/40 uppercase tracking-wider">
@@ -436,10 +436,10 @@ export default function CoupleAnalytics() {
                       <td className="py-2.5 px-3 text-right text-xs text-emerald-700 font-medium">
                         {row.attending}
                       </td>
-                      <td className="py-2.5 px-3 text-right text-xs text-red-600">
+                      <td className="py-2.5 px-3 text-right text-xs text-red-600 hidden sm:table-cell">
                         {row.declined}
                       </td>
-                      <td className="py-2.5 px-3 text-right text-xs text-amber-600">
+                      <td className="py-2.5 px-3 text-right text-xs text-amber-600 hidden sm:table-cell">
                         {row.pending}
                       </td>
                       <td className="py-2.5 pl-3 text-right">

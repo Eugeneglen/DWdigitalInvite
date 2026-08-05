@@ -383,7 +383,7 @@ export default function MasterSettings() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {Array.from({ length: 3 }).map((_, j) => (
-                  <div key={j} className="flex items-center justify-between gap-4">
+                  <div key={j} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <Skeleton className="h-4 w-36" />
                     <Skeleton className="h-9 w-48" />
                   </div>
@@ -403,11 +403,11 @@ export default function MasterSettings() {
               </CardHeader>
               <CardContent className="space-y-5">
                 {section.fields.map((field) => (
-                  <div key={field.key} className="flex items-center justify-between gap-4">
+                  <div key={field.key} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <Label htmlFor={field.key} className="text-sm text-slate-700 whitespace-nowrap shrink-0">
                       {field.label}
                     </Label>
-                    <div className="w-full max-w-sm">
+                    <div className="w-full max-w-full sm:max-w-sm">
                       {field.type === 'switch' ? (
                         <div className="flex items-center justify-end">
                           <Switch
@@ -439,7 +439,7 @@ export default function MasterSettings() {
                           value={settings[field.key] ?? ''}
                           onChange={(e) => updateField(field.key, e.target.value)}
                           placeholder={field.placeholder}
-                          className="max-w-sm"
+                          className="max-w-full sm:max-w-sm"
                         />
                       )}
                     </div>
@@ -464,11 +464,11 @@ export default function MasterSettings() {
             </CardHeader>
             <CardContent className="space-y-5">
               {/* Provider selector */}
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <Label className="text-sm text-slate-700 whitespace-nowrap shrink-0">
                   Email Provider
                 </Label>
-                <div className="w-full max-w-sm">
+                <div className="w-full max-w-full sm:max-w-sm">
                   <Select
                     value={emailConfig.provider}
                     onValueChange={(val) => setEmailConfig(prev => ({ ...prev, provider: val as EmailProviderConfig['provider'] }))}
@@ -491,11 +491,11 @@ export default function MasterSettings() {
               {/* API Key (hidden when provider is 'none') */}
               {emailConfig.provider !== 'none' && (
                 <>
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <Label className="text-sm text-slate-700 whitespace-nowrap shrink-0">
                       API Key
                     </Label>
-                    <div className="w-full max-w-sm">
+                    <div className="w-full max-w-full sm:max-w-sm">
                       <Input
                         type="password"
                         autoComplete="off"
@@ -504,51 +504,51 @@ export default function MasterSettings() {
                         value={emailConfig.apiKey}
                         onChange={(e) => setEmailConfig(prev => ({ ...prev, apiKey: e.target.value }))}
                         placeholder={emailConfig.provider === 'smtp' ? 'SMTP connection string' : 'Enter API key...'}
-                        className="max-w-sm"
+                        className="max-w-full sm:max-w-sm"
                       />
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <Label className="text-sm text-slate-700 whitespace-nowrap shrink-0">
                       From Email
                     </Label>
-                    <div className="w-full max-w-sm">
+                    <div className="w-full max-w-full sm:max-w-sm">
                       <Input
                         type="email"
                         value={emailConfig.fromEmail}
                         onChange={(e) => setEmailConfig(prev => ({ ...prev, fromEmail: e.target.value }))}
                         placeholder="noreply@dreamweavers.sg"
-                        className="max-w-sm"
+                        className="max-w-full sm:max-w-sm"
                       />
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <Label className="text-sm text-slate-700 whitespace-nowrap shrink-0">
                       From Name
                     </Label>
-                    <div className="w-full max-w-sm">
+                    <div className="w-full max-w-full sm:max-w-sm">
                       <Input
                         value={emailConfig.fromName}
                         onChange={(e) => setEmailConfig(prev => ({ ...prev, fromName: e.target.value }))}
                         placeholder="DreamWeavers"
-                        className="max-w-sm"
+                        className="max-w-full sm:max-w-sm"
                       />
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <Label className="text-sm text-slate-700 whitespace-nowrap shrink-0">
                       Reply-To Email
                     </Label>
-                    <div className="w-full max-w-sm">
+                    <div className="w-full max-w-full sm:max-w-sm">
                       <Input
                         type="email"
                         value={emailConfig.replyTo}
                         onChange={(e) => setEmailConfig(prev => ({ ...prev, replyTo: e.target.value }))}
                         placeholder="support@dreamweavers.sg (optional)"
-                        className="max-w-sm"
+                        className="max-w-full sm:max-w-sm"
                       />
                     </div>
                   </div>
@@ -686,7 +686,7 @@ export default function MasterSettings() {
                 {tabs.map((tab, index) => (
                   <div
                     key={tab.id}
-                    className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-100 hover:border-slate-200 bg-slate-50/50 transition-colors group"
+                    className="flex items-center flex-wrap gap-2 p-2.5 rounded-lg border border-slate-100 hover:border-slate-200 bg-slate-50/50 transition-colors group"
                   >
                     {/* Grip handle */}
                     <GripVertical className="h-4 w-4 text-slate-300 shrink-0" />
@@ -697,7 +697,7 @@ export default function MasterSettings() {
                         type="button"
                         disabled={index === 0}
                         onClick={() => moveTab(index, 'up')}
-                        className="p-0.5 text-slate-400 hover:text-slate-600 disabled:opacity-20 disabled:hover:text-slate-400 transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-slate-600 disabled:opacity-20 disabled:hover:text-slate-400 transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
                         aria-label="Move up"
                       >
                         <ChevronUp className="h-3.5 w-3.5" />
@@ -706,7 +706,7 @@ export default function MasterSettings() {
                         type="button"
                         disabled={index === tabs.length - 1}
                         onClick={() => moveTab(index, 'down')}
-                        className="p-0.5 text-slate-400 hover:text-slate-600 disabled:opacity-20 disabled:hover:text-slate-400 transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-slate-600 disabled:opacity-20 disabled:hover:text-slate-400 transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
                         aria-label="Move down"
                       >
                         <ChevronDown className="h-3.5 w-3.5" />
@@ -737,7 +737,7 @@ export default function MasterSettings() {
                     <button
                       type="button"
                       onClick={() => removeTab(index)}
-                      className="p-1.5 text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+                      className="p-1.5 text-slate-300 hover:text-red-500 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 shrink-0"
                       aria-label="Remove tab"
                     >
                       <Trash2 className="h-3.5 w-3.5" />

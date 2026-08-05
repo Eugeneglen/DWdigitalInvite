@@ -185,7 +185,7 @@ export default function MasterDashboard() {
       </div>
 
       {/* ── Period Selector + Stats ───────────────────────────────────── */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Period Stats</h3>
         <div className="flex items-center gap-2">
           <div className="flex gap-1">
@@ -261,7 +261,7 @@ export default function MasterDashboard() {
       {/* ── Alerts ────────────────────────────────────────────────────── */}
       <div>
         <h3 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">Alerts</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <AlertCard
             icon={Clock}
             title="Expiring Access"
@@ -393,13 +393,14 @@ export default function MasterDashboard() {
           </div>
           <Card>
             <CardContent className="p-0">
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100">
                     <th className="text-left p-3 text-xs text-slate-500 uppercase">Staff</th>
-                    <th className="text-center p-3 text-xs text-slate-500 uppercase">Role</th>
+                    <th className="text-center p-3 text-xs text-slate-500 uppercase hidden md:table-cell">Role</th>
                     <th className="text-center p-3 text-xs text-slate-500 uppercase">Weddings</th>
-                    <th className="text-right p-3 text-xs text-slate-500 uppercase">Last Login</th>
+                    <th className="text-right p-3 text-xs text-slate-500 uppercase hidden md:table-cell">Last Login</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -409,19 +410,20 @@ export default function MasterDashboard() {
                         <p className="font-medium text-slate-800">{staff.name}</p>
                         <p className="text-xs text-slate-400">{staff.email}</p>
                       </td>
-                      <td className="text-center p-3">
+                      <td className="text-center p-3 hidden md:table-cell">
                         <Badge variant="outline" className="text-xs">{staff.role.replace(/_/g, ' ')}</Badge>
                       </td>
                       <td className="text-center p-3">
                         <span className="font-bold text-slate-900">{staff.totalWeddings}</span>
                       </td>
-                      <td className="text-right p-3 text-xs text-slate-400">
+                      <td className="text-right p-3 text-xs text-slate-400 hidden md:table-cell">
                         {relativeTime(staff.lastLoginAt || '')}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              </div>
             </CardContent>
           </Card>
         </div>

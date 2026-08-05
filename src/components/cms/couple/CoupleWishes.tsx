@@ -273,7 +273,7 @@ export default function CoupleWishes() {
                     size="sm"
                     onClick={() => handleDelete(wish.id)}
                     disabled={deleting === wish.id}
-                    className="h-8 w-8 p-0 text-charcoal-ink/30 hover:text-red-500 hover:bg-red-50 shrink-0 mt-1"
+                    className="h-9 w-9 p-0 text-charcoal-ink/30 hover:text-red-500 hover:bg-red-50 shrink-0 mt-1"
                     title="Delete wish"
                   >
                     {deleting === wish.id ? (

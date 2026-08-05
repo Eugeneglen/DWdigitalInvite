@@ -120,7 +120,7 @@ export function HeroVisualSection({ weddingData }: { weddingData: Record<string,
               <button
                 type="button"
                 onClick={() => handleRemove('video')}
-                className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 text-white hover:bg-red-500 transition-colors"
+                className="absolute top-2 right-2 p-2.5 rounded-full bg-black/50 text-white hover:bg-red-500 transition-colors"
                 title="Remove video"
               >
                 <X className="size-3.5" />
@@ -137,7 +137,7 @@ export function HeroVisualSection({ weddingData }: { weddingData: Record<string,
               <button
                 type="button"
                 onClick={() => handleRemove('image')}
-                className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 text-white hover:bg-red-500 transition-colors"
+                className="absolute top-2 right-2 p-2.5 rounded-full bg-black/50 text-white hover:bg-red-500 transition-colors"
                 title="Remove image"
               >
                 <X className="size-3.5" />
@@ -162,7 +162,7 @@ export function HeroVisualSection({ weddingData }: { weddingData: Record<string,
                 }
               }}
               disabled={uploading}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-charcoal-ink/10 hover:border-cinematic-gold hover:bg-cinematic-gold/5 transition-colors text-xs font-medium text-charcoal-ink/70 disabled:opacity-50"
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border border-charcoal-ink/10 hover:border-cinematic-gold hover:bg-cinematic-gold/5 transition-colors text-xs font-medium text-charcoal-ink/70 disabled:opacity-50"
             >
               {uploading && uploadType === 'image' ? (
                 <Loader2 className="size-3.5 animate-spin" />

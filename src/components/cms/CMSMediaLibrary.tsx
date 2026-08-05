@@ -497,7 +497,7 @@ export default function CMSMediaLibrary({
                     </div>
 
                     {/* Hover overlay */}
-                    <div className="absolute inset-0 flex flex-col justify-end rounded-md bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none">
+                    <div className="absolute inset-0 flex flex-col justify-end rounded-md bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
                       <div className="p-2">
                         <p
                           className="font-[family-name:var(--font-inter)] text-[11px] text-white font-medium truncate"
@@ -519,7 +519,7 @@ export default function CMSMediaLibrary({
                         e.stopPropagation();
                         setDeleteTarget(item);
                       }}
-                      className="absolute top-1.5 right-1.5 flex items-center justify-center size-7 rounded-md bg-black/50 text-white/80 opacity-0 transition-all duration-200 group-hover:opacity-100 hover:bg-red-600 hover:text-white pointer-events-auto"
+                      className="absolute top-1.5 right-1.5 flex items-center justify-center size-9 rounded-md bg-black/50 text-white/80 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all duration-200 hover:bg-red-600 hover:text-white pointer-events-auto"
                       aria-label={`Delete ${item.originalName}`}
                     >
                       <Trash2 className="size-3.5" />

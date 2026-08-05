@@ -135,7 +135,7 @@ export function ChangePasswordModal({ open, onSuccess }: ChangePasswordModalProp
                   <button
                     type="button"
                     onClick={() => setShowCurrent(!showCurrent)}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 p-2 text-charcoal-ink/30 hover:text-charcoal-ink/60"
+                    className="absolute right-0 top-1/2 -translate-y-1/2 p-2.5 text-charcoal-ink/30 hover:text-charcoal-ink/60"
                     tabIndex={-1}
                   >
                     {showCurrent ? <X className="size-4" /> : <KeyRound className="size-4" />}
@@ -162,7 +162,7 @@ export function ChangePasswordModal({ open, onSuccess }: ChangePasswordModalProp
                   <button
                     type="button"
                     onClick={() => setShowNew(!showNew)}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 p-2 text-charcoal-ink/30 hover:text-charcoal-ink/60"
+                    className="absolute right-0 top-1/2 -translate-y-1/2 p-2.5 text-charcoal-ink/30 hover:text-charcoal-ink/60"
                     tabIndex={-1}
                   >
                     {showNew ? <X className="size-4" /> : <KeyRound className="size-4" />}

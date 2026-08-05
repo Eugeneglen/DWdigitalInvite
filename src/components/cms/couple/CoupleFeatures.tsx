@@ -494,7 +494,7 @@ export default function CoupleFeatures() {
                       </div>
                       <p className="text-[10px] text-charcoal-ink/30">Upload an MP3/WAV/OGG/M4A file (max 10 MB) or paste a direct URL</p>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1.5">
                         <Label className="text-xs font-medium text-charcoal-ink/70">Song Title</Label>
                         <Input
@@ -514,7 +514,7 @@ export default function CoupleFeatures() {
                         />
                       </div>
                     </div>
-                    <div className="flex items-center gap-6">
+                    <div className="flex flex-wrap items-center gap-4">
                       <div className="flex items-center gap-2">
                         <Switch
                           checked={musicConfig.autoplay}
@@ -577,7 +577,7 @@ export default function CoupleFeatures() {
                         className="h-16 text-xs resize-none"
                       />
                     </div>
-                    <div className="flex items-center gap-6">
+                    <div className="flex flex-wrap items-center gap-4">
                       <div className="flex items-center gap-2">
                         <Switch
                           checked={videoConfig.autoplay}

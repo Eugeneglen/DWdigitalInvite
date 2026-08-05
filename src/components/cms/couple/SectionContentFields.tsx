@@ -148,7 +148,6 @@ export default function SectionContentFields({
               <Button
                 onClick={handleSave}
                 disabled={saving}
-                size="sm"
                 className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 rounded px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.08em] transition-colors duration-300 shrink-0"
               >
                 {saving ? (

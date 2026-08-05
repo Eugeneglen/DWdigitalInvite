@@ -208,13 +208,14 @@ export default function MasterTemplates() {
       {/* Templates table */}
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[50px]"></TableHead>
                 <TableHead>Template</TableHead>
-                <TableHead>Content</TableHead>
-                <TableHead>Theme</TableHead>
+                <TableHead className="hidden md:table-cell">Content</TableHead>
+                <TableHead className="hidden md:table-cell">Theme</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -247,7 +248,7 @@ export default function MasterTemplates() {
                         {t.description && <p className="text-xs text-slate-400 mt-0.5">{t.description}</p>}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell">
                       <div className="flex flex-wrap gap-2 text-xs text-slate-500">
                         <span className="flex items-center gap-1" title="Content sections"><FileText className="size-3" />{t.contentCount}</span>
                         <span className="flex items-center gap-1" title="Schedule items"><Calendar className="size-3" />{t.scheduleCount}</span>
@@ -256,7 +257,7 @@ export default function MasterTemplates() {
                         <span className="flex items-center gap-1" title="Media"><ImageIcon className="size-3" />{t.mediaCount}</span>
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell">
                       <div className="flex items-center gap-1.5">
                         <div className="w-4 h-4 rounded-full border border-slate-200" style={{ backgroundColor: t.theme.colors.bg }} title="Background" />
                         <div className="w-4 h-4 rounded-full border border-slate-200" style={{ backgroundColor: t.theme.colors.accent }} title="Accent" />
@@ -301,6 +302,7 @@ export default function MasterTemplates() {
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -451,7 +453,7 @@ export default function MasterTemplates() {
               {editTab === 'content' && (
                 <div className="space-y-3 max-h-[400px] overflow-y-auto">
                   {editData.content.map((item, idx) => (
-                    <div key={idx} className="grid grid-cols-3 gap-2 items-start">
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-start">
                       <div className="col-span-1">
                         <Badge variant="outline" className="text-xs">{item.section}</Badge>
                         <p className="text-xs text-slate-400 mt-1">{item.fieldKey}</p>
@@ -475,7 +477,7 @@ export default function MasterTemplates() {
               {editTab === 'schedule' && (
                 <div className="space-y-3 max-h-[400px] overflow-y-auto">
                   {editData.schedule.map((item, idx) => (
-                    <div key={idx} className="grid grid-cols-2 gap-2 items-start border-b border-slate-50 pb-2">
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-2 gap-2 items-start border-b border-slate-50 pb-2">
                       <Input
                         className="text-sm"
                         value={item.title}
@@ -596,7 +598,7 @@ export default function MasterTemplates() {
                 <div className="space-y-4">
                   <div>
                     <Label className="text-xs uppercase tracking-wider text-slate-500 mb-2 block">Colors</Label>
-                    <div className="grid grid-cols-5 gap-3">
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
                       {(['bg', 'text', 'accent', 'secondary', 'muted'] as const).map((key) => (
                         <div key={key} className="text-center">
                           <Label className="text-xs text-slate-400 capitalize">{key}</Label>

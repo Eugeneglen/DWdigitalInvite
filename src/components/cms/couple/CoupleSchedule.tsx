@@ -520,7 +520,7 @@ export default function CoupleSchedule() {
                       variant="ghost"
                       size="sm"
                       onClick={() => openEditDialog(item)}
-                      className="h-8 w-8 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
+                      className="h-9 w-9 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
                     >
                       <Pencil className="size-3.5" />
                     </Button>
@@ -529,7 +529,7 @@ export default function CoupleSchedule() {
                       size="sm"
                       onClick={() => handleDelete(item.id)}
                       disabled={deleting === item.id}
-                      className="h-8 w-8 p-0 text-charcoal-ink/40 hover:text-red-500 hover:bg-red-50"
+                      className="h-9 w-9 p-0 text-charcoal-ink/40 hover:text-red-500 hover:bg-red-50"
                     >
                       {deleting === item.id ? (
                         <Loader2 className="size-3.5 animate-spin" />

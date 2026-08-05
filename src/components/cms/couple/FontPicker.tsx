@@ -210,7 +210,7 @@ export default function FontPicker({ section }: FontPickerProps) {
                             : 'border-l-2 border-transparent hover:bg-charcoal-ink/[0.03]'
                         }`}
                       >
-                        <div className="px-3 py-1.5">
+                        <div className="px-3 py-2">
                           <p
                             className="text-base text-charcoal-ink leading-snug truncate"
                             style={{ fontFamily: `'${font.value}', serif` }}
