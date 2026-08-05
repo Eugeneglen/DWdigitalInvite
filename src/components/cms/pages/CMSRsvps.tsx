@@ -200,7 +200,7 @@ export default function CMSRsvps({ selectedTenantId, authUser }: CMSRsvpsProps) 
 
       {/* Summary Cards */}
       {summary && !loading && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
           <div className="bg-white border rounded-lg p-4">
             <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium mb-1">
               <Users className="h-3.5 w-3.5" /> Submissions
@@ -372,7 +372,7 @@ export default function CMSRsvps({ selectedTenantId, authUser }: CMSRsvpsProps) 
           </DialogHeader>
           {selectedRsvp && (
             <div className="space-y-4 mt-2">
-              <div className="flex gap-4">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                 <div className="flex-1 bg-muted/50 rounded-lg p-3">
                   <p className="text-xs text-muted-foreground mb-1">Party Size</p>
                   <p className="text-lg font-bold">{selectedRsvp.partySize}</p>
@@ -386,7 +386,7 @@ export default function CMSRsvps({ selectedTenantId, authUser }: CMSRsvpsProps) 
                 <h4 className="text-sm font-semibold mb-2">Guest Responses</h4>
                 <div className="space-y-2">
                   {selectedRsvp.guests.map((guest) => (
-                    <div key={guest.id} className="flex items-center justify-between bg-white border rounded-lg p-3">
+                    <div key={guest.id} className="flex flex-wrap items-center gap-2 bg-white border rounded-lg p-3">
                       <div className="flex items-center gap-3">
                         {getAttendanceIcon(guest.attendance)}
                         <span className="font-medium">{guest.name}</span>

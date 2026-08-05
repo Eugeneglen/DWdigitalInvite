@@ -213,7 +213,7 @@ export default function MasterRoles() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">Roles &amp; Permissions</h2>
           <p className="text-slate-500 mt-1">Manage staff roles and their permissions</p>

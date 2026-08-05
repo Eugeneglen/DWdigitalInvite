@@ -294,7 +294,7 @@ export default function CMSFeatures() {
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <Badge
                       variant="outline"
-                      className={`text-[10px] px-1.5 py-0 ${
+                      className={`text-[10px] px-1.5 py-0 hidden sm:inline-flex ${
                         enabled
                           ? 'bg-green-50 text-green-700 border-green-200'
                           : 'bg-gray-100 text-gray-500 border-gray-200'

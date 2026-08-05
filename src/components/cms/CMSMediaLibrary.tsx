@@ -336,7 +336,7 @@ export default function CMSMediaLibrary({
           showCloseButton={false}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 pt-5 pb-3">
+          <div className="flex items-center justify-between px-4 sm:px-6 pt-5 pb-3">
             <DialogHeader className="gap-0">
               <DialogTitle
                 className="font-[family-name:var(--font-inter)] text-charcoal-ink text-xl"
@@ -357,7 +357,7 @@ export default function CMSMediaLibrary({
           </div>
 
           {/* Upload Zone */}
-          <div className="px-6 pb-3">
+          <div className="px-4 sm:px-6 pb-3">
             <div
               onDragEnter={handleDragEnter}
               onDragLeave={handleDragLeave}
@@ -420,7 +420,7 @@ export default function CMSMediaLibrary({
           </div>
 
           {/* Search bar */}
-          <div className="px-6 pb-3">
+          <div className="px-4 sm:px-6 pb-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-charcoal-ink/40" />
               <Input
@@ -433,10 +433,10 @@ export default function CMSMediaLibrary({
           </div>
 
           {/* Content area */}
-          <div className="flex-1 overflow-y-auto px-6 pb-6 min-h-0">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 pb-6 min-h-0">
             {/* Loading state */}
             {loading && (
-              <div className="grid grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
                 {Array.from({ length: 10 }).map((_, i) => (
                   <div key={i} className="flex flex-col gap-1.5">
                     <Skeleton className="aspect-square w-full rounded-md bg-champagne-silk/30" />
@@ -466,7 +466,7 @@ export default function CMSMediaLibrary({
 
             {/* Image grid */}
             {!loading && filteredMedia.length > 0 && (
-              <div className="grid grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
                 {filteredMedia.map((item) => (
                   <div
                     key={item.id}

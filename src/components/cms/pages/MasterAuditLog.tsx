@@ -394,7 +394,7 @@ export default function MasterAuditLog() {
 
         {/* Pagination */}
         {!loading && logs.length > 0 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 bg-slate-50/30">
+          <div className="flex flex-wrap items-center justify-between px-4 py-3 border-t border-slate-200 bg-slate-50/30 gap-2">
             <p className="text-xs text-slate-500">
               Page {page} of {Math.max(1, totalPages)} · {total} total {total === 1 ? 'entry' : 'entries'}
             </p>

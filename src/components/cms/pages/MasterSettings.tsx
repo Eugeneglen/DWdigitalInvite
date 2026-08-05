@@ -666,7 +666,7 @@ export default function MasterSettings() {
                 </div>
                 {availableSections.length > 0 && (
                   <Select onValueChange={addTab}>
-                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                    <SelectTrigger className="w-full sm:w-[180px] h-8 text-xs">
                       <Plus className="h-3.5 w-3.5 mr-1" />
                       <SelectValue placeholder="Add tab..." />
                     </SelectTrigger>

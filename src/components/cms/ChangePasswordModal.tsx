@@ -94,7 +94,7 @@ export function ChangePasswordModal({ open, onSuccess }: ChangePasswordModalProp
           {/* Gold accent top bar */}
           <div className="h-[2px] bg-cinematic-gold" />
 
-          <div className="px-8 pt-8 pb-6">
+          <div className="px-6 sm:px-8 pt-8 pb-6">
             <DialogHeader className="text-center">
               <div className="flex items-center justify-center mb-4">
                 <div className="w-10 h-10 rounded-full bg-cinematic-gold/10 border border-cinematic-gold/30 flex items-center justify-center">

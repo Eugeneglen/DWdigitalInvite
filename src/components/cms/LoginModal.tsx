@@ -545,7 +545,7 @@ export function LoginModal({ open, onOpenChange, variant = 'default', targetRole
           </div>
 
           {/* Footer */}
-          <div className="border-t border-champagne-silk/20 px-10 py-5 text-center">
+          <div className="border-t border-champagne-silk/20 px-6 sm:px-10 py-5 text-center">
             <img
               src="/dreamweavers-logo.png"
               alt="Dreamweavers"

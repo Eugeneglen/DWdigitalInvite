@@ -59,7 +59,7 @@ export function CMSPageHeader() {
         {isDirty && (
           <span className="flex shrink-0 items-center gap-1.5 text-xs text-cinematic-gold font-[family-name:var(--font-inter)]">
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-cinematic-gold" />
-            Unsaved changes
+            <span className="hidden sm:inline">Unsaved changes</span>
           </span>
         )}
       </div>

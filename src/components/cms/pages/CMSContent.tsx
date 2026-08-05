@@ -365,7 +365,7 @@ export default function CMSContent() {
               className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 flex items-start gap-4 hover:border-gray-300 transition-colors"
             >
               {/* Image Preview */}
-              <div className="h-16 w-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 border border-gray-200">
+              <div className="h-16 w-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 border border-gray-200 hidden sm:block">
                 {item.imageUrl ? (
                   <Image
                     src={item.imageUrl}

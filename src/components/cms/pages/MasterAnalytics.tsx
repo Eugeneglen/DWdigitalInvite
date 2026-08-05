@@ -136,7 +136,7 @@ export default function MasterAnalytics() {
   return (
     <div className="space-y-6">
       {/* ── Header + Period Selector ──────────────────────────────────── */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">Analytics</h2>
           <p className="text-sm text-slate-500 mt-1">Business performance insights</p>
@@ -161,7 +161,7 @@ export default function MasterAnalytics() {
       </div>
 
       {showCustom && (
-        <div className="flex items-center gap-2 bg-slate-50 rounded-lg p-3">
+        <div className="flex items-center gap-2 flex-wrap bg-slate-50 rounded-lg p-3">
           <input
             type="date"
             value={customFrom}
@@ -375,7 +375,7 @@ export default function MasterAnalytics() {
 
       {/* ── Staff Performance ────────────────────────────────────────── */}
       <div>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex flex-wrap items-center justify-between mb-3 gap-2">
           <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Staff Performance</h3>
           {data.staffPerformance.length > 0 && (
             <Button
@@ -397,13 +397,14 @@ export default function MasterAnalytics() {
             {data.staffPerformance.length === 0 ? (
               <EmptyChartState message="No staff to display" />
             ) : (
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100">
                     <th className="text-left p-3 text-xs text-slate-500 uppercase">Staff</th>
-                    <th className="text-center p-3 text-xs text-slate-500 uppercase">Role</th>
+                    <th className="text-center p-3 text-xs text-slate-500 uppercase hidden md:table-cell">Role</th>
                     <th className="text-center p-3 text-xs text-slate-500 uppercase">Weddings</th>
-                    <th className="text-center p-3 text-xs text-slate-500 uppercase">RSVPs</th>
+                    <th className="text-center p-3 text-xs text-slate-500 uppercase hidden md:table-cell">RSVPs</th>
                     <th className="text-center p-3 text-xs text-slate-500 uppercase">Actions ({data.range}d)</th>
                   </tr>
                 </thead>
@@ -414,16 +415,17 @@ export default function MasterAnalytics() {
                         <p className="font-medium text-slate-800">{staff.name}</p>
                         <p className="text-xs text-slate-400">{staff.email}</p>
                       </td>
-                      <td className="text-center p-3">
+                      <td className="text-center p-3 hidden md:table-cell">
                         <Badge variant="outline" className="text-xs">{staff.role.replace(/_/g, ' ')}</Badge>
                       </td>
                       <td className="text-center p-3 font-bold text-slate-900">{staff.weddingsAssigned}</td>
-                      <td className="text-center p-3 font-bold text-slate-900">{staff.rsvpsOnAssignedWeddings}</td>
+                      <td className="text-center p-3 font-bold text-slate-900 hidden md:table-cell">{staff.rsvpsOnAssignedWeddings}</td>
                       <td className="text-center p-3 text-slate-600">{staff.auditActionsInRange}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -431,7 +433,7 @@ export default function MasterAnalytics() {
 
       {/* ── Couple Engagement ────────────────────────────────────────── */}
       <div>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex flex-wrap items-center justify-between mb-3 gap-2">
           <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Couple Engagement — Content Completion</h3>
           {data.coupleEngagement.weddingCompletion.length > 0 && (
             <Button
@@ -455,12 +457,12 @@ export default function MasterAnalytics() {
             ) : (
               <div className="max-h-64 overflow-y-auto">
                 {data.coupleEngagement.weddingCompletion.map((w) => (
-                  <div key={w.slug} className="flex items-center gap-4 p-3 border-b border-slate-50 last:border-0">
+                  <div key={w.slug} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-3 border-b border-slate-50 last:border-0">
                     <div className="flex-1">
                       <p className="text-sm font-medium text-slate-800">{w.coupleName}</p>
                       <p className="text-xs text-slate-400">{w.slug} · {w.contentCount} items</p>
                     </div>
-                    <div className="w-48">
+                    <div className="w-full sm:w-48">
                       <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all ${w.completionPct >= 80 ? 'bg-emerald-400' : w.completionPct >= 50 ? 'bg-amber-400' : 'bg-red-400'}`}

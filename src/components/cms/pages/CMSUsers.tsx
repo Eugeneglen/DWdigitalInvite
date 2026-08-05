@@ -276,7 +276,7 @@ export default function CMSUsers() {
             <TableHeader>
               <TableRow className="border-gray-100 hover:bg-transparent">
                 <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</TableHead>
-                <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Email</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Role</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Tenant</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Tenant Role</TableHead>
@@ -311,7 +311,7 @@ export default function CMSUsers() {
                       <TableCell className="font-medium text-charcoal-ink text-sm">
                         {user.name}
                       </TableCell>
-                      <TableCell className="text-sm text-gray-600">
+                      <TableCell className="text-sm text-gray-600 hidden sm:table-cell">
                         {user.email}
                       </TableCell>
                       <TableCell>

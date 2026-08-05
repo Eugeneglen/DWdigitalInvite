@@ -749,7 +749,7 @@ export default function MasterWeddings() {
 
       {/* Pagination */}
       {total > limit && (
-        <div className="flex items-center justify-between px-1">
+        <div className="flex flex-wrap items-center justify-between px-1 gap-2">
           <p className="text-xs text-slate-500">
             Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total}
           </p>
@@ -1173,7 +1173,7 @@ export default function MasterWeddings() {
                       </Button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Login ID</Label>
                       <div className="flex items-center gap-2 mt-1">

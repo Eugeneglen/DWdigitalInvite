@@ -490,7 +490,7 @@ export default function CoupleAnalytics() {
               All guests have responded!
             </div>
           ) : (
-            <div className="max-h-80 overflow-y-auto">
+            <div className="max-h-80 overflow-x-auto overflow-y-auto">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-white">
                   <tr className="border-b border-champagne-silk">
@@ -552,7 +552,7 @@ export default function CoupleAnalytics() {
               No special dietary requirements noted
             </div>
           ) : (
-            <div className="max-h-80 overflow-y-auto">
+            <div className="max-h-80 overflow-x-auto overflow-y-auto">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-white">
                   <tr className="border-b border-champagne-silk">

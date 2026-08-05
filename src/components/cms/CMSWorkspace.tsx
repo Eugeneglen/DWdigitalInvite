@@ -682,12 +682,12 @@ export function CMSWorkspace() {
         {selectedPage ? (
           <>
             {/* Sticky header with page title + actions */}
-            <div className="px-6 pt-4">
+            <div className="px-4 sm:px-6 pt-4">
               <CMSPageHeader />
             </div>
 
             {/* Sections list */}
-            <div className="flex-1 overflow-y-auto px-6 pb-8 pt-4">
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 pb-8 pt-4">
               <SectionDndContext
                 selectedPage={selectedPage}
                 handleSectionDragEnd={handleSectionDragEnd}

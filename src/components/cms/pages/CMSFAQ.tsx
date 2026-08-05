@@ -310,7 +310,7 @@ export default function CMSFAQ() {
           <Accordion type="multiple">
             {items.map((item) => (
               <AccordionItem key={item.id} value={item.id} className="px-5">
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2">
                   <AccordionTrigger className="flex-1 hover:no-underline py-4">
                     <div className="flex items-center gap-3 min-w-0">
                       <span className={`text-sm font-medium text-charcoal-ink truncate ${!item.enabled ? 'text-gray-400' : ''}`}>

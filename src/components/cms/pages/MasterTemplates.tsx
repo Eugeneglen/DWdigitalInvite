@@ -194,7 +194,7 @@ export default function MasterTemplates() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">Content Templates</h2>
           <p className="text-sm text-slate-500 mt-1">Manage default content templates for new couple accounts</p>
@@ -411,7 +411,7 @@ export default function MasterTemplates() {
           {editData && (
             <form onSubmit={handleSaveEdit} className="space-y-4">
               {/* Tab selector */}
-              <div className="flex gap-1 border-b border-slate-200 pb-2">
+              <div className="flex gap-1 border-b border-slate-200 pb-2 overflow-x-auto">
                 {(['details', 'content', 'schedule', 'faqs', 'stories', 'theme'] as const).map((tab) => (
                   <button
                     key={tab}

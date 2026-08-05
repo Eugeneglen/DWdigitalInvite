@@ -249,7 +249,7 @@ export default function CMSWishes({ selectedTenantId, authUser }: PageProps) {
 
       {/* Filters */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-gray-500">Search</Label>
             <div className="relative">
@@ -324,7 +324,7 @@ export default function CMSWishes({ selectedTenantId, authUser }: PageProps) {
           </Button>
         </div>
       ) : loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 space-y-3">
               <div className="flex items-center justify-between">
@@ -344,7 +344,7 @@ export default function CMSWishes({ selectedTenantId, authUser }: PageProps) {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {wishes.map((wish) => (
             <div
               key={wish.id}
@@ -447,7 +447,7 @@ export default function CMSWishes({ selectedTenantId, authUser }: PageProps) {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
           <p className="text-xs text-gray-500">
             Showing {((page - 1) * LIMIT) + 1}–{Math.min(page * LIMIT, total)} of {total}
           </p>

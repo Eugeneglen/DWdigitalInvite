@@ -104,7 +104,7 @@ function ExpandableDetails({ details }: { details: string }) {
         </button>
       )}
       {expanded && (
-        <pre className="text-[11px] bg-gray-50 border border-gray-200 rounded p-2 overflow-x-auto max-w-[200px] sm:max-w-md text-gray-700 mt-1">
+        <pre className="text-[11px] bg-gray-50 border border-gray-200 rounded p-2 overflow-x-auto max-w-full sm:max-w-md text-gray-700 mt-1">
           <code>{formatted}</code>
         </pre>
       )}
@@ -220,7 +220,7 @@ export default function CMSAuditLog() {
 
       {/* Filters */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-gray-500">User</Label>
             <Select value={filterUser} onValueChange={(val) => { setFilterUser(val); setPage(1); }}>
@@ -368,7 +368,7 @@ export default function CMSAuditLog() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-4 py-3 border-t border-gray-100">
             <p className="text-xs text-gray-500">
               Showing {((page - 1) * LIMIT) + 1}–{Math.min(page * LIMIT, total)} of {total}
             </p>

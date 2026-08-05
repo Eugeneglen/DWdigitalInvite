@@ -314,7 +314,7 @@ export default function CMSTenants() {
             <TableHeader>
               <TableRow className="border-gray-100 hover:bg-transparent">
                 <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</TableHead>
-                <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Slug</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Slug</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Event Type</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Couple</TableHead>
@@ -347,7 +347,7 @@ export default function CMSTenants() {
                     <TableCell className="font-medium text-charcoal-ink text-sm">
                       {tenant.name}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       <code className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
                         {tenant.slug}
                       </code>
@@ -408,7 +408,7 @@ export default function CMSTenants() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-4 py-3 border-t border-gray-100">
             <p className="text-xs text-gray-500">
               Showing {((page - 1) * LIMIT) + 1}–{Math.min(page * LIMIT, total)} of {total}
             </p>

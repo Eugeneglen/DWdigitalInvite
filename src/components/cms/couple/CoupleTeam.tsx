@@ -207,7 +207,7 @@ export default function CoupleTeam() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-semibold text-charcoal-ink" style={{ fontFamily: "'Playfair Display', serif" }}>
             Team Members
@@ -244,7 +244,7 @@ export default function CoupleTeam() {
         ) : (
           members.map((member) => (
             <Card key={member.id}>
-              <CardContent className="flex items-center justify-between py-4">
+              <CardContent className="flex flex-wrap items-center justify-between py-4 gap-3">
                 <div className="flex items-center gap-4 min-w-0">
                   {/* Avatar */}
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-charcoal-ink/5 text-sm font-medium text-charcoal-ink/60">
@@ -270,7 +270,7 @@ export default function CoupleTeam() {
                   </div>
                 </div>
                 {/* Role + Actions */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 shrink-0">
                   <Badge variant="outline" className={`text-xs ${getRoleBadgeClass(member.role)}`}>
                     {getRoleIcon(member.role)}
                     <span className="ml-1">{ROLE_LABELS[member.role] || member.role}</span>

@@ -209,7 +209,7 @@ export default function MasterDashboard() {
       </div>
 
       {showCustom && (
-        <div className="flex items-center gap-2 bg-slate-50 rounded-lg p-3">
+        <div className="flex items-center gap-2 flex-wrap bg-slate-50 rounded-lg p-3">
           <input
             type="date"
             value={customFrom}
@@ -366,7 +366,7 @@ export default function MasterDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Staff Workload */}
         <div>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-wrap items-center justify-between mb-3 gap-2">
             <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Staff Workload</h3>
             {data.staffWorkload.length > 0 && (
               <Button

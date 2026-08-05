@@ -183,7 +183,7 @@ function MasterAdminView({ authUser }: { authUser: AuthUser }) {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           icon={Building2}
           label="Total Tenants"
@@ -495,7 +495,7 @@ function TenantDashboard({ tenantId, authUser }: { tenantId: string; authUser: A
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           icon={UserCheck}
           label="Total RSVPs"

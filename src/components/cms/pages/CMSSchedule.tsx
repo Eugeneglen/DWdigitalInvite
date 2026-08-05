@@ -134,7 +134,7 @@ function SortableScheduleItem({
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-start gap-3 p-4 rounded-lg border bg-white transition-colors ${
+      className={`flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3 p-4 rounded-lg border bg-white transition-colors ${
         isDragging
           ? 'border-cinematic-gold/50 shadow-md'
           : 'border-gray-200 hover:border-gray-300'

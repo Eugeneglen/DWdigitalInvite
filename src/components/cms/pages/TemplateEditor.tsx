@@ -1095,11 +1095,11 @@ export default function TemplateEditor() {
             disabled={activeSection === 'preview'}
             className="border-charcoal-ink/15 text-charcoal-ink hover:border-cinematic-gold hover:text-cinematic-gold"
           >
-            <Eye className="size-4 mr-1.5" />
-            Preview
+            <Eye className="size-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">Preview</span>
           </Button>
           <Button onClick={handleSave} disabled={!dirty || saving} className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90">
-            {saving ? <><Loader2 className="size-4 mr-2 animate-spin" />Saving...</> : <><Save className="size-4 mr-2" />Save Template</>}
+            {saving ? <><Loader2 className="size-4 sm:mr-2 animate-spin" /><span className="hidden sm:inline">Saving...</span></> : <><Save className="size-4 sm:mr-2" /><span className="hidden sm:inline">Save Template</span></>}
           </Button>
         </div>
       </div>

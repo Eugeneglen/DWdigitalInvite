@@ -205,7 +205,7 @@ export default function HoneymoonVoteAnalytics() {
                 <p className="text-[11px] font-medium uppercase tracking-wider text-charcoal-ink/40 mb-2">
                   Destination Rankings
                 </p>
-                <div className="max-h-60 overflow-y-auto">
+                <div className="max-h-60 overflow-x-auto overflow-y-auto">
                   <table className="w-full">
                     <thead className="sticky top-0 bg-white">
                       <tr className="border-b border-champagne-silk">
