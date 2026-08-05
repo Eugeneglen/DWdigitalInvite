@@ -336,8 +336,8 @@ export default function CMSContent() {
       {loading ? (
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 flex items-start gap-4">
-              <Skeleton className="h-16 w-16 rounded-lg flex-shrink-0" />
+            <div key={i} className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 sm:p-5 flex items-start gap-3 sm:gap-4">
+              <Skeleton className="h-16 w-16 rounded-lg flex-shrink-0 hidden sm:block" />
               <div className="flex-1 space-y-2">
                 <Skeleton className="h-4 w-48" />
                 <Skeleton className="h-3 w-64" />
@@ -362,7 +362,7 @@ export default function CMSContent() {
           {items.map((item) => (
             <div
               key={item.id}
-              className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 flex items-start gap-4 hover:border-gray-300 transition-colors"
+              className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 sm:p-5 flex items-start gap-3 sm:gap-4 hover:border-gray-300 transition-colors"
             >
               {/* Image Preview */}
               <div className="h-16 w-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 border border-gray-200 hidden sm:block">

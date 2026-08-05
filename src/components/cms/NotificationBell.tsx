@@ -227,7 +227,7 @@ export function NotificationBell({ variant = 'master' }: { variant?: 'master' | 
       {/* Dropdown */}
       {isOpen && (
         <div className={`
-          absolute right-0 top-full mt-2 w-80 max-w-[calc(100vw-2rem)] sm:w-96 rounded-lg shadow-lg border z-50
+          fixed top-[60px] right-2 left-2 sm:left-auto sm:right-4 sm:w-96 rounded-lg shadow-lg border z-50
           ${isMasterVariant
             ? 'bg-white border-slate-200'
             : 'bg-white border-champagne-silk'
@@ -281,7 +281,7 @@ export function NotificationBell({ variant = 'master' }: { variant?: 'master' | 
           </div>
 
           {/* Notification List */}
-          <div className="max-h-80 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:theme(colors.champagne-silk)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:bg-champagne-silk [&::-webkit-scrollbar-track]:bg-transparent">
+          <div className="max-h-[60vh] sm:max-h-80 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:theme(colors.champagne-silk)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:bg-champagne-silk [&::-webkit-scrollbar-track]:bg-transparent">
             {loading && notifications.length === 0 ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="size-5 animate-spin text-slate-300" />
