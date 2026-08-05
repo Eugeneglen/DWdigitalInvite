@@ -267,18 +267,18 @@ export default function CoupleCMSLayout({ children }: { children: React.ReactNod
           </div>
 
           {/* Right: Notifications + Preview + DW logo + Sign Out */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3">
             <NotificationBell variant="couple" />
             <Button
               variant="outline"
               size="sm"
               onClick={() => togglePreview(true)}
-              className="h-8 text-xs font-medium text-cinematic-gold border-cinematic-gold/30 hover:bg-cinematic-gold/10 hover:border-cinematic-gold rounded-md px-3 gap-1.5"
+              className="h-8 text-xs font-medium text-cinematic-gold border-cinematic-gold/30 hover:bg-cinematic-gold/10 hover:border-cinematic-gold rounded-md px-2 sm:px-3 gap-1.5"
             >
               <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-              Preview
+              <span className="hidden sm:inline">Preview</span>
             </Button>
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-cinematic-gold text-white font-bold text-[11px]">
+            <div className="hidden sm:flex h-7 w-7 items-center justify-center rounded-full bg-cinematic-gold text-white font-bold text-[11px]">
               DW
             </div>
             <Separator orientation="vertical" className="h-5 !bg-champagne-silk hidden sm:block" />
@@ -301,8 +301,8 @@ export default function CoupleCMSLayout({ children }: { children: React.ReactNod
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-20 md:pb-8">
-          <div className="mx-auto max-w-4xl rounded-lg bg-white p-6 shadow-sm ring-1 ring-charcoal-ink/5">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-8 pb-20 md:pb-8">
+          <div className="mx-auto max-w-4xl rounded-lg bg-white p-4 sm:p-6 shadow-sm ring-1 ring-charcoal-ink/5">
             {children}
           </div>
         </main>

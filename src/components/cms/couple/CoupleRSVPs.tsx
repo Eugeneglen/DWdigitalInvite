@@ -190,7 +190,7 @@ export default function CoupleRSVPs() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
         <div>
           <h2 className="text-xl font-semibold text-charcoal-ink">RSVP Responses</h2>
           <p className="text-sm text-charcoal-ink/50 mt-1">
@@ -201,10 +201,10 @@ export default function CoupleRSVPs() {
           onClick={handleExportCSV}
           disabled={exporting}
           variant="outline"
-          className="border-charcoal-ink/15 text-charcoal-ink hover:border-cinematic-gold hover:text-cinematic-gold rounded px-4 py-2 text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300 shrink-0"
+          className="border-charcoal-ink/15 text-charcoal-ink hover:border-cinematic-gold hover:text-cinematic-gold rounded px-3 sm:px-4 py-2 text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300 shrink-0 self-start"
         >
-          {exporting ? <Loader2 className="size-4 mr-1.5 animate-spin" /> : <Download className="size-4 mr-1.5" />}
-          Export Detail
+          {exporting ? <Loader2 className="size-4 sm:mr-1.5 animate-spin" /> : <Download className="size-4 sm:mr-1.5" />}
+          <span className="hidden sm:inline">Export Detail</span>
         </Button>
       </div>
 

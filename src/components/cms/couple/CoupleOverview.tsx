@@ -428,15 +428,15 @@ export default function CoupleOverview() {
       )}
 
       {/* 3. Snapshot KPIs — 7 cards, mode-aware (2x4 on mobile, 3+3+1 on md+) */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
         {/* KPI 1: Total Guests (both modes) */}
         <Card className="py-0">
-          <CardContent className="p-4 flex items-center gap-3">
+          <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
             <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-cinematic-gold/10 text-cinematic-gold shrink-0">
               <Users className="size-5" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+              <p className="text-xs font-medium uppercase tracking-normal sm:tracking-wider text-charcoal-ink/40">
                 Total Guests
               </p>
               <p className="text-xl font-bold text-charcoal-ink leading-tight">
@@ -453,12 +453,12 @@ export default function CoupleOverview() {
 
         {/* KPI 2: Days until wedding (both modes) */}
         <Card className="py-0">
-          <CardContent className="p-4 flex items-center gap-3">
+          <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
             <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-cinematic-gold/10 text-cinematic-gold shrink-0">
               <CalendarDays className="size-5" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+              <p className="text-xs font-medium uppercase tracking-normal sm:tracking-wider text-charcoal-ink/40">
                 Days Left
               </p>
               <p className="text-xl font-bold text-cinematic-gold leading-tight">
@@ -474,12 +474,12 @@ export default function CoupleOverview() {
         {/* KPI 3: Mode-aware — Confirmed headcount (RELIABLE) or RSVPs received (EMPTY/INCOMPLETE) */}
         {isReliable ? (
           <Card className="py-0">
-            <CardContent className="p-4 flex items-center gap-3">
+            <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
               <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-emerald-50 text-emerald-600 shrink-0">
                 <UserCheck className="size-5" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+                <p className="text-xs font-medium uppercase tracking-normal sm:tracking-wider text-charcoal-ink/40">
                   Confirmed Headcount
                 </p>
                 <p className="text-xl font-bold text-charcoal-ink leading-tight">
@@ -495,12 +495,12 @@ export default function CoupleOverview() {
           </Card>
         ) : (
           <Card className="py-0">
-            <CardContent className="p-4 flex items-center gap-3">
+            <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
               <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-cinematic-gold/10 text-cinematic-gold shrink-0">
                 <Mail className="size-5" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+                <p className="text-xs font-medium uppercase tracking-normal sm:tracking-wider text-charcoal-ink/40">
                   RSVPs Received
                 </p>
                 <p className="text-xl font-bold text-charcoal-ink leading-tight">
@@ -517,12 +517,12 @@ export default function CoupleOverview() {
         {/* KPI 4: Mode-aware — Response rate (RELIABLE) or Declined (EMPTY/INCOMPLETE) */}
         {isReliable ? (
           <Card className="py-0">
-            <CardContent className="p-4 flex items-center gap-3">
+            <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
               <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-cinematic-gold/10 text-cinematic-gold shrink-0">
                 <BarChart3 className="size-5" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+                <p className="text-xs font-medium uppercase tracking-normal sm:tracking-wider text-charcoal-ink/40">
                   Response Rate
                 </p>
                 <p className="text-xl font-bold text-charcoal-ink leading-tight">
@@ -536,12 +536,12 @@ export default function CoupleOverview() {
           </Card>
         ) : (
           <Card className="py-0">
-            <CardContent className="p-4 flex items-center gap-3">
+            <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
               <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-red-50 text-red-500 shrink-0">
                 <X className="size-5" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+                <p className="text-xs font-medium uppercase tracking-normal sm:tracking-wider text-charcoal-ink/40">
                   Declined
                 </p>
                 <p className="text-xl font-bold text-charcoal-ink leading-tight">
@@ -561,12 +561,12 @@ export default function CoupleOverview() {
             className="py-0 cursor-pointer hover:border-cinematic-gold/30 transition-colors"
             onClick={() => setPage('guests')}
           >
-            <CardContent className="p-4 flex items-center gap-3">
+            <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
               <div className={`flex items-center justify-center h-10 w-10 rounded-lg shrink-0 ${pendingFollowUps > 0 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
                 <Mail className="size-5" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+                <p className="text-xs font-medium uppercase tracking-normal sm:tracking-wider text-charcoal-ink/40">
                   Pending Follow-ups
                 </p>
                 <p className="text-xl font-bold text-charcoal-ink leading-tight">
@@ -583,12 +583,12 @@ export default function CoupleOverview() {
             className={`py-0 ${unmatchedRsvps > 0 ? 'cursor-pointer hover:border-amber-300 transition-colors' : ''}`}
             onClick={() => unmatchedRsvps > 0 && setPage('guests')}
           >
-            <CardContent className="p-4 flex items-center gap-3">
+            <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
               <div className={`flex items-center justify-center h-10 w-10 rounded-lg shrink-0 ${unmatchedRsvps > 0 ? 'bg-amber-50 text-amber-600' : 'bg-cinematic-gold/10 text-cinematic-gold'}`}>
                 <AlertCircle className="size-5" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+                <p className="text-xs font-medium uppercase tracking-normal sm:tracking-wider text-charcoal-ink/40">
                   Unmatched RSVPs
                 </p>
                 <p className="text-xl font-bold text-charcoal-ink leading-tight">
@@ -604,12 +604,12 @@ export default function CoupleOverview() {
 
         {/* KPI 6: Dietary requirements (both modes) */}
         <Card className="py-0">
-          <CardContent className="p-4 flex items-center gap-3">
+          <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
             <div className={`flex items-center justify-center h-10 w-10 rounded-lg shrink-0 ${dietaryCount > 0 ? 'bg-violet-50 text-violet-600' : 'bg-cinematic-gold/10 text-cinematic-gold'}`}>
               <Utensils className="size-5" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+              <p className="text-xs font-medium uppercase tracking-normal sm:tracking-wider text-charcoal-ink/40">
                 Dietary Reqs
               </p>
               <p className="text-xl font-bold text-charcoal-ink leading-tight">
@@ -624,12 +624,12 @@ export default function CoupleOverview() {
 
         {/* KPI 7: New wishes this week (both modes) */}
         <Card className="py-0">
-          <CardContent className="p-4 flex items-center gap-3">
+          <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
             <div className={`flex items-center justify-center h-10 w-10 rounded-lg shrink-0 ${newWishesThisWeek > 0 ? 'bg-rose-50 text-rose-500' : 'bg-cinematic-gold/10 text-cinematic-gold'}`}>
               <MessageSquareHeart className="size-5" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wider text-charcoal-ink/40">
+              <p className="text-xs font-medium uppercase tracking-normal sm:tracking-wider text-charcoal-ink/40">
                 New Wishes
               </p>
               <p className="text-xl font-bold text-charcoal-ink leading-tight">
@@ -679,7 +679,7 @@ export default function CoupleOverview() {
                         {guests.byStatus.PENDING}
                       </span>
                     </div>
-                    <p className="text-[10px] text-charcoal-ink/40 uppercase tracking-wider">Pending</p>
+                    <p className="text-[10px] text-charcoal-ink/40 uppercase tracking-normal sm:tracking-wider">Pending</p>
                   </div>
                   <div className="text-center space-y-1">
                     <div className="flex items-center justify-center gap-1.5">
@@ -688,7 +688,7 @@ export default function CoupleOverview() {
                         {guests.byStatus.ATTENDING}
                       </span>
                     </div>
-                    <p className="text-[10px] text-charcoal-ink/40 uppercase tracking-wider">Attending</p>
+                    <p className="text-[10px] text-charcoal-ink/40 uppercase tracking-normal sm:tracking-wider">Attending</p>
                   </div>
                   <div className="text-center space-y-1">
                     <div className="flex items-center justify-center gap-1.5">
@@ -697,7 +697,7 @@ export default function CoupleOverview() {
                         {guests.byStatus.DECLINED}
                       </span>
                     </div>
-                    <p className="text-[10px] text-charcoal-ink/40 uppercase tracking-wider">Declined</p>
+                    <p className="text-[10px] text-charcoal-ink/40 uppercase tracking-normal sm:tracking-wider">Declined</p>
                   </div>
                   <div className="text-center space-y-1">
                     <div className="flex items-center justify-center gap-1.5">
@@ -706,7 +706,7 @@ export default function CoupleOverview() {
                         {guests.byStatus.PARTIAL}
                       </span>
                     </div>
-                    <p className="text-[10px] text-charcoal-ink/40 uppercase tracking-wider">Partial</p>
+                    <p className="text-[10px] text-charcoal-ink/40 uppercase tracking-normal sm:tracking-wider">Partial</p>
                   </div>
                 </div>
               </>
