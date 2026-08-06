@@ -2,7 +2,7 @@ import type { CoupleCMSPage } from '@/store/useCoupleCMSStore';
 
 /**
  * Map Couple CMS pages to their corresponding WeddingFeature featureKey.
- * Pages NOT in this map are always available (overview, details, guests, etc.)
+ * Pages NOT in this map are always available (overview, details, etc.)
  */
 export const PAGE_TO_FEATURE: Partial<Record<CoupleCMSPage, string>> = {
   schedule: 'schedule',
@@ -12,6 +12,7 @@ export const PAGE_TO_FEATURE: Partial<Record<CoupleCMSPage, string>> = {
   wishes: 'wishes',
   faqs: 'qa',
   moments: 'moments',
+  guests: 'guests',
   design: 'templates',
 };
 
@@ -22,7 +23,6 @@ export const ALWAYS_AVAILABLE_PAGES: CoupleCMSPage[] = [
   'overview',
   'details',
   'home',
-  'guests',
   'analytics',
   'audit',
   'sharing',

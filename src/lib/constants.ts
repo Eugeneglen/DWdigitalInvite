@@ -23,6 +23,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   moments: 'Moments',
   'getting-there': 'Getting There',
   countdown: 'Countdown',
+  guests: 'Guest Management',
   music: 'Background Music',
   video: 'Wedding Video',
   templates: 'Theme Templates',

@@ -53,6 +53,7 @@ const ALL_FEATURES: FeatureInfo[] = [
   { key: 'wishes', label: 'Wishes & Blessings', description: 'Guest messages' },
   { key: 'qa', label: 'Q&A', description: 'Common guest questions' },
   { key: 'moments', label: 'Moments', description: 'Photo gallery' },
+  { key: 'guests', label: 'Guest Management', description: 'Guest list, invitations & RSVP tracking' },
   { key: 'gallery', label: 'Photo Gallery', description: 'Additional gallery' },
   { key: 'music', label: 'Background Music', description: 'Music player' },
   { key: 'video', label: 'Wedding Video', description: 'Embedded video' },

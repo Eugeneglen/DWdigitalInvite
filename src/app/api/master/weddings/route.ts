@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
     const enabledFeatures = data.features ?? packageFeatures;
 
     // All known feature keys
-    const allFeatureKeys = ['countdown', 'schedule', 'rsvp', 'getting-there', 'story', 'wishes', 'qa', 'moments', 'gallery', 'music', 'video'];
+    const allFeatureKeys = ['countdown', 'schedule', 'rsvp', 'getting-there', 'story', 'wishes', 'qa', 'moments', 'guests', 'gallery', 'music', 'video'];
 
     // Calculate access expiry date
     const weddingDate = new Date(data.weddingDate);
