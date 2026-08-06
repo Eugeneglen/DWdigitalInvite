@@ -37,13 +37,6 @@ interface StaffUser {
   role: string;
 }
 
-interface PackageTemplate {
-  name: string;
-  label: string;
-  features: string[];
-  maxGuests: number;
-  maxMedia: number;
-}
 
 interface FeatureInfo {
   key: string;
@@ -75,12 +68,14 @@ const PACKAGE_DESCRIPTIONS: Record<string, string> = {
   DIAMOND: 'Platinum + Wishes, Moments',
 };
 
-/** Hardcoded fallback feature sets per tier.
- * Used when no package_templates are configured in Master Settings. */
+/** Hardcoded feature sets per tier — single source of truth for pre-selection.
+ * Gold:   Home, Schedule, RSVP, Getting There
+ * Platinum: Gold + Story, Q&A
+ * Diamond: Platinum + Wishes, Moments */
 const TIER_FEATURES: Record<string, string[]> = {
-  GOLD: ['schedule', 'rsvp', 'getting-there'],
-  PLATINUM: ['schedule', 'rsvp', 'getting-there', 'story', 'qa'],
-  DIAMOND: ['schedule', 'rsvp', 'getting-there', 'story', 'wishes', 'qa', 'moments'],
+  GOLD: ['countdown', 'schedule', 'rsvp', 'getting-there'],
+  PLATINUM: ['countdown', 'schedule', 'rsvp', 'getting-there', 'story', 'qa'],
+  DIAMOND: ['countdown', 'schedule', 'rsvp', 'getting-there', 'story', 'wishes', 'qa', 'moments'],
 };
 
 interface WeddingCreationWizardProps {
@@ -144,7 +139,6 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormData>(INITIAL_FORM);
   const [staff, setStaff] = useState<StaffUser[]>([]);
-  const [packages, setPackages] = useState<PackageTemplate[]>([]);
   const [defaultPassword, setDefaultPassword] = useState<string>('Couple@123');
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -172,12 +166,6 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
 
       if (settingsRes.ok) {
         const settingsData = await settingsRes.json();
-        const templatesStr = settingsData.settings?.package_templates;
-        if (templatesStr) {
-          try {
-            setPackages(JSON.parse(templatesStr));
-          } catch { /* ignore */ }
-        }
         const pwd = settingsData.settings?.default_couple_password;
         if (typeof pwd === 'string' && pwd.trim().length > 0) {
           setDefaultPassword(pwd.trim());
@@ -194,24 +182,21 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
     if (open) {
       fetchInitialData();
       setStep(0);
-      setForm(INITIAL_FORM);
+      // Reset form — pre-populate features for the default tier (GOLD).
+      const initialFeatures = TIER_FEATURES['GOLD'] ?? [];
+      setForm({ ...INITIAL_FORM, features: initialFeatures });
       setResult(null);
     }
   }, [open, fetchInitialData]);
 
-  // When package changes, auto-apply that package's features.
-  // Falls back to TIER_FEATURES when no package_templates are configured.
-  // Gold Dust animation is ON by default for all new weddings; admin can
-  // toggle individual animations ON/OFF in the feature grid.
+  // When tier changes, pre-select the standard feature set for that tier.
+  // Always uses TIER_FEATURES (hardcoded) so the pre-selection is predictable
+  // and never affected by stale package_templates in the database.
+  // Admin can still toggle individual features (including animations) ON/OFF.
   useEffect(() => {
-    const pkg = packages.find((p) => p.name === form.plan);
-    const baseFeatures = pkg
-      ? [...pkg.features]
-      : [...(TIER_FEATURES[form.plan] ?? [])];
-    // Default: Gold Dust ON, Meteors OFF, Bubbles OFF
-    if (!baseFeatures.includes('animation:gold-dust')) baseFeatures.push('animation:gold-dust');
+    const baseFeatures = [...(TIER_FEATURES[form.plan] ?? [])];
     setForm((prev) => ({ ...prev, features: baseFeatures }));
-  }, [form.plan, packages]);
+  }, [form.plan]);
 
   const consultants = staff.filter((s) => normalizePlatformRole(s.role) === 'ACCOUNT_MANAGER_1');
   const coordinators = staff.filter((s) => normalizePlatformRole(s.role) === 'ACCOUNT_MANAGER_2');

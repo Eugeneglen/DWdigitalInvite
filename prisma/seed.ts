@@ -418,8 +418,8 @@ async function seed() {
       key: 'package_templates',
       value: JSON.stringify([
         { name: 'GOLD', label: 'Gold', features: ['countdown', 'schedule', 'rsvp', 'getting-there'], maxGuests: 100, maxMedia: 20, sortOrder: 1 },
-        { name: 'PLATINUM', label: 'Platinum', features: ['countdown', 'schedule', 'rsvp', 'getting-there', 'story', 'wishes', 'qa'], maxGuests: 200, maxMedia: 50, sortOrder: 2 },
-        { name: 'DIAMOND', label: 'Diamond', features: ['countdown', 'schedule', 'rsvp', 'getting-there', 'story', 'wishes', 'qa', 'moments', 'music', 'video', 'templates'], maxGuests: 500, maxMedia: 100, sortOrder: 3 },
+        { name: 'PLATINUM', label: 'Platinum', features: ['countdown', 'schedule', 'rsvp', 'getting-there', 'story', 'qa'], maxGuests: 200, maxMedia: 50, sortOrder: 2 },
+        { name: 'DIAMOND', label: 'Diamond', features: ['countdown', 'schedule', 'rsvp', 'getting-there', 'story', 'wishes', 'qa', 'moments'], maxGuests: 500, maxMedia: 100, sortOrder: 3 },
       ]),
     },
   ];
