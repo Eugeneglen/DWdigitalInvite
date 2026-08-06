@@ -66,13 +66,15 @@ export default function CMSLogin() {
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8">
           {/* Logo */}
           <div className="flex flex-col items-center mb-8">
-            <Image
-              src="/dreamweavers-logo.png"
-              alt="Dreamweavers"
-              width={48}
-              height={48}
-              className="mb-4"
-            />
+            <a href="https://www.dreamweavers.com.sg/" target="_blank" rel="noopener noreferrer">
+              <Image
+                src="/dreamweavers-logo.png"
+                alt="Dreamweavers"
+                width={48}
+                height={48}
+                className="mb-4"
+              />
+            </a>
             <h1 className="text-xl font-semibold text-charcoal-ink">
               Dreamweavers CMS
             </h1>

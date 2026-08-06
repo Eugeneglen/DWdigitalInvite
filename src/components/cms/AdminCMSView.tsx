@@ -41,11 +41,13 @@ function AdminLoginScreen({ onSignInClick }: { onSignInClick: () => void }) {
       {/* Dark Sidebar (visual only) */}
       <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-paper-cream/8 bg-charcoal-ink text-paper-cream md:flex">
         <div className="flex items-center justify-center py-3 px-2 border-b border-paper-cream/8">
-          <img
-            alt="Dreamweavers"
-            className="h-[15px] w-auto brightness-0 invert"
-            src="/dreamweavers-logo.png"
-          />
+          <a href="https://www.dreamweavers.com.sg/" target="_blank" rel="noopener noreferrer">
+            <img
+              alt="Dreamweavers"
+              className="h-[15px] w-auto brightness-0 invert"
+              src="/dreamweavers-logo.png"
+            />
+          </a>
         </div>
 
         <div className="px-4 py-3">

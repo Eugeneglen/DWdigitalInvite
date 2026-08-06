@@ -70,9 +70,17 @@ const ALL_FEATURES: FeatureInfo[] = [
 ];
 
 const PACKAGE_DESCRIPTIONS: Record<string, string> = {
-  GOLD: 'Home, Schedule, RSVP, Getting There, Countdown',
-  PLATINUM: 'Gold + Story, Wishes, Q&A',
-  DIAMOND: 'Platinum + Moments, Music, Video, Theme Templates',
+  GOLD: 'Home, Schedule, RSVP, Getting There',
+  PLATINUM: 'Gold + Story, Q&A',
+  DIAMOND: 'Platinum + Wishes, Moments',
+};
+
+/** Hardcoded fallback feature sets per tier.
+ * Used when no package_templates are configured in Master Settings. */
+const TIER_FEATURES: Record<string, string[]> = {
+  GOLD: ['schedule', 'rsvp', 'getting-there'],
+  PLATINUM: ['schedule', 'rsvp', 'getting-there', 'story', 'qa'],
+  DIAMOND: ['schedule', 'rsvp', 'getting-there', 'story', 'wishes', 'qa', 'moments'],
 };
 
 interface WeddingCreationWizardProps {
@@ -192,16 +200,17 @@ export default function WeddingCreationWizard({ open, onOpenChange, onCreated }:
   }, [open, fetchInitialData]);
 
   // When package changes, auto-apply that package's features.
+  // Falls back to TIER_FEATURES when no package_templates are configured.
   // Gold Dust animation is ON by default for all new weddings; admin can
   // toggle individual animations ON/OFF in the feature grid.
   useEffect(() => {
     const pkg = packages.find((p) => p.name === form.plan);
-    if (pkg) {
-      const features = [...pkg.features];
-      // Default: Gold Dust ON, Meteors OFF, Bubbles OFF
-      if (!features.includes('animation:gold-dust')) features.push('animation:gold-dust');
-      setForm((prev) => ({ ...prev, features }));
-    }
+    const baseFeatures = pkg
+      ? [...pkg.features]
+      : [...(TIER_FEATURES[form.plan] ?? [])];
+    // Default: Gold Dust ON, Meteors OFF, Bubbles OFF
+    if (!baseFeatures.includes('animation:gold-dust')) baseFeatures.push('animation:gold-dust');
+    setForm((prev) => ({ ...prev, features: baseFeatures }));
   }, [form.plan, packages]);
 
   const consultants = staff.filter((s) => normalizePlatformRole(s.role) === 'ACCOUNT_MANAGER_1');

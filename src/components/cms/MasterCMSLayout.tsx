@@ -78,13 +78,13 @@ function CMSLogo() {
   const isCollapsed = state === 'collapsed';
 
   return (
-    <div className="flex items-center justify-center py-3 px-2">
+    <a href="https://www.dreamweavers.com.sg/" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center py-3 px-2">
       <img
         src="/dreamweavers-logo.png"
         alt="Dreamweavers"
         className={`brightness-0 invert transition-all duration-200 ${isCollapsed ? 'h-[13px] w-auto' : 'h-[15px] w-auto'}`}
       />
-    </div>
+    </a>
   );
 }
 

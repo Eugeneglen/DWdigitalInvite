@@ -62,11 +62,13 @@ function CoupleLoginScreen({ onSignInClick }: { onSignInClick: () => void }) {
       {/* Left Sidebar (visual only) */}
       <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-champagne-silk bg-paper-cream md:flex">
         <div className="flex items-center px-4 py-5">
-          <img
-            alt="Dreamweavers"
-            className="h-3.5 w-auto object-contain"
-            src="/dreamweavers-logo.png"
-          />
+          <a href="https://www.dreamweavers.com.sg/" target="_blank" rel="noopener noreferrer">
+            <img
+              alt="Dreamweavers"
+              className="h-3.5 w-auto object-contain"
+              src="/dreamweavers-logo.png"
+            />
+          </a>
         </div>
         <Separator className="bg-champagne-silk" />
         <nav className="flex-1 overflow-y-auto px-2 py-3 opacity-40">

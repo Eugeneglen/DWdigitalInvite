@@ -546,11 +546,13 @@ export function LoginModal({ open, onOpenChange, variant = 'default', targetRole
 
           {/* Footer */}
           <div className="border-t border-champagne-silk/20 px-6 sm:px-10 py-5 text-center">
-            <img
-              src="/dreamweavers-logo.png"
-              alt="Dreamweavers"
-              className="h-5 w-auto mx-auto mb-3 opacity-40"
-            />
+            <a href="https://www.dreamweavers.com.sg/" target="_blank" rel="noopener noreferrer">
+              <img
+                src="/dreamweavers-logo.png"
+                alt="Dreamweavers"
+                className="h-5 w-auto mx-auto mb-3 opacity-40"
+              />
+            </a>
             <p
               className="text-[11px] uppercase tracking-[0.12em] font-semibold text-charcoal-ink/30"
             >
