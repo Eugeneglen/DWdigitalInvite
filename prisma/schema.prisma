@@ -153,6 +153,7 @@ model WeddingAccount {
   faqs      FAQ[]
   stories   StoryItem[]
   guests    Guest[]
+  seatingTables SeatingTable[]
   rsvps     RSVPSubmission[]
   wishes    Wish[]
   contacts      ContactSubmission[]
@@ -306,6 +307,27 @@ model Guest {
   updatedAt      DateTime        @updatedAt
 
   rsvps RSVPSubmission[]
+}
+
+// ============================================================
+// SEATING ARRANGEMENT (visual canvas tables)
+// ============================================================
+
+model SeatingTable {
+  id         String          @id @default(cuid())
+  weddingId  String
+  wedding    WeddingAccount  @relation(fields: [weddingId], references: [id], onDelete: Cascade)
+  tableNum   Int             // Display number (e.g. 1, 2, 3)
+  shape      String          @default("circle") // circle | rectangle | oval
+  capacity   Int             @default(8)        // max seats
+  posX       Float           @default(100)      // canvas X position
+  posY       Float           @default(100)      // canvas Y position
+  notes      String?         // e.g. "Near bar", "VIP"
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@unique([weddingId, tableNum])
+  @@index([weddingId])
 }
 
 // ============================================================
