@@ -120,11 +120,12 @@ model WeddingAccount {
   googleMapsUrl String?
   status        String   @default("DRAFT") // DRAFT | ACTIVE | SUSPENDED | ARCHIVED | COMPLETED
   plan          String   @default("GOLD")   // GOLD | PLATINUM | DIAMOND
-  heroImageUrl  String?
-  heroVideoUrl  String?
-  bannerUrl     String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  heroImageUrl   String?
+  heroVideoUrl   String?
+  bannerUrl      String?
+  floorPlanUrl   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // Operational fields (Admin CMS)
   jobNumber        String?  @unique  // Internal tracking ID (e.g. DW-TDS-2026-000008)
@@ -318,6 +319,8 @@ model SeatingTable {
   weddingId  String
   wedding    WeddingAccount  @relation(fields: [weddingId], references: [id], onDelete: Cascade)
   tableNum   Int             // Display number (e.g. 1, 2, 3)
+  name       String?         // Custom table name (e.g. "VIP Table", "Bride's Family")
+  zone       String?         // Zone tag: VIP, BRIDE_FAMILY, GROOM_FAMILY, FRIENDS, COLLEAGUES, CUSTOM
   shape      String          @default("circle") // circle | rectangle | oval
   capacity   Int             @default(8)        // max seats
   posX       Float           @default(100)      // canvas X position

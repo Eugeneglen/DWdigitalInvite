@@ -4,8 +4,12 @@ import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { z } from 'zod/v4';
 
+const ZONE_VALUES = ['VIP', 'BRIDE_FAMILY', 'GROOM_FAMILY', 'FRIENDS', 'COLLEAGUES', 'CUSTOM'] as const;
+
 const createSchema = z.object({
   tableNum: z.number().int().positive(),
+  name: z.string().optional(),
+  zone: z.enum(ZONE_VALUES).optional(),
   shape: z.enum(['circle', 'rectangle', 'oval']).optional(),
   capacity: z.number().int().min(1).max(50).optional(),
   posX: z.number().optional(),
@@ -16,6 +20,8 @@ const createSchema = z.object({
 const updateSchema = z.object({
   id: z.string().min(1),
   tableNum: z.number().int().positive().optional(),
+  name: z.string().optional(),
+  zone: z.enum(ZONE_VALUES).optional().nullable(),
   shape: z.enum(['circle', 'rectangle', 'oval']).optional(),
   capacity: z.number().int().min(1).max(50).optional(),
   posX: z.number().optional(),
@@ -28,6 +34,8 @@ const batchUpdateSchema = z.object({
     z.object({
       id: z.string(),
       tableNum: z.number().int().positive().optional(),
+      name: z.string().optional(),
+      zone: z.enum(ZONE_VALUES).optional().nullable(),
       shape: z.enum(['circle', 'rectangle', 'oval']).optional(),
       capacity: z.number().int().min(1).max(50).optional(),
       posX: z.number().optional(),
