@@ -58,7 +58,7 @@ db/
 
 # Sandbox tooling
 tool-results/
-upload/
+/upload/
 worklog.md
 ensure-server.sh
 mini-services/PUSH_PROCEDURE.md
