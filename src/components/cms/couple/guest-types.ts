@@ -10,7 +10,7 @@ export const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 export const TABLE_DIMS: Record<string, { w: number; h: number }> = {
-  circle:    { w: 76, h: 76 },
+  circle:    { w: 90, h: 90 },
   rectangle: { w: 84, h: 84 },
   oval:      { w: 150, h: 70 },
 };

@@ -6,7 +6,7 @@ import {
   ZoomIn, ZoomOut, Circle, Square, RectangleHorizontal,
   AlertCircle, UtensilsCrossed, Lock, Unlock,
   ImagePlus, ImageOff, Maximize, ChevronRight, Mail, Phone,
-  UserPlus, ArrowRightLeft, Ban,
+  UserPlus, ArrowRightLeft, Ban, X, Pencil,
   Wand2, Grid3x3, Download, Printer, Copy, FileDown,
   UsersRound, CheckCircle2, Clock, ChevronsUpDown,
   List,
@@ -133,6 +133,7 @@ export default function CoupleSeatingCanvas() {
   const [guestFormOpen, setGuestFormOpen] = useState(false);
   const [editingGuest, setEditingGuest] = useState<GuestItem | null>(null);
   const [deletingGuestId, setDeletingGuestId] = useState<string | null>(null);
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
 
   // Drag state (table drag)
   const dragRef = useRef<{
@@ -142,6 +143,7 @@ export default function CoupleSeatingCanvas() {
     origPosX: number;
     origPosY: number;
   } | null>(null);
+  const rafRef = useRef<number | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const outerRef = useRef<HTMLDivElement>(null);
 
@@ -494,25 +496,39 @@ export default function CoupleSeatingCanvas() {
     };
     latestDragPos.current = { posX: tbl.posX, posY: tbl.posY };
 
+    document.body.style.cursor = 'grabbing';
+    document.body.style.userSelect = 'none';
+
     const handleMove = (ev: MouseEvent) => {
       if (!dragRef.current) return;
-      const dx = (ev.clientX - dragRef.current.startX) / (canvasScale / 100);
-      const dy = (ev.clientY - dragRef.current.startY) / (canvasScale / 100);
-      let newPosX = Math.max(0, dragRef.current.origPosX + dx);
-      let newPosY = Math.max(0, dragRef.current.origPosY + dy);
-      if (gridSnap) {
-        newPosX = Math.round(newPosX / 20) * 20;
-        newPosY = Math.round(newPosY / 20) * 20;
-      }
-      latestDragPos.current = { posX: newPosX, posY: newPosY };
-      setTables((prev) =>
-        prev.map((t) => (t.id === tableId ? { ...t, posX: newPosX, posY: newPosY } : t))
-      );
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        if (!dragRef.current) return;
+        const scale = canvasScale / 100;
+        const dx = (ev.clientX - dragRef.current.startX) / scale;
+        const dy = (ev.clientY - dragRef.current.startY) / scale;
+        let newPosX = Math.max(0, dragRef.current.origPosX + dx);
+        let newPosY = Math.max(0, dragRef.current.origPosY + dy);
+        if (gridSnap) {
+          newPosX = Math.round(newPosX / 20) * 20;
+          newPosY = Math.round(newPosY / 20) * 20;
+        }
+        latestDragPos.current = { posX: newPosX, posY: newPosY };
+        setTables((prev) =>
+          prev.map((t) => (t.id === tableId ? { ...t, posX: newPosX, posY: newPosY } : t))
+        );
+      });
     };
 
     const handleUp = async () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
       if (!dragRef.current || !latestDragPos.current) return;
       try {
         await fetch(TABLES_API, {
@@ -783,37 +799,6 @@ export default function CoupleSeatingCanvas() {
   // ======== Detail Drawer Guest ========
   const detailGuest = guests.find((g) => g.id === detailGuestId);
 
-  // ======== Layout Measurement (fills <main> exactly, no scroll) ========
-  const [mainDims, setMainDims] = useState<{ w: number; h: number } | null>(null);
-
-  useEffect(() => {
-    const el = outerRef.current;
-    if (!el) return;
-    const main = el.closest('main') as HTMLElement | null;
-    if (!main) return;
-
-    const measure = () => {
-      const rect = main.getBoundingClientRect();
-      setMainDims({ w: Math.round(rect.width), h: Math.round(rect.height) });
-    };
-
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(main);
-    return () => ro.disconnect();
-  }, []);
-
-  // Inject CSS to prevent <main> from scrolling when seating canvas is active
-  useEffect(() => {
-    const styleId = 'seating-canvas-no-scroll';
-    if (document.getElementById(styleId)) return;
-    const style = document.createElement('style');
-    style.id = styleId;
-    style.textContent = `main:has([data-seating-canvas]) { overflow: hidden !important; }`;
-    document.head.appendChild(style);
-    return () => { style.remove(); };
-  }, []);
-
   // ======== Content Bounds (dynamic virtual canvas) ========
   const contentBounds = useMemo(() => {
     if (tables.length === 0) return { w: 800, h: 500 };
@@ -864,11 +849,10 @@ export default function CoupleSeatingCanvas() {
       <div
         ref={outerRef}
         data-seating-canvas
-        className="-mt-[28px] sm:-mt-[40px] md:-mt-[56px] -mx-[28px] sm:-mx-[40px] md:-mx-[56px] -mb-[96px] sm:-mb-[104px] md:-mb-[56px] flex flex-col overflow-hidden rounded-lg"
-        style={mainDims ? { width: mainDims.w, height: mainDims.h } : { height: '100dvh' }}
+        className="-mt-[28px] sm:-mt-[40px] md:-mt-[56px] -mx-[28px] sm:-mx-[40px] md:-mx-[56px] -mb-[96px] sm:-mb-[104px] md:-mb-[56px] flex flex-col overflow-y-auto rounded-lg"
       >
         {/* ======== SECTION 1: CANVAS AREA (top) ======== */}
-        <div className="flex-1 flex flex-col gap-2 min-w-0 min-h-0">
+        <div className="flex flex-col gap-2 min-w-0"> 
           {/* Toolbar */}
           <div className="flex items-center gap-2 px-1 flex-wrap">
             <Tooltip>
@@ -1121,7 +1105,7 @@ export default function CoupleSeatingCanvas() {
           {/* Canvas */}
           <div
             ref={canvasRef}
-            className="relative flex-1 min-h-0 border border-champagne-silk rounded-lg bg-[radial-gradient(circle,_#d4d4d4_1px,_transparent_1px)] [background-size:20px_20px] overflow-hidden"
+            className="relative h-[58vh] min-h-[400px] border border-champagne-silk rounded-lg bg-[radial-gradient(circle,_#d4d4d4_1px,_transparent_1px)] [background-size:20px_20px] overflow-hidden"
             onClick={(e) => {
               if (e.target === e.currentTarget) {
                 if (reassigningGuestId) setReassigningGuestId(null);
@@ -1184,8 +1168,13 @@ export default function CoupleSeatingCanvas() {
 
                   // Shape
                   let shapeCls = 'rounded-full';
+                  let circleDepthCls = tbl.shape === 'circle'
+                    ? 'shadow-[inset_0_1px_2px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.08)]'
+                    : '';
                   if (tbl.shape === 'rectangle') shapeCls = 'rounded-md';
                   if (tbl.shape === 'oval') shapeCls = 'rounded-lg';
+
+                  const isDragging = dragRef.current?.tableId === tbl.id;
 
                   return (
                     <div
@@ -1208,7 +1197,7 @@ export default function CoupleSeatingCanvas() {
                         onDragOver={(e) => handleTableDragOver(e, tbl.id)}
                         onDragLeave={handleTableDragLeave}
                         onDrop={(e) => handleTableDrop(e, tbl.id)}
-                        className={`absolute inset-0 border-2 ${borderCls} ${shapeCls} bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center cursor-grab active:cursor-grabbing transition-all duration-200 ${
+                        className={`absolute inset-0 border-2 ${borderCls} ${shapeCls} ${circleDepthCls} bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center cursor-grab active:cursor-grabbing transition-all duration-200 will-change-transform ${isDragging ? 'z-50' : ''} ${
                           isSelected
                             ? 'shadow-[0_0_0_3px_rgba(212,175,55,0.3)] ring-2 ring-cinematic-gold/30'
                             : 'hover:shadow-md'
@@ -1240,13 +1229,43 @@ export default function CoupleSeatingCanvas() {
                         </div>
                       </div>
 
-                      {/* Guest labels around table */}
+                      {/* Guest labels around table — shape-aware distribution */}
                       {tableGuests.map((guest, gi) => {
                         const dietary = getEffectiveDietary(guest);
-                        const angle = (gi / Math.max(tableGuests.length, 1)) * 2 * Math.PI - Math.PI / 2;
-                        const radius = (dims.w / 2) + 40;
-                        const gx = dims.w / 2 + Math.cos(angle) * radius - 50;
-                        const gy = dims.h / 2 + Math.sin(angle) * radius - 10;
+                        const total = tableGuests.length;
+
+                        // Shape-aware position calculation
+                        let gx: number, gy: number;
+                        const padding = 38;
+
+                        if (tbl.shape === 'oval') {
+                          const angle = (gi / Math.max(total, 1)) * 2 * Math.PI - Math.PI / 2;
+                          const rx = dims.w / 2 + padding;
+                          const ry = dims.h / 2 + padding;
+                          gx = dims.w / 2 + Math.cos(angle) * rx;
+                          gy = dims.h / 2 + Math.sin(angle) * ry;
+                        } else if (tbl.shape === 'rectangle') {
+                          const perimeter = 2 * (dims.w + dims.h);
+                          const step = perimeter / Math.max(total, 1);
+                          let dist = step * gi;
+                          if (dist < dims.w) {
+                            gx = dist; gy = -padding;
+                          } else if (dist < dims.w + dims.h) {
+                            gx = dims.w + padding; gy = dist - dims.w;
+                          } else if (dist < 2 * dims.w + dims.h) {
+                            gx = dims.w - (dist - dims.w - dims.h); gy = dims.h + padding;
+                          } else {
+                            gx = -padding; gy = dims.h - (dist - 2 * dims.w - dims.h);
+                          }
+                        } else {
+                          const angle = (gi / Math.max(total, 1)) * 2 * Math.PI - Math.PI / 2;
+                          const radius = dims.w / 2 + padding;
+                          gx = dims.w / 2 + Math.cos(angle) * radius;
+                          gy = dims.h / 2 + Math.sin(angle) * radius;
+                        }
+
+                        gx = Math.max(-20, Math.min(dims.w + 20, gx));
+                        gy = Math.max(-10, Math.min(dims.h + 20, gy));
 
                         return (
                           <Tooltip key={guest.id}>
@@ -1266,8 +1285,9 @@ export default function CoupleSeatingCanvas() {
                                     : 'bg-white border border-charcoal-ink/10 text-charcoal-ink/70 hover:border-cinematic-gold hover:text-charcoal-ink'
                                 }`}
                                 style={{
-                                  left: Math.max(0, gx),
-                                  top: Math.max(0, gy),
+                                  left: gx,
+                                  top: gy,
+                                  transform: 'translate(-50%, -50%)',
                                 }}
                               >
                                 {guest.name.split(' ')[0]}
@@ -1294,23 +1314,138 @@ export default function CoupleSeatingCanvas() {
           </div>
         </div>
 
+        {/* ======== INLINE GUEST PANEL ======== */}
+        {selectedTable && (
+          <div className="border border-champagne-silk border-t-0 rounded-b-lg bg-white p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-bold text-charcoal-ink">
+                    {selectedTable.name || `Table ${selectedTable.tableNum}`}
+                  </span>
+                  {selectedTable.zone && (
+                    <Badge variant="outline" className={`text-[10px] shrink-0 ${ZONE_COLORS[selectedTable.zone] || ''}`}>
+                      {selectedTable.zone.replace('_', ' ')}
+                    </Badge>
+                  )}
+                </div>
+                <span className="text-[11px] text-charcoal-ink/50 flex items-center gap-1">
+                  {SHAPE_ICONS[selectedTable.shape]}
+                  {selectedTable.capacity} seats
+                </span>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setEditSheetOpen(true)}
+                      className="h-7 w-7 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
+                    >
+                      <Pencil className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Edit Table</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedTableId(null)}
+                      className="h-7 w-7 p-0 text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/5"
+                    >
+                      <X className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Close</TooltipContent>
+                </Tooltip>
+              </div>
+            </div>
+
+            <div className="max-h-[35vh] overflow-y-auto">
+              <div className="space-y-1.5">
+                {guestsAtTable(selectedTable.tableNum).map((g) => {
+                  const dietary = getEffectiveDietary(g);
+                  return (
+                    <div key={g.id} className="flex items-center justify-between gap-2 rounded-md border border-charcoal-ink/5 px-2.5 py-1.5 hover:border-champagne-silk transition-colors">
+                      <div className="min-w-0 flex items-center gap-2">
+                        <span className="text-xs font-semibold text-charcoal-ink truncate">{g.name}</span>
+                        {dietary && (
+                          <span className="flex items-center gap-0.5 text-[10px] text-red-500/70 shrink-0">
+                            <UtensilsCrossed className="size-2.5" />
+                            <span className="hidden sm:inline">{truncate(dietary, 16)}</span>
+                          </span>
+                        )}
+                        {g.plusOne && (
+                          <span className="flex items-center gap-0.5 text-[10px] text-pink-400/70 shrink-0" title={g.plusOneName || 'Plus one'}>
+                            <UserPlus className="size-2.5" />
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleReassignGuest(g.id, null)}
+                        className="text-[10px] text-red-400 hover:text-red-600 shrink-0 underline"
+                        title="Unassign"
+                      >Remove</button>
+                    </div>
+                  );
+                })}
+                {getGuestCountForTable(selectedTable.tableNum) === 0 && (
+                  <p className="text-xs text-charcoal-ink/30 italic py-2 text-center">No guests assigned</p>
+                )}
+              </div>
+
+              {unassignedGuests.length > 0 && (
+                <>
+                  <Separator className="bg-champagne-silk my-3" />
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-charcoal-ink/50">
+                        Add Guest
+                      </h4>
+                      <span className="text-[10px] text-charcoal-ink/30">{unassignedGuests.length} available</span>
+                    </div>
+                    <Select
+                      onValueChange={(v) => {
+                        const guestId = v;
+                        const count = getGuestCountForTable(selectedTable.tableNum);
+                        if (count < selectedTable.capacity) {
+                          handleReassignGuest(guestId, selectedTable.tableNum);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-xs border-charcoal-ink/10 focus:border-cinematic-gold">
+                        <SelectValue placeholder="Select a guest to add..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {unassignedGuests.map((g) => (
+                          <SelectItem key={g.id} value={g.id}>
+                            {g.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* ======== TABLE DETAIL SHEET ======== */}
-      <Sheet open={!!selectedTable} onOpenChange={(open) => { if (!open) setSelectedTableId(null); }}>
+      {/* ======== EDIT TABLE SHEET (simplified, edit-only) ======== */}
+      <Sheet open={editSheetOpen} onOpenChange={(open) => { if (!open) setEditSheetOpen(false); }}>
         <SheetContent side="right" className="w-[360px] p-0 overflow-y-auto">
           {selectedTable && (
             <>
               <SheetHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
                 <div className="flex items-center gap-2 min-w-0">
                   <SheetTitle className="text-charcoal-ink text-sm font-semibold truncate">
-                    {selectedTable.name || `Table ${selectedTable.tableNum}`}
+                    Edit Table
                   </SheetTitle>
-                  {selectedTable.zone && (
-                    <Badge variant="outline" className={`text-[10px] shrink-0 ${ZONE_COLORS[selectedTable.zone] || ''}`}>
-                      {selectedTable.zone.replace('_', ' ')}
-                    </Badge>
-                  )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <Tooltip>
@@ -1339,144 +1474,96 @@ export default function CoupleSeatingCanvas() {
 
               <Separator className="bg-champagne-silk" />
 
-              <div className="p-4 space-y-4">
-                <div className="space-y-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-charcoal-ink/70">Table Name</Label>
-                    <Input
-                      value={editingTableName}
-                      onChange={(e) => { setEditingTableName(e.target.value); debouncedSaveTable(); }}
-                      placeholder="e.g. VIP Table"
-                      className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
-                    />
-                  </div>
+              <div className="p-4 space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-charcoal-ink/70">Table Name</Label>
+                  <Input
+                    value={editingTableName}
+                    onChange={(e) => { setEditingTableName(e.target.value); debouncedSaveTable(); }}
+                    placeholder="e.g. VIP Table"
+                    className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                  />
+                </div>
 
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-charcoal-ink/70">Table Number</Label>
-                    <Input
-                      value={editingTableNum}
-                      onChange={(e) => { setEditingTableNum(e.target.value); debouncedSaveTable(); }}
-                      type="number"
-                      className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
-                    />
-                  </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-charcoal-ink/70">Table Number</Label>
+                  <Input
+                    value={editingTableNum}
+                    onChange={(e) => { setEditingTableNum(e.target.value); debouncedSaveTable(); }}
+                    type="number"
+                    className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                  />
+                </div>
 
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-charcoal-ink/70">Shape</Label>
-                    <Select
-                      value={editingShape}
-                      onValueChange={(v) => {
-                        setEditingShape(v);
-                        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-                        handleSaveTableEditsWith({ ...editFieldsRef.current, shape: v });
-                      }}
-                    >
-                      <SelectTrigger className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="circle">
-                          <span className="flex items-center gap-2">{SHAPE_ICONS.circle} Round</span>
-                        </SelectItem>
-                        <SelectItem value="rectangle">
-                          <span className="flex items-center gap-2">{SHAPE_ICONS.rectangle} Square</span>
-                        </SelectItem>
-                        <SelectItem value="oval">
-                          <span className="flex items-center gap-2">{SHAPE_ICONS.oval} Long Rectangle</span>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-charcoal-ink/70">Capacity</Label>
-                    <Input
-                      value={editingCapacity}
-                      onChange={(e) => { setEditingCapacity(parseInt(e.target.value, 10) || 1); debouncedSaveTable(); }}
-                      type="number" min={1} max={50}
-                      className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-charcoal-ink/70">Zone</Label>
-                    <Select value={editingZone} onValueChange={(v) => { setEditingZone(v); debouncedSaveTable(); }}>
-                      <SelectTrigger className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20">
-                        <SelectValue placeholder="None" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ZONE_OPTIONS.map((z) => (
-                          <SelectItem key={z.value} value={z.value}>{z.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-charcoal-ink/70">Notes</Label>
-                    <Textarea
-                      value={editingNotes}
-                      onChange={(e) => { setEditingNotes(e.target.value); debouncedSaveTable(); }}
-                      placeholder="e.g. Near bar, VIP"
-                      className="text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20 min-h-[60px]"
-                    />
-                  </div>
-
-                  <Button
-                    onClick={handleSaveTableEdits}
-                    disabled={savingTable}
-                    className="w-full bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 rounded text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300 disabled:opacity-50"
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-charcoal-ink/70">Shape</Label>
+                  <Select
+                    value={editingShape}
+                    onValueChange={(v) => {
+                      setEditingShape(v);
+                      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+                      handleSaveTableEditsWith({ ...editFieldsRef.current, shape: v });
+                    }}
                   >
-                    {savingTable ? <Loader2 className="size-4 animate-spin mr-1.5" /> : null}
-                    Save Changes
-                  </Button>
+                    <SelectTrigger className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="circle">
+                        <span className="flex items-center gap-2">{SHAPE_ICONS.circle} Round</span>
+                      </SelectItem>
+                      <SelectItem value="rectangle">
+                        <span className="flex items-center gap-2">{SHAPE_ICONS.rectangle} Square</span>
+                      </SelectItem>
+                      <SelectItem value="oval">
+                        <span className="flex items-center gap-2">{SHAPE_ICONS.oval} Long Rectangle</span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                <Separator className="bg-champagne-silk" />
-
-                <div className="space-y-2">
-                  <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-charcoal-ink/50">
-                    Guests ({getGuestCountForTable(selectedTable.tableNum)}/{selectedTable.capacity})
-                  </h4>
-                  <div className="space-y-1.5">
-                    {guestsAtTable(selectedTable.tableNum).map((g) => (
-                      <div key={g.id} className="flex items-center justify-between gap-2 rounded-md border border-charcoal-ink/5 px-2.5 py-1.5">
-                        <div className="min-w-0 cursor-pointer" onClick={() => setDetailGuestId(g.id)}>
-                          <p className="text-xs font-medium text-charcoal-ink truncate hover:text-cinematic-gold transition-colors">{g.name}</p>
-                          {g.dietaryNotes && (
-                            <p className="text-[10px] text-red-500/70 flex items-center gap-0.5">
-                              <UtensilsCrossed className="size-2.5" />{truncate(g.dietaryNotes, 20)}
-                            </p>
-                          )}
-                        </div>
-                        <button type="button" onClick={() => handleReassignGuest(g.id, null)} className="text-[10px] text-red-400 hover:text-red-600 shrink-0 underline" title="Unassign">Remove</button>
-                      </div>
-                    ))}
-                    {getGuestCountForTable(selectedTable.tableNum) === 0 && (
-                      <p className="text-xs text-charcoal-ink/30 italic">No guests assigned</p>
-                    )}
-                  </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-charcoal-ink/70">Capacity</Label>
+                  <Input
+                    value={editingCapacity}
+                    onChange={(e) => { setEditingCapacity(parseInt(e.target.value, 10) || 1); debouncedSaveTable(); }}
+                    type="number" min={1} max={50}
+                    className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                  />
                 </div>
 
-                <Separator className="bg-champagne-silk" />
-
-                {unassignedGuests.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-charcoal-ink/50">
-                      Unassigned ({unassignedGuests.length})
-                    </h4>
-                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                      {unassignedGuests.map((g) => (
-                        <div key={g.id} className="flex items-center justify-between gap-2 rounded-md border border-charcoal-ink/5 px-2.5 py-1.5">
-                          <p className="text-xs font-medium text-charcoal-ink truncate min-w-0">{g.name}</p>
-                          <Button variant="ghost" size="sm" onClick={() => handleReassignGuest(g.id, selectedTable.tableNum)} className="h-6 px-2 text-[10px] text-cinematic-gold hover:bg-cinematic-gold/10 shrink-0">
-                            <Plus className="size-3" />
-                          </Button>
-                        </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-charcoal-ink/70">Zone</Label>
+                  <Select value={editingZone} onValueChange={(v) => { setEditingZone(v); debouncedSaveTable(); }}>
+                    <SelectTrigger className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20">
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ZONE_OPTIONS.map((z) => (
+                        <SelectItem key={z.value} value={z.value}>{z.label}</SelectItem>
                       ))}
-                    </div>
-                  </div>
-                )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-charcoal-ink/70">Notes</Label>
+                  <Textarea
+                    value={editingNotes}
+                    onChange={(e) => { setEditingNotes(e.target.value); debouncedSaveTable(); }}
+                    placeholder="e.g. Near bar, VIP"
+                    className="text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20 min-h-[60px]"
+                  />
+                </div>
+
+                <Button
+                  onClick={handleSaveTableEdits}
+                  disabled={savingTable}
+                  className="w-full bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 rounded text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300 disabled:opacity-50"
+                >
+                  {savingTable ? <Loader2 className="size-4 animate-spin mr-1.5" /> : null}
+                  Save Changes
+                </Button>
               </div>
             </>
           )}
