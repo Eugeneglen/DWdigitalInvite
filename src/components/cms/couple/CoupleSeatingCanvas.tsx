@@ -2,13 +2,14 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  Loader2, Plus, Trash2, Users, Search,
+  Loader2, Plus, Trash2, Pencil, Users, Search,
   ZoomIn, ZoomOut, GripVertical, Circle, Square, CircleEllipsis,
   AlertCircle, UtensilsCrossed, X, Lock, Unlock,
   ImagePlus, ImageOff, Maximize, ChevronRight, Mail, Phone,
   UserPlus, ArrowRightLeft, Ban,
   Wand2, Grid3x3, Download, Printer, Copy, FileDown,
   UsersRound, CheckCircle2, XCircle, Clock, ChevronsUpDown,
+  List,
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import {
@@ -50,24 +51,22 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { invalidateWeddingCache } from '@/hooks/usePublicWedding';
+import {
+  API_BASE, TABLES_API, TABLE_DIMS,
+  type GuestItem, type SeatingTableItem,
+  getEffectiveDietary, truncate, dietaryBadgeColor,
+} from './guest-types';
+import GuestFormDialog from './GuestFormDialog';
+import GuestListSheet from './GuestListSheet';
 
-// ---- Constants ----
-const API_BASE = '/api/cms/guests?XTransformPort=3000';
-const TABLES_API = '/api/cms/tables?XTransformPort=3000';
+// ---- Constants (canvas-only) ----
 const FLOORPLAN_API = '/api/cms/floorplan?XTransformPort=3000';
-
-const TABLE_DIMS: Record<string, { w: number; h: number }> = {
-  circle:    { w: 76, h: 76 },
-  rectangle: { w: 120, h: 76 },
-  oval:      { w: 100, h: 80 },
-};
 
 const SHAPE_ICONS: Record<string, React.ReactNode> = {
   circle: <Circle className="size-3.5" />,
   rectangle: <Square className="size-3.5" />,
   oval: <CircleEllipsis className="size-3.5" />,
 };
-
 const ZONE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: '', label: 'None' },
   { value: 'VIP', label: 'VIP' },
@@ -86,83 +85,8 @@ const ZONE_COLORS: Record<string, string> = {
   CUSTOM: 'bg-gray-100 text-gray-700 border-gray-300',
 };
 
-// ---- Interfaces ----
-interface RsvpGuestResponse {
-  dietary: string | null;
-  name: string;
-  attendance: string;
-}
-
-interface RsvpSubmissionBrief {
-  id: string;
-  createdAt: string;
-  guests: RsvpGuestResponse[];
-}
-
-interface GuestItem {
-  id: string;
-  name: string;
-  email: string | null;
-  phone: string | null;
-  groupName: string | null;
-  tableNumber: number | null;
-  invitationCode: string;
-  rsvpStatus: string;
-  plusOne: boolean;
-  plusOneName: string | null;
-  dietaryNotes: string | null;
-  sentVia: string | null;
-  sentAt: string | null;
-  _count?: { rsvps: number; wishes: number };
-  rsvps?: RsvpSubmissionBrief[];
-}
-
-interface SeatingTableItem {
-  id: string;
-  tableNum: number;
-  name: string | null;
-  zone: string | null;
-  shape: string;
-  capacity: number;
-  posX: number;
-  posY: number;
-  notes: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-// ---- Helpers ----
-function getEffectiveDietary(guest: GuestItem): string | null {
-  const rsvpDietary = guest.rsvps?.[0]?.guests
-    ?.map((g) => g.dietary)
-    .filter((d): d is string => !!d && d.trim().length > 0)
-    .join('; ');
-  return guest.dietaryNotes || rsvpDietary || null;
-}
-
-function truncate(str: string, len: number) {
-  if (!str) return '';
-  return str.length > len ? str.slice(0, len) + '\u2026' : str;
-}
-
-function dietaryBadgeColor(dietary: string): string {
-  const d = dietary.toLowerCase();
-  if (d.includes('vegan')) return 'bg-green-100 text-green-700';
-  if (d.includes('vegetarian')) return 'bg-emerald-100 text-emerald-700';
-  if (d.includes('halal')) return 'bg-blue-100 text-blue-700';
-  if (d.includes('kosher')) return 'bg-indigo-100 text-indigo-700';
-  if (d.includes('gluten') || d.includes('celiac')) return 'bg-amber-100 text-amber-700';
-  if (d.includes('nut') || d.includes('allerg')) return 'bg-red-100 text-red-700';
-  return 'bg-orange-100 text-orange-700';
-}
-
-// ---- Props ----
-interface CoupleSeatingCanvasProps {
-  onAddTable: () => Promise<void>;
-}
-
 // ---- Main Component ----
-export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasProps) {
+export default function CoupleSeatingCanvas() {
   // --- Guest state ---
   const [guests, setGuests] = useState<GuestItem[]>([]);
 
@@ -209,6 +133,12 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [bulkCount, setBulkCount] = useState(5);
   const [bulkShape, setBulkShape] = useState('circle');
+
+  // Guest management (unified view)
+  const [guestListOpen, setGuestListOpen] = useState(false);
+  const [guestFormOpen, setGuestFormOpen] = useState(false);
+  const [editingGuest, setEditingGuest] = useState<GuestItem | null>(null);
+  const [deletingGuestId, setDeletingGuestId] = useState<string | null>(null);
 
   // Drag state (table drag)
   const dragRef = useRef<{
@@ -315,6 +245,29 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
   const fillPct = totalSeats > 0 ? Math.round((assignedCount / totalSeats) * 100) : 0;
 
   // ======== Table CRUD ========
+  const handleAddTable = async () => {
+    const maxNum = tables.length > 0 ? Math.max(...tables.map((t) => t.tableNum)) : 0;
+    const newNum = maxNum + 1;
+    const offset = (newNum - 1) * 180;
+    const col = offset % 720;
+    const row = Math.floor(offset / 720) * 180;
+    try {
+      const res = await fetch(TABLES_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tableNum: newNum, shape: 'circle', capacity: 8, posX: 120 + col, posY: 120 + row }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to create table');
+      }
+      await fetchTables();
+      toast({ title: 'Success', description: `Table ${newNum} added` });
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to add table', variant: 'destructive' });
+    }
+  };
+
   const handleDeleteTable = async () => {
     const tbl = tables.find((t) => t.id === selectedTableId);
     if (!tbl) return;
@@ -408,6 +361,26 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
     } catch (err) {
       toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to reassign guest', variant: 'destructive' });
       fetchAllGuests();
+    }
+  };
+
+  // ======== Guest CRUD (sidebar) ========
+  const handleDeleteGuest = async (id: string) => {
+    if (!confirm('Delete this guest? This action cannot be undone.')) return;
+    try {
+      setDeletingGuestId(id);
+      const res = await fetch(`${API_BASE}&id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to delete guest');
+      }
+      invalidateWeddingCache();
+      toast({ title: 'Success', description: 'Guest deleted' });
+      await fetchAllGuests();
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to delete guest', variant: 'destructive' });
+    } finally {
+      setDeletingGuestId(null);
     }
   };
 
@@ -805,9 +778,37 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
           <div className="px-3 py-2.5 border-b border-champagne-silk">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold uppercase tracking-[0.08em] text-charcoal-ink/60">Guests</span>
-              <span className="text-xs font-medium text-charcoal-ink/50">
-                {assignedCount}/{totalCount} assigned
-              </span>
+              <div className="flex items-center gap-1">
+                <span className="text-xs font-medium text-charcoal-ink/50 mr-1">
+                  {assignedCount}/{totalCount} assigned
+                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
+                      onClick={() => { setEditingGuest(null); setGuestFormOpen(true); }}
+                    >
+                      <Plus className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Add Guest</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
+                      onClick={() => setGuestListOpen(true)}
+                    >
+                      <List className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Full Guest List</TooltipContent>
+                </Tooltip>
+              </div>
             </div>
             {unassignedGuests.length > 0 && (
               <Badge variant="outline" className="text-[10px] font-medium bg-amber-50 text-amber-700 border-amber-200">
@@ -892,7 +893,7 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
                       }
                     }}
                     onDoubleClick={() => setDetailGuestId(guest.id)}
-                    className={`flex items-center gap-2 rounded-md border px-2 py-1.5 cursor-grab active:cursor-grabbing transition-all duration-150 ${
+                    className={`group flex items-center gap-2 rounded-md border px-2 py-1.5 cursor-grab active:cursor-grabbing transition-all duration-150 ${
                       isSelected
                         ? 'border-cinematic-gold bg-cinematic-gold/10 ring-1 ring-cinematic-gold/30'
                         : 'border-charcoal-ink/5 bg-white hover:border-champagne-silk hover:shadow-sm'
@@ -915,6 +916,23 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
                           </span>
                         )}
                       </div>
+                    </div>
+                    <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setEditingGuest(guest); setGuestFormOpen(true); }}
+                        className="h-5 w-5 flex items-center justify-center rounded text-charcoal-ink/30 hover:text-cinematic-gold hover:bg-cinematic-gold/10 transition-colors"
+                      >
+                        <Pencil className="size-2.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleDeleteGuest(guest.id); }}
+                        disabled={deletingGuestId === guest.id}
+                        className="h-5 w-5 flex items-center justify-center rounded text-charcoal-ink/30 hover:text-red-500 hover:bg-red-50 transition-colors"
+                      >
+                        {deletingGuestId === guest.id ? <Loader2 className="size-2.5 animate-spin" /> : <Trash2 className="size-2.5" />}
+                      </button>
                     </div>
                     {guest.plusOne && (
                       <UserPlus className="size-3 text-pink-400 shrink-0" />
@@ -1042,7 +1060,7 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
                 <TooltipContent>Add tables</TooltipContent>
               </Tooltip>
               <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={async () => { await onAddTable(); await fetchTables(); }}>Add 1 Table</DropdownMenuItem>
+                <DropdownMenuItem onClick={async () => { await handleAddTable(); }}>Add 1 Table</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => { setBulkCount(5); setBulkShape('circle'); setBulkDialogOpen(true); }}>Add 5 Tables</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => { setBulkCount(10); setBulkShape('circle'); setBulkDialogOpen(true); }}>Add 10 Tables</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => { setBulkCount(20); setBulkShape('circle'); setBulkDialogOpen(true); }}>Add 20 Tables</DropdownMenuItem>
@@ -1091,6 +1109,21 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Export CSV</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setGuestListOpen(true)}
+                  className="h-8 px-2 text-charcoal-ink/50 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
+                >
+                  <List className="size-4" />
+                  <span className="hidden xl:inline text-xs ml-1.5">Guest List</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Full Guest List</TooltipContent>
             </Tooltip>
           </div>
 
@@ -1854,6 +1887,20 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Guest Form Dialog (sidebar add/edit) */}
+      <GuestFormDialog
+        open={guestFormOpen}
+        onOpenChange={setGuestFormOpen}
+        editGuest={editingGuest}
+        onSaved={fetchAllGuests}
+      />
+
+      {/* Guest List Sheet (full management) */}
+      <GuestListSheet
+        open={guestListOpen}
+        onOpenChange={setGuestListOpen}
+        onGuestsChanged={fetchAllGuests}
+      />
     </TooltipProvider>
   );
 }
