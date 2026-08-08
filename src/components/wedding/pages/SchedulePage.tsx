@@ -2,6 +2,7 @@
 
 import { useCallback } from 'react';
 import { useNavigationStore } from '@/store/useNavigationStore';
+import SectionBanner from '@/components/wedding/SectionBanner';
 import { usePublicWedding } from '@/hooks/usePublicWedding'
 import { useWeddingSlug } from '@/hooks/useWeddingSlug';;
 
@@ -10,8 +11,6 @@ const CEREMONY_IMG =
 const CELEBRATION_IMG =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuC01POr_eFI2RUG86kAb7dHs-q12Kj6HzxEoXpnzTnJ9n_VB9_BJL6Iy8vtGixOWTn1jVNZKDjXNQkHSy9Gsa8KI5IomZe3968VCNWHhXNZ44gbgs5LCBp4_Axjbj72RJwN0BWAIEmrqH8lgR-_j2_9Ci79wI4t583OCS4YuDca-s2xldrzBhBM-KeS4GFVFDSQdzWRY-4chmwkFfFgO3g-S4VS_jae416SCd-357i_ix3m68zwnHtpBSxyXFSjZISZ_Z66Jlxj6Npv_Lo';
 
-const FALLBACK_BANNER_BG =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuA-OyKfcsxXAmZDArHbDXl1cVCgGUG5liFPzyHdVvMG6_4jN9pNTrN9GCrkdnegli9UPJUSPs39KJRsRP7AiLem4xYS-q1ZYq1T3DAIqyvn3wAvbdkoMVkufft0SpQw4gDTPSnIml6k62lRYobUrNu70UGIILiMZQ0fAydTXXwVZ1oswQZ-mjPT8H9mDDqfhxsMSI5zla8GKz_ILXbmdRjtRUk682dPEDBD6I81DzEx7dITgjb6vxQoee5599jkYf_vCYP7npydvxqx';
 
 const FALLBACK_SCHEDULE_ITEMS = [
   {
@@ -113,7 +112,6 @@ export default function SchedulePage() {
   const { data, getField } = usePublicWedding(useWeddingSlug());
   const { setSection } = useNavigationStore();
 
-  const bannerUrl = data?.wedding.bannerUrl || FALLBACK_BANNER_BG;
   const fullDateText = formatFullDate(data?.wedding.weddingDate);
   const shortDateText = formatShortDate(data?.wedding.weddingDate);
   const sectionTitle = getField('schedule', 'title', 'The Schedule');
@@ -158,15 +156,7 @@ export default function SchedulePage() {
   return (
     <>
       {/* Banner */}
-      <div
-        className="w-full h-[360px] md:h-[420px] bg-cover bg-center mt-[54px] md:mt-[64px] relative z-40 border-b border-champagne-silk/20 flex items-center justify-center"
-        style={{ backgroundImage: `url('${bannerUrl}')` }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-b from-paper-cream/30 via-paper-cream/10 to-paper-cream/60" />
-        <div className="relative z-10 text-center px-6">
-          <h1 className="font-display-hero text-[44px] md:text-[72px] leading-[1.05] text-charcoal-ink tracking-tight font-bold drop-shadow-sm">{sectionTitle}</h1>
-        </div>
-      </div>
+      <SectionBanner title={sectionTitle} />
 
       <main className="pb-section-gap px-4 md:px-canvas-margin max-w-[1440px] mx-auto min-h-screen pt-[20px] md:pt-[40px]">
         {/* Intro Images — only show if couple has uploaded them */}
