@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
-  Loader2, Plus, Trash2, Users, Search,
-  ZoomIn, ZoomOut, GripVertical, Circle, Square, CircleEllipsis,
-  AlertCircle, UtensilsCrossed, X, Lock, Unlock,
+  Loader2, Plus, Trash2, Users,
+  ZoomIn, ZoomOut, Circle, Square, RectangleHorizontal,
+  AlertCircle, UtensilsCrossed, Lock, Unlock,
   ImagePlus, ImageOff, Maximize, ChevronRight, Mail, Phone,
   UserPlus, ArrowRightLeft, Ban,
   Wand2, Grid3x3, Download, Printer, Copy, FileDown,
-  UsersRound, CheckCircle2, XCircle, Clock, ChevronsUpDown,
+  UsersRound, CheckCircle2, Clock, ChevronsUpDown,
+  List,
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import {
@@ -17,7 +18,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Progress } from '@/components/ui/progress';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,7 +26,6 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import {
   Dialog,
@@ -50,26 +49,24 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { invalidateWeddingCache } from '@/hooks/usePublicWedding';
+import {
+  API_BASE, TABLES_API, TABLE_DIMS,
+  type GuestItem, type SeatingTableItem,
+  getEffectiveDietary, truncate,
+} from './guest-types';
+import GuestFormDialog from './GuestFormDialog';
+import GuestListSheet from './GuestListSheet';
 
-// ---- Constants ----
-const API_BASE = '/api/cms/guests?XTransformPort=3000';
-const TABLES_API = '/api/cms/tables?XTransformPort=3000';
+// ---- Constants (canvas-only) ----
 const FLOORPLAN_API = '/api/cms/floorplan?XTransformPort=3000';
-
-const TABLE_DIMS: Record<string, { w: number; h: number }> = {
-  circle:    { w: 76, h: 76 },
-  rectangle: { w: 120, h: 76 },
-  oval:      { w: 100, h: 80 },
-};
 
 const SHAPE_ICONS: Record<string, React.ReactNode> = {
   circle: <Circle className="size-3.5" />,
   rectangle: <Square className="size-3.5" />,
-  oval: <CircleEllipsis className="size-3.5" />,
+  oval: <RectangleHorizontal className="size-3.5" />,
 };
-
 const ZONE_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: '', label: 'None' },
+  { value: '__none__', label: 'None' },
   { value: 'VIP', label: 'VIP' },
   { value: 'BRIDE_FAMILY', label: "Bride's Family" },
   { value: 'GROOM_FAMILY', label: "Groom's Family" },
@@ -86,83 +83,8 @@ const ZONE_COLORS: Record<string, string> = {
   CUSTOM: 'bg-gray-100 text-gray-700 border-gray-300',
 };
 
-// ---- Interfaces ----
-interface RsvpGuestResponse {
-  dietary: string | null;
-  name: string;
-  attendance: string;
-}
-
-interface RsvpSubmissionBrief {
-  id: string;
-  createdAt: string;
-  guests: RsvpGuestResponse[];
-}
-
-interface GuestItem {
-  id: string;
-  name: string;
-  email: string | null;
-  phone: string | null;
-  groupName: string | null;
-  tableNumber: number | null;
-  invitationCode: string;
-  rsvpStatus: string;
-  plusOne: boolean;
-  plusOneName: string | null;
-  dietaryNotes: string | null;
-  sentVia: string | null;
-  sentAt: string | null;
-  _count?: { rsvps: number; wishes: number };
-  rsvps?: RsvpSubmissionBrief[];
-}
-
-interface SeatingTableItem {
-  id: string;
-  tableNum: number;
-  name: string | null;
-  zone: string | null;
-  shape: string;
-  capacity: number;
-  posX: number;
-  posY: number;
-  notes: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-// ---- Helpers ----
-function getEffectiveDietary(guest: GuestItem): string | null {
-  const rsvpDietary = guest.rsvps?.[0]?.guests
-    ?.map((g) => g.dietary)
-    .filter((d): d is string => !!d && d.trim().length > 0)
-    .join('; ');
-  return guest.dietaryNotes || rsvpDietary || null;
-}
-
-function truncate(str: string, len: number) {
-  if (!str) return '';
-  return str.length > len ? str.slice(0, len) + '\u2026' : str;
-}
-
-function dietaryBadgeColor(dietary: string): string {
-  const d = dietary.toLowerCase();
-  if (d.includes('vegan')) return 'bg-green-100 text-green-700';
-  if (d.includes('vegetarian')) return 'bg-emerald-100 text-emerald-700';
-  if (d.includes('halal')) return 'bg-blue-100 text-blue-700';
-  if (d.includes('kosher')) return 'bg-indigo-100 text-indigo-700';
-  if (d.includes('gluten') || d.includes('celiac')) return 'bg-amber-100 text-amber-700';
-  if (d.includes('nut') || d.includes('allerg')) return 'bg-red-100 text-red-700';
-  return 'bg-orange-100 text-orange-700';
-}
-
-// ---- Props ----
-interface CoupleSeatingCanvasProps {
-  onAddTable: () => Promise<void>;
-}
-
 // ---- Main Component ----
-export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasProps) {
+export default function CoupleSeatingCanvas() {
   // --- Guest state ---
   const [guests, setGuests] = useState<GuestItem[]>([]);
 
@@ -184,13 +106,10 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
   const [editingTableNum, setEditingTableNum] = useState('');
   const [editingShape, setEditingShape] = useState('circle');
   const [editingCapacity, setEditingCapacity] = useState(8);
-  const [editingZone, setEditingZone] = useState('');
+  const [editingZone, setEditingZone] = useState('__none__');
   const [editingNotes, setEditingNotes] = useState('');
   const [savingTable, setSavingTable] = useState(false);
 
-  // Guest sidebar search/filter
-  const [guestSearch, setGuestSearch] = useState('');
-  const [guestFilter, setGuestFilter] = useState<string>('all'); // all | unassigned | table-N
 
   // Guest detail drawer
   const [detailGuestId, setDetailGuestId] = useState<string | null>(null);
@@ -201,7 +120,6 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
   const [swapGuestId, setSwapGuestId] = useState<string | null>(null);
 
   // Phase 3+4 state
-  const [rsvpFilter, setRsvpFilter] = useState<string>('all');
   const [autoAssigning, setAutoAssigning] = useState(false);
   const [gridSnap, setGridSnap] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -209,6 +127,12 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [bulkCount, setBulkCount] = useState(5);
   const [bulkShape, setBulkShape] = useState('circle');
+
+  // Guest management (unified view)
+  const [guestListOpen, setGuestListOpen] = useState(false);
+  const [guestFormOpen, setGuestFormOpen] = useState(false);
+  const [editingGuest, setEditingGuest] = useState<GuestItem | null>(null);
+  const [deletingGuestId, setDeletingGuestId] = useState<string | null>(null);
 
   // Drag state (table drag)
   const dragRef = useRef<{
@@ -219,6 +143,7 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
     origPosY: number;
   } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const outerRef = useRef<HTMLDivElement>(null);
 
   // Debounce save ref
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -277,36 +202,6 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
   const getGuestCountForTable = (tableNum: number) =>
     guests.filter((g) => g.tableNumber === tableNum).length;
 
-  // Guest sidebar filtered list
-  const filteredGuests = (() => {
-    let list = guests;
-    // RSVP filter (applied first)
-    if (rsvpFilter === 'attending') {
-      list = list.filter((g) => g.rsvpStatus === 'ATTENDING');
-    } else if (rsvpFilter === 'pending') {
-      list = list.filter((g) => g.rsvpStatus === 'PENDING' || !g.rsvpStatus);
-    } else if (rsvpFilter === 'declined') {
-      list = list.filter((g) => g.rsvpStatus === 'DECLINED');
-    }
-    // Table assignment filter
-    if (guestFilter === 'unassigned') {
-      list = list.filter((g) => g.tableNumber == null);
-    } else if (guestFilter.startsWith('table-')) {
-      const num = parseInt(guestFilter.split('-')[1], 10);
-      list = list.filter((g) => g.tableNumber === num);
-    }
-    // Search filter
-    if (guestSearch.trim()) {
-      const q = guestSearch.toLowerCase();
-      list = list.filter(
-        (g) =>
-          g.name.toLowerCase().includes(q) ||
-          (g.email && g.email.toLowerCase().includes(q)) ||
-          (g.groupName && g.groupName.toLowerCase().includes(q))
-      );
-    }
-    return list;
-  })();
 
   const assignedCount = guests.filter((g) => g.tableNumber != null).length;
   const totalCount = guests.length;
@@ -315,6 +210,29 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
   const fillPct = totalSeats > 0 ? Math.round((assignedCount / totalSeats) * 100) : 0;
 
   // ======== Table CRUD ========
+  const handleAddTable = async () => {
+    const maxNum = tables.length > 0 ? Math.max(...tables.map((t) => t.tableNum)) : 0;
+    const newNum = maxNum + 1;
+    const offset = (newNum - 1) * 180;
+    const col = offset % 720;
+    const row = Math.floor(offset / 720) * 180;
+    try {
+      const res = await fetch(TABLES_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tableNum: newNum, shape: 'circle', capacity: 8, posX: 120 + col, posY: 120 + row }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to create table');
+      }
+      await fetchTables();
+      toast({ title: 'Success', description: `Table ${newNum} added` });
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to add table', variant: 'destructive' });
+    }
+  };
+
   const handleDeleteTable = async () => {
     const tbl = tables.find((t) => t.id === selectedTableId);
     if (!tbl) return;
@@ -342,7 +260,7 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
           id: selectedTableId,
           name: editingTableName.trim() || undefined,
           tableNum: parseInt(editingTableNum, 10),
-          zone: editingZone || null,
+          zone: editingZone === '__none__' ? null : editingZone,
           shape: editingShape,
           capacity: editingCapacity,
           notes: editingNotes.trim() || undefined,
@@ -361,13 +279,70 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
     }
   };
 
+  // Immediate save with explicit field values (avoids stale closure)
+  const handleSaveTableEditsWith = async (fields: { tableName?: string; tableNum?: string; zone?: string; shape?: string; capacity?: number; notes?: string }) => {
+    if (!selectedTableId) return;
+    try {
+      const res = await fetch(TABLES_API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedTableId,
+          name: (fields.tableName ?? '').trim() || undefined,
+          tableNum: parseInt(String(fields.tableNum), 10),
+          zone: fields.zone === '__none__' ? null : fields.zone,
+          shape: fields.shape,
+          capacity: fields.capacity,
+          notes: (fields.notes ?? '').trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to update table');
+      }
+      await fetchTables();
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to update table', variant: 'destructive' });
+    }
+  };
+
   // Debounced auto-save for table properties
+  // Use refs to avoid stale closure — the timeout fires after state updates
+  const editFieldsRef = useRef({
+    tableName: '', tableNum: '', shape: 'circle', capacity: 8, zone: '__none__', notes: '',
+  });
+  editFieldsRef.current = {
+    tableName: editingTableName, tableNum: editingTableNum, shape: editingShape,
+    capacity: editingCapacity, zone: editingZone, notes: editingNotes,
+  };
+
   const debouncedSaveTable = useCallback(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    debounceTimerRef.current = setTimeout(() => {
-      handleSaveTableEdits();
+    debounceTimerRef.current = setTimeout(async () => {
+      if (!selectedTableId) return;
+      const f = editFieldsRef.current;
+      try {
+        const res = await fetch(TABLES_API, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: selectedTableId,
+            name: f.tableName.trim() || undefined,
+            tableNum: parseInt(f.tableNum, 10),
+            zone: f.zone === '__none__' ? null : f.zone,
+            shape: f.shape,
+            capacity: f.capacity,
+            notes: f.notes.trim() || undefined,
+          }),
+        });
+        if (!res.ok) throw new Error('Failed to update table');
+        await fetchTables();
+        toast({ title: 'Success', description: 'Table updated' });
+      } catch (err) {
+        toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to update table', variant: 'destructive' });
+      }
     }, 800);
-  }, [selectedTableId, editingTableName, editingTableNum, editingZone, editingShape, editingCapacity, editingNotes]);
+  }, [selectedTableId]);
 
   // Populate edit fields when a table is selected
   useEffect(() => {
@@ -377,7 +352,7 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
       setEditingTableNum(String(tbl.tableNum));
       setEditingShape(tbl.shape || 'circle');
       setEditingCapacity(tbl.capacity || 8);
-      setEditingZone(tbl.zone || '');
+      setEditingZone(tbl.zone || '__none__');
       setEditingNotes(tbl.notes || '');
     }
   }, [selectedTableId, tables]);
@@ -408,6 +383,26 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
     } catch (err) {
       toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to reassign guest', variant: 'destructive' });
       fetchAllGuests();
+    }
+  };
+
+  // ======== Guest CRUD (sidebar) ========
+  const handleDeleteGuest = async (id: string) => {
+    if (!confirm('Delete this guest? This action cannot be undone.')) return;
+    try {
+      setDeletingGuestId(id);
+      const res = await fetch(`${API_BASE}&id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to delete guest');
+      }
+      invalidateWeddingCache();
+      toast({ title: 'Success', description: 'Guest deleted' });
+      await fetchAllGuests();
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to delete guest', variant: 'destructive' });
+    } finally {
+      setDeletingGuestId(null);
     }
   };
 
@@ -788,6 +783,74 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
   // ======== Detail Drawer Guest ========
   const detailGuest = guests.find((g) => g.id === detailGuestId);
 
+  // ======== Layout Measurement (fills <main> exactly, no scroll) ========
+  const [mainDims, setMainDims] = useState<{ w: number; h: number } | null>(null);
+
+  useEffect(() => {
+    const el = outerRef.current;
+    if (!el) return;
+    const main = el.closest('main') as HTMLElement | null;
+    if (!main) return;
+
+    const measure = () => {
+      const rect = main.getBoundingClientRect();
+      setMainDims({ w: Math.round(rect.width), h: Math.round(rect.height) });
+    };
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(main);
+    return () => ro.disconnect();
+  }, []);
+
+  // Inject CSS to prevent <main> from scrolling when seating canvas is active
+  useEffect(() => {
+    const styleId = 'seating-canvas-no-scroll';
+    if (document.getElementById(styleId)) return;
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `main:has([data-seating-canvas]) { overflow: hidden !important; }`;
+    document.head.appendChild(style);
+    return () => { style.remove(); };
+  }, []);
+
+  // ======== Content Bounds (dynamic virtual canvas) ========
+  const contentBounds = useMemo(() => {
+    if (tables.length === 0) return { w: 800, h: 500 };
+    let maxX = 0, maxY = 0;
+    tables.forEach(t => {
+      const dims = TABLE_DIMS[t.shape] || TABLE_DIMS.circle;
+      const r = (Math.max(dims.w, dims.h) / 2) + 100;
+      maxX = Math.max(maxX, t.posX + dims.w + r);
+      maxY = Math.max(maxY, t.posY + dims.h + 60);
+    });
+    return { w: Math.max(maxX + 40, 400), h: Math.max(maxY + 40, 300) };
+  }, [tables]);
+
+  // ======== Auto-Fit Scale ========
+  const autoFitScale = useCallback(() => {
+    if (!canvasRef.current) {
+      setCanvasScale(100);
+      return;
+    }
+    const container = canvasRef.current;
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    if (cw === 0 || ch === 0) return;
+    const scaleX = cw / contentBounds.w;
+    const scaleY = ch / contentBounds.h;
+    const fit = Math.min(scaleX, scaleY) * 100;
+    setCanvasScale(Math.max(30, Math.min(200, Math.round(fit / 5) * 5)));
+  }, [contentBounds]);
+
+  const initialFitDoneRef = useRef(false);
+  useEffect(() => {
+    if (!tablesLoading && tables.length > 0 && !initialFitDoneRef.current) {
+      initialFitDoneRef.current = true;
+      requestAnimationFrame(() => autoFitScale());
+    }
+  }, [tablesLoading, tables.length, autoFitScale]);
+
   // ======== Cleanup ========
   useEffect(() => {
     return () => {
@@ -798,136 +861,14 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
   // ======== Render ========
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="flex flex-col lg:flex-row gap-0 h-full">
-        {/* ======== LEFT GUEST SIDEBAR ======== */}
-        <div className="w-full lg:w-64 shrink-0 border-r border-champagne-silk bg-paper-cream/50 flex flex-col lg:max-h-[580px] lg:h-auto max-h-[200px] lg:max-h-none order-2 lg:order-1">
-          {/* Summary */}
-          <div className="px-3 py-2.5 border-b border-champagne-silk">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.08em] text-charcoal-ink/60">Guests</span>
-              <span className="text-xs font-medium text-charcoal-ink/50">
-                {assignedCount}/{totalCount} assigned
-              </span>
-            </div>
-            {unassignedGuests.length > 0 && (
-              <Badge variant="outline" className="text-[10px] font-medium bg-amber-50 text-amber-700 border-amber-200">
-                <AlertCircle className="size-2.5 mr-1" />
-                {unassignedGuests.length} unassigned
-              </Badge>
-            )}
-          </div>
-
-          {/* Search */}
-          <div className="px-3 py-2 border-b border-champagne-silk">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-charcoal-ink/30" />
-              <Input
-                value={guestSearch}
-                onChange={(e) => setGuestSearch(e.target.value)}
-                placeholder="Search guests..."
-                className="h-7 pl-8 text-xs border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
-              />
-            </div>
-          </div>
-
-          {/* RSVP Filter */}
-          <div className="px-3 py-1.5 border-b border-champagne-silk flex items-center gap-1">
-            {([['all', 'All', UsersRound], ['attending', 'Attending', CheckCircle2], ['pending', 'Pending', Clock], ['declined', 'Declined', XCircle]] as const).map(([val, label, Icon]) => (
-              <button
-                key={val}
-                type="button"
-                onClick={() => setRsvpFilter(val)}
-                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors duration-150 ${
-                  rsvpFilter === val
-                    ? 'bg-cinematic-gold/10 text-cinematic-gold border-cinematic-gold/30'
-                    : 'text-charcoal-ink/40 border-transparent hover:text-charcoal-ink/60 hover:border-charcoal-ink/10'
-                }`}
-              >
-                <Icon className="size-2.5" />
-                <span className="hidden sm:inline">{label}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Filter */}
-          <div className="px-3 py-2 border-b border-champagne-silk">
-            <Select value={guestFilter} onValueChange={setGuestFilter}>
-              <SelectTrigger className="h-7 text-xs border-charcoal-ink/10">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Guests</SelectItem>
-                <SelectItem value="unassigned">Unassigned</SelectItem>
-                {tables
-                  .sort((a, b) => a.tableNum - b.tableNum)
-                  .map((t) => (
-                    <SelectItem key={t.id} value={`table-${t.tableNum}`}>
-                      {t.name || `Table ${t.tableNum}`}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Guest list */}
-          <ScrollArea className="flex-1">
-            <div className="px-2 py-1 space-y-1">
-              {filteredGuests.length === 0 && (
-                <p className="text-xs text-charcoal-ink/30 text-center py-4 italic">
-                  No guests found
-                </p>
-              )}
-              {filteredGuests.map((guest) => {
-                const dietary = getEffectiveDietary(guest);
-                const isSelected = reassigningGuestId === guest.id;
-                return (
-                  <div
-                    key={guest.id}
-                    draggable
-                    onDragStart={(e) => handleGuestDragStart(e, guest.id)}
-                    onClick={(e) => {
-                      if (e.detail === 1) {
-                        // Single click: tap-to-assign mode (for mobile)
-                        handleCanvasGuestClick(guest.id);
-                      }
-                    }}
-                    onDoubleClick={() => setDetailGuestId(guest.id)}
-                    className={`flex items-center gap-2 rounded-md border px-2 py-1.5 cursor-grab active:cursor-grabbing transition-all duration-150 ${
-                      isSelected
-                        ? 'border-cinematic-gold bg-cinematic-gold/10 ring-1 ring-cinematic-gold/30'
-                        : 'border-charcoal-ink/5 bg-white hover:border-champagne-silk hover:shadow-sm'
-                    }`}
-                  >
-                    <div className="flex-1 min-w-0" onClick={() => setDetailGuestId(guest.id)}>
-                      <p className="text-xs font-medium text-charcoal-ink truncate">{guest.name}</p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        {guest.tableNumber != null && (
-                          <span className="text-[10px] font-medium text-cinematic-gold">
-                            T{guest.tableNumber}
-                          </span>
-                        )}
-                        {dietary && (
-                          <span
-                            className={`inline-flex items-center justify-center size-3.5 rounded text-[8px] font-bold ${dietaryBadgeColor(dietary)}`}
-                            title={dietary}
-                          >
-                            {dietary.charAt(0).toUpperCase()}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {guest.plusOne && (
-                      <UserPlus className="size-3 text-pink-400 shrink-0" />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </ScrollArea>
-        </div>
-
-        {/* ======== CENTER CANVAS AREA ======== */}
-        <div className="flex-1 flex flex-col gap-3 min-w-0 order-1 lg:order-2">
+      <div
+        ref={outerRef}
+        data-seating-canvas
+        className="-mt-[28px] sm:-mt-[40px] md:-mt-[56px] -mx-[28px] sm:-mx-[40px] md:-mx-[56px] -mb-[96px] sm:-mb-[104px] md:-mb-[56px] flex flex-col overflow-hidden rounded-lg"
+        style={mainDims ? { width: mainDims.w, height: mainDims.h } : { height: '100dvh' }}
+      >
+        {/* ======== SECTION 1: CANVAS AREA (top) ======== */}
+        <div className="flex-1 flex flex-col gap-2 min-w-0 min-h-0">
           {/* Toolbar */}
           <div className="flex items-center gap-2 px-1 flex-wrap">
             <Tooltip>
@@ -935,13 +876,13 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setCanvasScale(100)}
+                  onClick={autoFitScale}
                   className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5"
                 >
                   <Maximize className="size-3.5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Fit View (100%)</TooltipContent>
+              <TooltipContent>Fit View</TooltipContent>
             </Tooltip>
 
             <Tooltip>
@@ -1042,7 +983,7 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
                 <TooltipContent>Add tables</TooltipContent>
               </Tooltip>
               <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={async () => { await onAddTable(); await fetchTables(); }}>Add 1 Table</DropdownMenuItem>
+                <DropdownMenuItem onClick={async () => { await handleAddTable(); }}>Add 1 Table</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => { setBulkCount(5); setBulkShape('circle'); setBulkDialogOpen(true); }}>Add 5 Tables</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => { setBulkCount(10); setBulkShape('circle'); setBulkDialogOpen(true); }}>Add 10 Tables</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => { setBulkCount(20); setBulkShape('circle'); setBulkDialogOpen(true); }}>Add 20 Tables</DropdownMenuItem>
@@ -1091,6 +1032,36 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Export CSV</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setEditingGuest(null); setGuestFormOpen(true); }}
+                  className="h-8 px-2 text-charcoal-ink/50 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
+                >
+                  <UserPlus className="size-3.5" />
+                  <span className="hidden xl:inline text-xs ml-1.5">Add Guest</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Add Guest</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setGuestListOpen(true)}
+                  className="h-8 px-2 text-charcoal-ink/50 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
+                >
+                  <List className="size-4" />
+                  <span className="hidden xl:inline text-xs ml-1.5">Guest List</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Full Guest List</TooltipContent>
             </Tooltip>
           </div>
 
@@ -1150,8 +1121,7 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
           {/* Canvas */}
           <div
             ref={canvasRef}
-            className="relative border border-champagne-silk rounded-lg bg-white overflow-hidden"
-            style={{ height: '520px' }}
+            className="relative flex-1 min-h-0 border border-champagne-silk rounded-lg bg-[radial-gradient(circle,_#d4d4d4_1px,_transparent_1px)] [background-size:20px_20px] overflow-hidden"
             onClick={(e) => {
               if (e.target === e.currentTarget) {
                 if (reassigningGuestId) setReassigningGuestId(null);
@@ -1170,24 +1140,25 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
                 <p className="text-xs text-charcoal-ink/30">Click &quot;Add Table&quot; to start arranging seating.</p>
               </div>
             ) : (
-              <div
-                style={{
-                  transform: `scale(${canvasScale / 100})`,
-                  transformOrigin: 'top left',
-                  width: `${2000 * (100 / canvasScale)}px`,
-                  height: `${2000 * (100 / canvasScale)}px`,
-                }}
-                className="relative"
-              >
-                {/* Floor plan background */}
-                {floorPlanUrl && (
-                  <img
-                    src={floorPlanUrl}
-                    alt="Floor plan"
-                    className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-                    style={{ opacity: 0.15 }}
-                  />
-                )}
+              <div className="w-full h-full flex items-center justify-center">
+                <div
+                  style={{
+                    transform: `scale(${canvasScale / 100})`,
+                    transformOrigin: 'center center',
+                    width: `${contentBounds.w}px`,
+                    height: `${contentBounds.h}px`,
+                  }}
+                  className="relative shrink-0"
+                >
+                  {/* Floor plan background */}
+                  {floorPlanUrl && (
+                    <img
+                      src={floorPlanUrl}
+                      alt="Floor plan"
+                      className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                      style={{ opacity: 0.15 }}
+                    />
+                  )}
 
                 {tables.map((tbl) => {
                   const dims = TABLE_DIMS[tbl.shape] || TABLE_DIMS.circle;
@@ -1214,7 +1185,7 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
                   // Shape
                   let shapeCls = 'rounded-full';
                   if (tbl.shape === 'rectangle') shapeCls = 'rounded-md';
-                  if (tbl.shape === 'oval') shapeCls = 'rounded-[50%]';
+                  if (tbl.shape === 'oval') shapeCls = 'rounded-lg';
 
                   return (
                     <div
@@ -1318,27 +1289,37 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
                   );
                 })}
               </div>
-            )}
+            </div>
+          )}
           </div>
         </div>
 
-        {/* ======== RIGHT TABLE DETAIL PANEL ======== */}
-        {selectedTable && (
-          <div className="w-full lg:w-72 shrink-0 border-l border-champagne-silk bg-paper-cream order-3 lg:max-h-[580px] overflow-y-auto custom-scrollbar max-h-[300px] lg:max-h-none">
-            <div className="p-4 space-y-4">
-              {/* Header */}
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-[0.08em]">
-                  {selectedTable.name || `Table ${selectedTable.tableNum}`}
-                </h3>
-                <div className="flex items-center gap-1">
+      </div>
+
+      {/* ======== TABLE DETAIL SHEET ======== */}
+      <Sheet open={!!selectedTable} onOpenChange={(open) => { if (!open) setSelectedTableId(null); }}>
+        <SheetContent side="right" className="w-[360px] p-0 overflow-y-auto">
+          {selectedTable && (
+            <>
+              <SheetHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <SheetTitle className="text-charcoal-ink text-sm font-semibold truncate">
+                    {selectedTable.name || `Table ${selectedTable.tableNum}`}
+                  </SheetTitle>
+                  {selectedTable.zone && (
+                    <Badge variant="outline" className={`text-[10px] shrink-0 ${ZONE_COLORS[selectedTable.zone] || ''}`}>
+                      {selectedTable.zone.replace('_', ' ')}
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={handleDuplicateTable}
-                        className="h-8 w-8 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
+                        className="h-7 w-7 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
                       >
                         <Copy className="size-3.5" />
                       </Button>
@@ -1349,218 +1330,158 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
                     variant="ghost"
                     size="sm"
                     onClick={handleDeleteTable}
-                    className="h-8 w-8 p-0 text-charcoal-ink/40 hover:text-red-500 hover:bg-red-50"
+                    className="h-7 w-7 p-0 text-charcoal-ink/40 hover:text-red-500 hover:bg-red-50"
                   >
                     <Trash2 className="size-3.5" />
                   </Button>
+                </div>
+              </SheetHeader>
+
+              <Separator className="bg-champagne-silk" />
+
+              <div className="p-4 space-y-4">
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-charcoal-ink/70">Table Name</Label>
+                    <Input
+                      value={editingTableName}
+                      onChange={(e) => { setEditingTableName(e.target.value); debouncedSaveTable(); }}
+                      placeholder="e.g. VIP Table"
+                      className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-charcoal-ink/70">Table Number</Label>
+                    <Input
+                      value={editingTableNum}
+                      onChange={(e) => { setEditingTableNum(e.target.value); debouncedSaveTable(); }}
+                      type="number"
+                      className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-charcoal-ink/70">Shape</Label>
+                    <Select
+                      value={editingShape}
+                      onValueChange={(v) => {
+                        setEditingShape(v);
+                        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+                        handleSaveTableEditsWith({ ...editFieldsRef.current, shape: v });
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="circle">
+                          <span className="flex items-center gap-2">{SHAPE_ICONS.circle} Round</span>
+                        </SelectItem>
+                        <SelectItem value="rectangle">
+                          <span className="flex items-center gap-2">{SHAPE_ICONS.rectangle} Square</span>
+                        </SelectItem>
+                        <SelectItem value="oval">
+                          <span className="flex items-center gap-2">{SHAPE_ICONS.oval} Long Rectangle</span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-charcoal-ink/70">Capacity</Label>
+                    <Input
+                      value={editingCapacity}
+                      onChange={(e) => { setEditingCapacity(parseInt(e.target.value, 10) || 1); debouncedSaveTable(); }}
+                      type="number" min={1} max={50}
+                      className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-charcoal-ink/70">Zone</Label>
+                    <Select value={editingZone} onValueChange={(v) => { setEditingZone(v); debouncedSaveTable(); }}>
+                      <SelectTrigger className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20">
+                        <SelectValue placeholder="None" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ZONE_OPTIONS.map((z) => (
+                          <SelectItem key={z.value} value={z.value}>{z.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-charcoal-ink/70">Notes</Label>
+                    <Textarea
+                      value={editingNotes}
+                      onChange={(e) => { setEditingNotes(e.target.value); debouncedSaveTable(); }}
+                      placeholder="e.g. Near bar, VIP"
+                      className="text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20 min-h-[60px]"
+                    />
+                  </div>
+
                   <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedTableId(null)}
-                    className="h-8 w-8 p-0 text-charcoal-ink/40 hover:text-charcoal-ink lg:hidden"
+                    onClick={handleSaveTableEdits}
+                    disabled={savingTable}
+                    className="w-full bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 rounded text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300 disabled:opacity-50"
                   >
-                    <X className="size-3.5" />
+                    {savingTable ? <Loader2 className="size-4 animate-spin mr-1.5" /> : null}
+                    Save Changes
                   </Button>
                 </div>
-              </div>
 
-              <Separator className="bg-champagne-silk" />
+                <Separator className="bg-champagne-silk" />
 
-              {/* Edit fields */}
-              <div className="space-y-3">
-                {/* Table Name */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-charcoal-ink/70">Table Name</Label>
-                  <Input
-                    value={editingTableName}
-                    onChange={(e) => {
-                      setEditingTableName(e.target.value);
-                      debouncedSaveTable();
-                    }}
-                    placeholder="e.g. VIP Table"
-                    className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
-                  />
-                </div>
-
-                {/* Table Number */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-charcoal-ink/70">Table Number</Label>
-                  <Input
-                    value={editingTableNum}
-                    onChange={(e) => {
-                      setEditingTableNum(e.target.value);
-                      debouncedSaveTable();
-                    }}
-                    type="number"
-                    className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
-                  />
-                </div>
-
-                {/* Shape selector */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-charcoal-ink/70">Shape</Label>
-                  <Select
-                    value={editingShape}
-                    onValueChange={(v) => {
-                      setEditingShape(v);
-                      debouncedSaveTable();
-                    }}
-                  >
-                    <SelectTrigger className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="circle">
-                        <span className="flex items-center gap-2">{SHAPE_ICONS.circle} Circle</span>
-                      </SelectItem>
-                      <SelectItem value="rectangle">
-                        <span className="flex items-center gap-2">{SHAPE_ICONS.rectangle} Rectangle</span>
-                      </SelectItem>
-                      <SelectItem value="oval">
-                        <span className="flex items-center gap-2">{SHAPE_ICONS.oval} Oval</span>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Capacity */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-charcoal-ink/70">Capacity</Label>
-                  <Input
-                    value={editingCapacity}
-                    onChange={(e) => {
-                      setEditingCapacity(parseInt(e.target.value, 10) || 1);
-                      debouncedSaveTable();
-                    }}
-                    type="number"
-                    min={1}
-                    max={50}
-                    className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
-                  />
-                </div>
-
-                {/* Zone selector */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-charcoal-ink/70">Zone</Label>
-                  <Select
-                    value={editingZone}
-                    onValueChange={(v) => {
-                      setEditingZone(v);
-                      debouncedSaveTable();
-                    }}
-                  >
-                    <SelectTrigger className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20">
-                      <SelectValue placeholder="None" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ZONE_OPTIONS.map((z) => (
-                        <SelectItem key={z.value} value={z.value}>
-                          {z.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Notes */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-charcoal-ink/70">Notes</Label>
-                  <Textarea
-                    value={editingNotes}
-                    onChange={(e) => {
-                      setEditingNotes(e.target.value);
-                      debouncedSaveTable();
-                    }}
-                    placeholder="e.g. Near bar, VIP"
-                    className="text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20 min-h-[60px]"
-                  />
-                </div>
-
-                {/* Save button (explicit) */}
-                <Button
-                  onClick={handleSaveTableEdits}
-                  disabled={savingTable}
-                  className="w-full bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 rounded text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300 disabled:opacity-50"
-                >
-                  {savingTable ? <Loader2 className="size-4 animate-spin mr-1.5" /> : null}
-                  Save Changes
-                </Button>
-              </div>
-
-              <Separator className="bg-champagne-silk" />
-
-              {/* Guests at this table */}
-              <div className="space-y-2">
-                <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-charcoal-ink/50">
-                  Guests at Table ({getGuestCountForTable(selectedTable.tableNum)}/{selectedTable.capacity})
-                </h4>
-                <div className="space-y-1.5">
-                  {guestsAtTable(selectedTable.tableNum).map((g) => (
-                    <div
-                      key={g.id}
-                      className="flex items-center justify-between gap-2 rounded-md border border-charcoal-ink/5 px-2.5 py-1.5"
-                    >
-                      <div
-                        className="min-w-0 cursor-pointer"
-                        onClick={() => setDetailGuestId(g.id)}
-                      >
-                        <p className="text-xs font-medium text-charcoal-ink truncate hover:text-cinematic-gold transition-colors">
-                          {g.name}
-                        </p>
-                        {g.dietaryNotes && (
-                          <p className="text-[10px] text-red-500/70 flex items-center gap-0.5">
-                            <UtensilsCrossed className="size-2.5" />{truncate(g.dietaryNotes, 20)}
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleReassignGuest(g.id, null)}
-                        className="text-[10px] text-red-400 hover:text-red-600 shrink-0 underline"
-                        title="Unassign"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                  {getGuestCountForTable(selectedTable.tableNum) === 0 && (
-                    <p className="text-xs text-charcoal-ink/30 italic">No guests assigned</p>
-                  )}
-                </div>
-              </div>
-
-              <Separator className="bg-champagne-silk" />
-
-              {/* Unassigned guests */}
-              {unassignedGuests.length > 0 && (
                 <div className="space-y-2">
                   <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-charcoal-ink/50">
-                    Unassigned ({unassignedGuests.length})
+                    Guests ({getGuestCountForTable(selectedTable.tableNum)}/{selectedTable.capacity})
                   </h4>
-                  <div className="space-y-1.5 max-h-32 overflow-y-auto custom-scrollbar">
-                    {unassignedGuests.map((g) => (
-                      <div
-                        key={g.id}
-                        className="flex items-center justify-between gap-2 rounded-md border border-charcoal-ink/5 px-2.5 py-1.5"
-                      >
-                        <p className="text-xs font-medium text-charcoal-ink truncate min-w-0">{g.name}</p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleReassignGuest(g.id, selectedTable.tableNum)}
-                          className="h-6 px-2 text-[10px] text-cinematic-gold hover:bg-cinematic-gold/10 shrink-0"
-                        >
-                          <Plus className="size-3" />
-                        </Button>
+                  <div className="space-y-1.5">
+                    {guestsAtTable(selectedTable.tableNum).map((g) => (
+                      <div key={g.id} className="flex items-center justify-between gap-2 rounded-md border border-charcoal-ink/5 px-2.5 py-1.5">
+                        <div className="min-w-0 cursor-pointer" onClick={() => setDetailGuestId(g.id)}>
+                          <p className="text-xs font-medium text-charcoal-ink truncate hover:text-cinematic-gold transition-colors">{g.name}</p>
+                          {g.dietaryNotes && (
+                            <p className="text-[10px] text-red-500/70 flex items-center gap-0.5">
+                              <UtensilsCrossed className="size-2.5" />{truncate(g.dietaryNotes, 20)}
+                            </p>
+                          )}
+                        </div>
+                        <button type="button" onClick={() => handleReassignGuest(g.id, null)} className="text-[10px] text-red-400 hover:text-red-600 shrink-0 underline" title="Unassign">Remove</button>
                       </div>
                     ))}
+                    {getGuestCountForTable(selectedTable.tableNum) === 0 && (
+                      <p className="text-xs text-charcoal-ink/30 italic">No guests assigned</p>
+                    )}
                   </div>
                 </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+
+                <Separator className="bg-champagne-silk" />
+
+                {unassignedGuests.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-charcoal-ink/50">
+                      Unassigned ({unassignedGuests.length})
+                    </h4>
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                      {unassignedGuests.map((g) => (
+                        <div key={g.id} className="flex items-center justify-between gap-2 rounded-md border border-charcoal-ink/5 px-2.5 py-1.5">
+                          <p className="text-xs font-medium text-charcoal-ink truncate min-w-0">{g.name}</p>
+                          <Button variant="ghost" size="sm" onClick={() => handleReassignGuest(g.id, selectedTable.tableNum)} className="h-6 px-2 text-[10px] text-cinematic-gold hover:bg-cinematic-gold/10 shrink-0">
+                            <Plus className="size-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
 
       {/* ======== SWAP DIALOG ======== */}
       <Dialog open={swapDialogOpen} onOpenChange={setSwapDialogOpen}>
@@ -1829,9 +1750,9 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="circle">Circle</SelectItem>
-                  <SelectItem value="rectangle">Rectangle</SelectItem>
-                  <SelectItem value="oval">Oval</SelectItem>
+                  <SelectItem value="circle">Round</SelectItem>
+                  <SelectItem value="rectangle">Square</SelectItem>
+                  <SelectItem value="oval">Long Rectangle</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1854,6 +1775,21 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Guest Form Dialog (sidebar add/edit) */}
+      <GuestFormDialog
+        open={guestFormOpen}
+        onOpenChange={setGuestFormOpen}
+        editGuest={editingGuest}
+        onSaved={fetchAllGuests}
+      />
+
+      {/* Guest List Sheet (full management) */}
+      <GuestListSheet
+        open={guestListOpen}
+        onOpenChange={setGuestListOpen}
+        onGuestsChanged={fetchAllGuests}
+      />
     </TooltipProvider>
   );
 }
