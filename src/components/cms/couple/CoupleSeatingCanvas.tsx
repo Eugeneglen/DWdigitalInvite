@@ -9,7 +9,7 @@ import {
   UserPlus, ArrowRightLeft, Ban, X, Pencil,
   Wand2, Grid3x3, Download, Printer, Copy, FileDown,
   UsersRound, CheckCircle2, Clock, ChevronsUpDown,
-  List,
+  List, Undo2, Redo2, ArrowDownUp, Move,
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import {
@@ -26,6 +26,8 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import {
   Dialog,
@@ -83,6 +85,13 @@ const ZONE_COLORS: Record<string, string> = {
   CUSTOM: 'bg-gray-100 text-gray-700 border-gray-300',
 };
 
+// ---- History Entry for Undo/Redo ----
+interface HistoryEntry {
+  tables: SeatingTableItem[];
+  guestTableNumbers: { guestId: string; tableNumber: number | null }[];
+  label: string;
+}
+
 // ---- Main Component ----
 export default function CoupleSeatingCanvas() {
   // --- Guest state ---
@@ -135,6 +144,28 @@ export default function CoupleSeatingCanvas() {
   const [deletingGuestId, setDeletingGuestId] = useState<string | null>(null);
   const [editSheetOpen, setEditSheetOpen] = useState(false);
 
+  // Phase 5: Canvas pan state
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [isPanning] = useState(false);
+
+  // Phase 5: Smart auto-assign state
+  const [smartAssignOpen, setSmartAssignOpen] = useState(false);
+  const [smartStrategies, setSmartStrategies] = useState({
+    groupTogether: true,
+    pairPlusOnes: true,
+    matchZones: false,
+    balanceFill: true,
+  });
+  const [smartClearExisting, setSmartClearExisting] = useState(false);
+
+  // Phase 5: Multi-select state
+  const [multiSelectedIds, setMultiSelectedIds] = useState<Set<string>>(new Set());
+  const [batchZoneDialogOpen, setBatchZoneDialogOpen] = useState(false);
+  const [batchZone, setBatchZone] = useState('__none__');
+  const [batchShapeDialogOpen, setBatchShapeDialogOpen] = useState(false);
+  const [batchShape, setBatchShape] = useState('circle');
+
   // Drag state (table drag)
   const dragRef = useRef<{
     tableId: string;
@@ -146,6 +177,10 @@ export default function CoupleSeatingCanvas() {
   const rafRef = useRef<number | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const outerRef = useRef<HTMLDivElement>(null);
+  const panRef = useRef<{ startX: number; startY: number; origPanX: number; origPanY: number } | null>(null);
+  const undoStackRef = useRef<HistoryEntry[]>([]);
+  const redoStackRef = useRef<HistoryEntry[]>([]);
+  const shiftHeldRef = useRef(false);
 
   // Debounce save ref
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -346,6 +381,214 @@ export default function CoupleSeatingCanvas() {
     }, 800);
   }, [selectedTableId]);
 
+  // ======== Undo/Redo System ========
+  const pushHistory = useCallback((label: string) => {
+    const entry: HistoryEntry = {
+      tables: JSON.parse(JSON.stringify(tables)),
+      guestTableNumbers: guests.map((g) => ({ guestId: g.id, tableNumber: g.tableNumber })),
+      label,
+    };
+    if (undoStackRef.current.length >= 50) undoStackRef.current.shift();
+    undoStackRef.current.push(entry);
+    redoStackRef.current = [];
+  }, [tables, guests]);
+
+  const handleUndo = useCallback(() => {
+    if (undoStackRef.current.length === 0) return;
+    const entry = undoStackRef.current.pop()!;
+    // Push current state to redo
+    redoStackRef.current.push({
+      tables: JSON.parse(JSON.stringify(tables)),
+      guestTableNumbers: guests.map((g) => ({ guestId: g.id, tableNumber: g.tableNumber })),
+      label: entry.label,
+    });
+    setTables(entry.tables);
+    // Restore guest table numbers
+    const guestMap = new Map(entry.guestTableNumbers.map((g) => [g.guestId, g.tableNumber]));
+    setGuests((prev) =>
+      prev.map((g) => {
+        const tblNum = guestMap.get(g.id);
+        return tblNum !== undefined ? { ...g, tableNumber: tblNum } : g;
+      })
+    );
+    toast({ title: 'Undo', description: entry.label });
+  }, [tables, guests]);
+
+  const handleRedo = useCallback(() => {
+    if (redoStackRef.current.length === 0) return;
+    const entry = redoStackRef.current.pop()!;
+    // Push current state to undo
+    undoStackRef.current.push({
+      tables: JSON.parse(JSON.stringify(tables)),
+      guestTableNumbers: guests.map((g) => ({ guestId: g.id, tableNumber: g.tableNumber })),
+      label: entry.label,
+    });
+    setTables(entry.tables);
+    const guestMap = new Map(entry.guestTableNumbers.map((g) => [g.guestId, g.tableNumber]));
+    setGuests((prev) =>
+      prev.map((g) => {
+        const tblNum = guestMap.get(g.id);
+        return tblNum !== undefined ? { ...g, tableNumber: tblNum } : g;
+      })
+    );
+    toast({ title: 'Redo', description: entry.label });
+  }, [tables, guests]);
+
+  const canUndo = undoStackRef.current.length > 0;
+  const canRedo = redoStackRef.current.length > 0;
+
+  // ======== Canvas Pan Handler ========
+  const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button === 1) {
+      // Middle mouse button
+      e.preventDefault();
+      panRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        origPanX: panX,
+        origPanY: panY,
+      };
+
+      const handleMove = (ev: MouseEvent) => {
+        if (!panRef.current) return;
+        const scale = canvasScale / 100;
+        const dx = (ev.clientX - panRef.current.startX) / scale;
+        const dy = (ev.clientY - panRef.current.startY) / scale;
+        setPanX(panRef.current.origPanX + dx);
+        setPanY(panRef.current.origPanY + dy);
+      };
+
+      const handleUp = () => {
+        panRef.current = null;
+        document.removeEventListener('mousemove', handleMove);
+        document.removeEventListener('mouseup', handleUp);
+      };
+
+      document.addEventListener('mousemove', handleMove);
+      document.addEventListener('mouseup', handleUp);
+    }
+  }, [panX, panY, canvasScale]);
+
+  // ======== Batch Operations ========
+  const handleBatchDelete = useCallback(async () => {
+    if (multiSelectedIds.size === 0) return;
+    if (!confirm('Delete ' + multiSelectedIds.size + ' selected tables? All guests at these tables will be unassigned.')) return;
+    try {
+      for (const tableId of multiSelectedIds) {
+        await fetch(TABLES_API + '&id=' + tableId, { method: 'DELETE' });
+      }
+      setMultiSelectedIds(new Set());
+      setSelectedTableId(null);
+      await fetchTables();
+      await fetchAllGuests();
+      toast({ title: 'Success', description: multiSelectedIds.size + ' tables deleted' });
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Batch delete failed', variant: 'destructive' });
+    }
+  }, [multiSelectedIds, fetchTables, fetchAllGuests]);
+
+  const handleBatchZone = useCallback(async () => {
+    if (multiSelectedIds.size === 0 || batchZone === '__none__') return;
+    try {
+      const tablesArr = Array.from(multiSelectedIds);
+      await fetch(TABLES_API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tables: tablesArr.map((id) => ({
+            id,
+            zone: batchZone,
+          })),
+        }),
+      });
+      setBatchZoneDialogOpen(false);
+      await fetchTables();
+      toast({ title: 'Success', description: 'Zone updated for ' + multiSelectedIds.size + ' tables' });
+    } catch (err) {
+      toast({ title: 'Error', description: 'Batch zone update failed', variant: 'destructive' });
+    }
+  }, [multiSelectedIds, batchZone, fetchTables]);
+
+  const handleBatchShape = useCallback(async () => {
+    if (multiSelectedIds.size === 0) return;
+    try {
+      const tablesArr = Array.from(multiSelectedIds);
+      await fetch(TABLES_API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tables: tablesArr.map((id) => ({
+            id,
+            shape: batchShape,
+          })),
+        }),
+      });
+      setBatchShapeDialogOpen(false);
+      await fetchTables();
+      toast({ title: 'Success', description: 'Shape updated for ' + multiSelectedIds.size + ' tables' });
+    } catch (err) {
+      toast({ title: 'Error', description: 'Batch shape update failed', variant: 'destructive' });
+    }
+  }, [multiSelectedIds, batchShape, fetchTables]);
+
+  // ======== Table Renumber ========
+  const handleRenumber = useCallback(async () => {
+    if (tables.length === 0) return;
+    pushHistory('Renumber tables');
+    const sorted = [...tables].sort((a, b) => {
+      if (a.posY !== b.posY) return a.posY - b.posY;
+      return a.posX - b.posX;
+    });
+    try {
+      await fetch(TABLES_API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tables: sorted.map((t, i) => ({
+            id: t.id,
+            tableNum: i + 1,
+          })),
+        }),
+      });
+      await fetchTables();
+      await fetchAllGuests();
+      toast({ title: 'Success', description: 'Tables renumbered by position (top-left to bottom-right)' });
+    } catch (err) {
+      toast({ title: 'Error', description: 'Renumber failed', variant: 'destructive' });
+    }
+  }, [tables, pushHistory, fetchTables, fetchAllGuests]);
+
+  // ======== Smart Auto-Assign ========
+  const handleSmartAssign = useCallback(async () => {
+    try {
+      setAutoAssigning(true);
+      const res = await fetch('/api/cms/tables/auto-assign?XTransformPort=3000', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          strategies: smartStrategies,
+          clearExisting: smartClearExisting,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Smart assign failed');
+      }
+      const data = await res.json();
+      await fetchAllGuests();
+      await fetchTables();
+      setSmartAssignOpen(false);
+      toast({
+        title: 'Smart Assign Complete',
+        description: data.assigned + ' guests assigned, ' + data.unassigned + ' unassigned, ' + data.tablesUsed + ' tables used',
+      });
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Smart assign failed', variant: 'destructive' });
+    } finally {
+      setAutoAssigning(false);
+    }
+  }, [smartStrategies, smartClearExisting, fetchAllGuests, fetchTables]);
+
   // Populate edit fields when a table is selected
   useEffect(() => {
     const tbl = tables.find((t) => t.id === selectedTableId);
@@ -426,7 +669,19 @@ export default function CoupleSeatingCanvas() {
         handleReassignGuest(reassigningGuestId, tbl.tableNum);
       }
       setReassigningGuestId(null);
+    } else if (shiftHeldRef.current) {
+      // Multi-select with shift+click
+      setMultiSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(tableId)) {
+          next.delete(tableId);
+        } else {
+          next.add(tableId);
+        }
+        return next;
+      });
     } else {
+      setMultiSelectedIds(new Set());
       setSelectedTableId(tableId === selectedTableId ? null : tableId);
     }
   };
@@ -487,6 +742,7 @@ export default function CoupleSeatingCanvas() {
     e.preventDefault();
     const tbl = tables.find((t) => t.id === tableId);
     if (!tbl) return;
+    pushHistory('Drag table');
     dragRef.current = {
       tableId,
       startX: e.clientX,
@@ -782,22 +1038,80 @@ export default function CoupleSeatingCanvas() {
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
 
+      // Shift tracking for multi-select
+      if (e.key === 'Shift') shiftHeldRef.current = true;
+
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedTableId) {
         e.preventDefault();
         handleDeleteTable();
+      }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && multiSelectedIds.size > 0 && !selectedTableId) {
+        e.preventDefault();
+        handleBatchDelete();
       }
       if (e.key === 'Escape') {
         setSelectedTableId(null);
         setReassigningGuestId(null);
         setDetailGuestId(null);
+        setMultiSelectedIds(new Set());
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        handleUndo();
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
+        e.preventDefault();
+        handleRedo();
       }
     };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') shiftHeldRef.current = false;
+    };
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [selectedTableId]);
+    document.addEventListener('keyup', handleKeyUp);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [selectedTableId, multiSelectedIds, handleDeleteTable, handleBatchDelete, handleUndo, handleRedo]);
 
   // ======== Detail Drawer Guest ========
   const detailGuest = guests.find((g) => g.id === detailGuestId);
+
+  // ======== Seating Statistics (Phase 6) ========
+  const seatingStats = useMemo(() => {
+    const zoneStats: Record<string, { seats: number; assigned: number; tables: number }> = {};
+    const rsvpByTable: Record<number, { attending: number; pending: number; declined: number }> = {};
+    const dietaryCounts: Record<string, number> = {};
+
+    for (const tbl of tables) {
+      const zone = tbl.zone || 'Unzoned';
+      if (!zoneStats[zone]) zoneStats[zone] = { seats: 0, assigned: 0, tables: 0 };
+      zoneStats[zone].seats += tbl.capacity;
+      zoneStats[zone].tables += 1;
+
+      const tblGuests = guests.filter((g) => g.tableNumber === tbl.tableNum);
+      zoneStats[zone].assigned += tblGuests.length;
+
+      const rsvp = rsvpByTable[tbl.tableNum] || { attending: 0, pending: 0, declined: 0 };
+      for (const g of tblGuests) {
+        const status = (g.rsvpStatus || 'PENDING').toUpperCase();
+        if (status === 'ATTENDING') rsvp.attending++;
+        else if (status === 'DECLINED') rsvp.declined++;
+        else rsvp.pending++;
+        const dietary = getEffectiveDietary(g);
+        if (dietary) {
+          const d = dietary.split(';').map((s) => s.trim()).filter(Boolean);
+          for (const item of d) {
+            dietaryCounts[item] = (dietaryCounts[item] || 0) + 1;
+          }
+        }
+      }
+      rsvpByTable[tbl.tableNum] = rsvp;
+    }
+
+    return { zoneStats, rsvpByTable, dietaryCounts };
+  }, [tables, guests]);
 
   // ======== Content Bounds (dynamic virtual canvas) ========
   const contentBounds = useMemo(() => {
@@ -826,6 +1140,8 @@ export default function CoupleSeatingCanvas() {
     const scaleY = ch / contentBounds.h;
     const fit = Math.min(scaleX, scaleY) * 100;
     setCanvasScale(Math.max(30, Math.min(200, Math.round(fit / 5) * 5)));
+    setPanX(0);
+    setPanY(0);
   }, [contentBounds]);
 
   const initialFitDoneRef = useRef(false);
@@ -860,6 +1176,36 @@ export default function CoupleSeatingCanvas() {
                 <Button
                   variant="ghost"
                   size="sm"
+                  onClick={handleUndo}
+                  disabled={!canUndo}
+                  className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5 disabled:opacity-30"
+                >
+                  <Undo2 className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Undo (Ctrl+Z)</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRedo}
+                  disabled={!canRedo}
+                  className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5 disabled:opacity-30"
+                >
+                  <Redo2 className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Redo (Ctrl+Y)</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={autoFitScale}
                   className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5"
                 >
@@ -867,6 +1213,21 @@ export default function CoupleSeatingCanvas() {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Fit View</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRenumber}
+                  disabled={tables.length === 0}
+                  className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5 disabled:opacity-30"
+                >
+                  <ArrowDownUp className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Renumber tables by position</TooltipContent>
             </Tooltip>
 
             <Tooltip>
@@ -1074,14 +1435,57 @@ export default function CoupleSeatingCanvas() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={handleAutoAssign}
+              onClick={() => setSmartAssignOpen(true)}
               disabled={autoAssigning}
               className="h-7 px-2 text-[11px] font-medium text-cinematic-gold hover:bg-cinematic-gold/10 ml-auto"
             >
               {autoAssigning ? <Loader2 className="size-3 animate-spin mr-1" /> : <Wand2 className="size-3 mr-1" />}
-              Auto-Assign
+              Smart Assign
             </Button>
           </div>
+
+          {/* Multi-select info bar */}
+          {multiSelectedIds.size > 0 && (
+            <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-cinematic-gold/30 bg-cinematic-gold/5 text-xs text-charcoal-ink/70 flex-wrap">
+              <span className="font-medium text-cinematic-gold"><Move className="size-3 inline mr-1" />{multiSelectedIds.size} tables selected</span>
+              <span className="text-charcoal-ink/30">|</span>
+              <span className="text-charcoal-ink/50">Shift+click to add/remove</span>
+              <div className="flex items-center gap-1.5 ml-auto">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setBatchZone('__none__'); setBatchZoneDialogOpen(true); }}
+                  className="h-7 px-2 text-[11px] font-medium text-charcoal-ink/60 hover:bg-charcoal-ink/5"
+                >
+                  Set Zone
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setBatchShape('circle'); setBatchShapeDialogOpen(true); }}
+                  className="h-7 px-2 text-[11px] font-medium text-charcoal-ink/60 hover:bg-charcoal-ink/5"
+                >
+                  Set Shape
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleBatchDelete}
+                  className="h-7 px-2 text-[11px] font-medium text-red-500 hover:bg-red-50"
+                >
+                  <Trash2 className="size-3 mr-1" />Delete
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setMultiSelectedIds(new Set())}
+                  className="h-7 px-2 text-[11px] font-medium text-charcoal-ink/60 hover:bg-charcoal-ink/5"
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* Reassigning indicator */}
           {reassigningGuestId && (
@@ -1106,10 +1510,12 @@ export default function CoupleSeatingCanvas() {
           <div
             ref={canvasRef}
             className="relative h-[58vh] min-h-[400px] border border-champagne-silk rounded-lg bg-[radial-gradient(circle,_#d4d4d4_1px,_transparent_1px)] [background-size:20px_20px] overflow-hidden"
+            onMouseDown={handleCanvasMouseDown}
             onClick={(e) => {
               if (e.target === e.currentTarget) {
                 if (reassigningGuestId) setReassigningGuestId(null);
                 setSelectedTableId(null);
+                setMultiSelectedIds(new Set());
               }
             }}
           >
@@ -1127,10 +1533,10 @@ export default function CoupleSeatingCanvas() {
               <div className="w-full h-full flex items-center justify-center">
                 <div
                   style={{
-                    transform: `scale(${canvasScale / 100})`,
+                    transform: 'translate(' + panX + 'px, ' + panY + 'px) scale(' + (canvasScale / 100) + ')',
                     transformOrigin: 'center center',
-                    width: `${contentBounds.w}px`,
-                    height: `${contentBounds.h}px`,
+                    width: contentBounds.w + 'px',
+                    height: contentBounds.h + 'px',
                   }}
                   className="relative shrink-0"
                 >
@@ -1156,7 +1562,9 @@ export default function CoupleSeatingCanvas() {
 
                   // Border color logic
                   let borderCls = 'border-gray-300';
-                  if (isDragOver) {
+                  if (multiSelectedIds.has(tbl.id)) {
+                    borderCls = 'border-dashed border-cinematic-gold';
+                  } else if (isDragOver) {
                     borderCls = 'border-cinematic-gold animate-pulse';
                   } else if (isSelected) {
                     borderCls = 'border-cinematic-gold';
@@ -1730,30 +2138,69 @@ export default function CoupleSeatingCanvas() {
         </SheetContent>
       </Sheet>
 
-      {/* ======== PRINT DIALOG ======== */}
+      {/* ======== PRINT DIALOG (Enhanced) ======== */}
       <Dialog open={printDialogOpen} onOpenChange={setPrintDialogOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-charcoal-ink">Print-Ready Seating Chart</DialogTitle>
             <DialogDescription className="text-charcoal-ink/50">
-              Clean layout for printing. Use the Print button below.
+              Comprehensive view with stats, dietary info, and RSVP breakdown.
             </DialogDescription>
           </DialogHeader>
+
+          {/* Stats header */}
+          <div className="grid grid-cols-4 gap-3 p-3 rounded-lg bg-paper-cream/50 border border-champagne-silk text-center">
+            <div>
+              <p className="text-lg font-bold text-charcoal-ink">{tables.length}</p>
+              <p className="text-[10px] text-charcoal-ink/50 uppercase tracking-wider">Tables</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-emerald-600">{assignedCount}</p>
+              <p className="text-[10px] text-charcoal-ink/50 uppercase tracking-wider">Assigned</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-amber-600">{unassignedGuests.length}</p>
+              <p className="text-[10px] text-charcoal-ink/50 uppercase tracking-wider">Unassigned</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-charcoal-ink">{fillPct}%</p>
+              <p className="text-[10px] text-charcoal-ink/50 uppercase tracking-wider">Fill Rate</p>
+            </div>
+          </div>
+
           <div className="print-area space-y-6 p-4">
-            {tables.sort((a, b) => a.tableNum - b.tableNum).map((tbl) => {
+            {[...tables].sort((a, b) => a.tableNum - b.tableNum).map((tbl) => {
               const tblGuests = guestsAtTable(tbl.tableNum);
+              const rsvp = seatingStats.rsvpByTable[tbl.tableNum] || { attending: 0, pending: 0, declined: 0 };
+              const tblDietary: Record<string, number> = {};
+              for (const g of tblGuests) {
+                const dietary = getEffectiveDietary(g);
+                if (dietary) {
+                  const items = dietary.split(';').map(function(s) { return s.trim(); }).filter(Boolean);
+                  for (const item of items) {
+                    tblDietary[item] = (tblDietary[item] || 0) + 1;
+                  }
+                }
+              }
+              const dietarySummary = Object.entries(tblDietary).map(function(entry) { return entry[0] + ' (' + entry[1] + ')'; }).join(', ');
               return (
                 <div key={tbl.id} className="border border-charcoal-ink/10 rounded-lg p-4 print:break-inside-avoid">
                   <div className="flex items-center gap-2 mb-2">
                     <h3 className="text-sm font-bold text-charcoal-ink">
-                      {tbl.name || `Table ${tbl.tableNum}`}
+                      {tbl.name || 'Table ' + tbl.tableNum}
                     </h3>
-                    <span className="text-xs text-charcoal-ink/50">({tblGuests.length}/{tbl.capacity})</span>
+                    <span className="text-xs text-charcoal-ink/50">({'capacity: ' + tbl.capacity})</span>
                     {tbl.zone && (
-                      <Badge variant="outline" className={`text-[10px] ${ZONE_COLORS[tbl.zone] || ''}`}>
+                      <Badge variant="outline" className={'text-[10px] ' + (ZONE_COLORS[tbl.zone] || '')}>
                         {tbl.zone.replace('_', ' ')}
                       </Badge>
                     )}
+                  </div>
+                  {/* RSVP breakdown */}
+                  <div className="flex gap-3 text-[10px] text-charcoal-ink/50 mb-2">
+                    <span className="text-emerald-600">Attending: {rsvp.attending}</span>
+                    <span className="text-amber-600">Pending: {rsvp.pending}</span>
+                    <span className="text-red-500">Declined: {rsvp.declined}</span>
                   </div>
                   {tblGuests.length > 0 ? (
                     <ul className="space-y-1">
@@ -1761,13 +2208,18 @@ export default function CoupleSeatingCanvas() {
                         const dietary = getEffectiveDietary(g);
                         return (
                           <li key={g.id} className="text-xs text-charcoal-ink/80">
-                            {g.name}{dietary ? ` (${dietary})` : ''}
+                            {g.name}{dietary ? ' (' + dietary + ')' : ''}
                           </li>
                         );
                       })}
                     </ul>
                   ) : (
                     <p className="text-xs text-charcoal-ink/30 italic">No guests assigned</p>
+                  )}
+                  {dietarySummary && (
+                    <p className="text-[10px] text-red-500/70 mt-2 pt-2 border-t border-charcoal-ink/5">
+                      Dietary: {dietarySummary}
+                    </p>
                   )}
                 </div>
               );
@@ -1782,7 +2234,7 @@ export default function CoupleSeatingCanvas() {
                     const dietary = getEffectiveDietary(g);
                     return (
                       <li key={g.id} className="text-xs text-charcoal-ink/70">
-                        {g.name}{dietary ? ` (${dietary})` : ''}
+                        {g.name}{dietary ? ' (' + dietary + ')' : ''}
                       </li>
                     );
                   })}
@@ -1877,6 +2329,242 @@ export default function CoupleSeatingCanvas() {
         onOpenChange={setGuestListOpen}
         onGuestsChanged={fetchAllGuests}
       />
+
+      {/* ======== SEATING STATISTICS CARDS (Phase 6) ======== */}
+      <div className="flex flex-col gap-2 mt-3">
+        {/* Zone fill cards */}
+        {Object.keys(seatingStats.zoneStats).length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {Object.entries(seatingStats.zoneStats).map(function(entry) {
+              const zone = entry[0];
+              const stats = entry[1];
+              const zoneFillPct = stats.seats > 0 ? Math.round((stats.assigned / stats.seats) * 100) : 0;
+              const zoneColor = ZONE_COLORS[zone] || 'bg-gray-100 text-gray-600';
+              return (
+                <div key={zone} className="rounded-lg border border-champagne-silk p-3 bg-white">
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge variant="outline" className={'text-[10px] ' + zoneColor}>
+                      {zone === 'Unzoned' ? 'No Zone' : zone.replace('_', ' ')}
+                    </Badge>
+                    <span className="text-[10px] text-charcoal-ink/40">{stats.tables} tables</span>
+                  </div>
+                  <div className="flex items-baseline gap-1 mb-1.5">
+                    <span className="text-sm font-semibold text-charcoal-ink">{stats.assigned}</span>
+                    <span className="text-[10px] text-charcoal-ink/40">/ {stats.seats} seats</span>
+                  </div>
+                  <Progress value={zoneFillPct} className="h-1.5" />
+                  <span className="text-[10px] text-charcoal-ink/40 mt-1">{zoneFillPct}%</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Dietary overview card */}
+        {Object.keys(seatingStats.dietaryCounts).length > 0 && (
+          <div className="rounded-lg border border-champagne-silk p-3 bg-white">
+            <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-charcoal-ink/50 mb-2">Dietary Overview</h4>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {Object.entries(seatingStats.dietaryCounts).map(function(entry) {
+                const name = entry[0];
+                const count = entry[1];
+                return (
+                  <div key={name} className="flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-1.5 text-charcoal-ink/70">
+                      <UtensilsCrossed className="size-3 text-red-400" />
+                      {name}
+                    </span>
+                    <span className="font-medium text-charcoal-ink">{count}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ======== SMART ASSIGN DIALOG ======== */}
+      <Dialog open={smartAssignOpen} onOpenChange={setSmartAssignOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-charcoal-ink">Smart Assign</DialogTitle>
+            <DialogDescription className="text-charcoal-ink/50">
+              Choose strategies for automatic guest placement.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="groupTogether"
+                checked={smartStrategies.groupTogether}
+                onCheckedChange={(checked) => setSmartStrategies((prev) => ({ ...prev, groupTogether: !!checked }))}
+                className="mt-0.5"
+              />
+              <div>
+                <Label htmlFor="groupTogether" className="text-sm font-medium text-charcoal-ink cursor-pointer">Group Together</Label>
+                <p className="text-[11px] text-charcoal-ink/50">Keep guests from the same group at the same table</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="pairPlusOnes"
+                checked={smartStrategies.pairPlusOnes}
+                onCheckedChange={(checked) => setSmartStrategies((prev) => ({ ...prev, pairPlusOnes: !!checked }))}
+                className="mt-0.5"
+              />
+              <div>
+                <Label htmlFor="pairPlusOnes" className="text-sm font-medium text-charcoal-ink cursor-pointer">Pair Plus Ones</Label>
+                <p className="text-[11px] text-charcoal-ink/50">Seat plus-one partners at the same table</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="matchZones"
+                checked={smartStrategies.matchZones}
+                onCheckedChange={(checked) => setSmartStrategies((prev) => ({ ...prev, matchZones: !!checked }))}
+                className="mt-0.5"
+              />
+              <div>
+                <Label htmlFor="matchZones" className="text-sm font-medium text-charcoal-ink cursor-pointer">Match Zones</Label>
+                <p className="text-[11px] text-charcoal-ink/50">Assign guests to tables in matching zones</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="balanceFill"
+                checked={smartStrategies.balanceFill}
+                onCheckedChange={(checked) => setSmartStrategies((prev) => ({ ...prev, balanceFill: !!checked }))}
+                className="mt-0.5"
+              />
+              <div>
+                <Label htmlFor="balanceFill" className="text-sm font-medium text-charcoal-ink cursor-pointer">Balance Fill</Label>
+                <p className="text-[11px] text-charcoal-ink/50">Distribute guests evenly across tables</p>
+              </div>
+            </div>
+            <Separator className="bg-champagne-silk" />
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="clearExisting"
+                checked={smartClearExisting}
+                onCheckedChange={(checked) => setSmartClearExisting(!!checked)}
+                className="mt-0.5"
+              />
+              <div>
+                <Label htmlFor="clearExisting" className="text-sm font-medium text-red-600 cursor-pointer">Clear Existing Assignments</Label>
+                <p className="text-[11px] text-charcoal-ink/50">Unassign all guests before running smart assign</p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setSmartAssignOpen(false)}
+              className="border-charcoal-ink/15 text-charcoal-ink"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSmartAssign}
+              disabled={autoAssigning}
+              className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90"
+            >
+              {autoAssigning ? <Loader2 className="size-4 animate-spin mr-1.5" /> : <Wand2 className="size-4 mr-1.5" />}
+              Run Smart Assign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ======== BATCH ZONE DIALOG ======== */}
+      <Dialog open={batchZoneDialogOpen} onOpenChange={setBatchZoneDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-charcoal-ink">Set Zone for Selected Tables</DialogTitle>
+            <DialogDescription className="text-charcoal-ink/50">
+              Apply the same zone to {multiSelectedIds.size} selected tables.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-charcoal-ink/70">Zone</Label>
+              <Select value={batchZone} onValueChange={setBatchZone}>
+                <SelectTrigger className="h-8 text-sm border-charcoal-ink/10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ZONE_OPTIONS.map((z) => (
+                    <SelectItem key={z.value} value={z.value}>{z.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBatchZoneDialogOpen(false)}
+              className="border-charcoal-ink/15 text-charcoal-ink"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleBatchZone}
+              disabled={batchZone === '__none__'}
+              className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90"
+            >
+              Apply Zone
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ======== BATCH SHAPE DIALOG ======== */}
+      <Dialog open={batchShapeDialogOpen} onOpenChange={setBatchShapeDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-charcoal-ink">Set Shape for Selected Tables</DialogTitle>
+            <DialogDescription className="text-charcoal-ink/50">
+              Apply the same shape to {multiSelectedIds.size} selected tables.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-charcoal-ink/70">Shape</Label>
+              <Select value={batchShape} onValueChange={setBatchShape}>
+                <SelectTrigger className="h-8 text-sm border-charcoal-ink/10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="circle">
+                    <span className="flex items-center gap-2">{SHAPE_ICONS.circle} Round</span>
+                  </SelectItem>
+                  <SelectItem value="rectangle">
+                    <span className="flex items-center gap-2">{SHAPE_ICONS.rectangle} Square</span>
+                  </SelectItem>
+                  <SelectItem value="oval">
+                    <span className="flex items-center gap-2">{SHAPE_ICONS.oval} Long Rectangle</span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBatchShapeDialogOpen(false)}
+              className="border-charcoal-ink/15 text-charcoal-ink"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleBatchShape}
+              className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90"
+            >
+              Apply Shape
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   );
 }
