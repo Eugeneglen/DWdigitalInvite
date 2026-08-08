@@ -7,9 +7,18 @@ import {
   AlertCircle, UtensilsCrossed, X, Lock, Unlock,
   ImagePlus, ImageOff, Maximize, ChevronRight, Mail, Phone,
   UserPlus, ArrowRightLeft, Ban,
+  Wand2, Grid3x3, Download, Printer, Copy, FileDown,
+  UsersRound, CheckCircle2, XCircle, Clock, ChevronsUpDown,
 } from 'lucide-react';
+import { toPng } from 'html-to-image';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Progress } from '@/components/ui/progress';
 import { toast } from '@/hooks/use-toast';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -149,7 +158,7 @@ function dietaryBadgeColor(dietary: string): string {
 
 // ---- Props ----
 interface CoupleSeatingCanvasProps {
-  onAddTable: () => void;
+  onAddTable: () => Promise<void>;
 }
 
 // ---- Main Component ----
@@ -190,6 +199,16 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
   const [swapDialogOpen, setSwapDialogOpen] = useState(false);
   const [swapTargetTableId, setSwapTargetTableId] = useState<string | null>(null);
   const [swapGuestId, setSwapGuestId] = useState<string | null>(null);
+
+  // Phase 3+4 state
+  const [rsvpFilter, setRsvpFilter] = useState<string>('all');
+  const [autoAssigning, setAutoAssigning] = useState(false);
+  const [gridSnap, setGridSnap] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [bulkCount, setBulkCount] = useState(5);
+  const [bulkShape, setBulkShape] = useState('circle');
 
   // Drag state (table drag)
   const dragRef = useRef<{
@@ -261,12 +280,22 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
   // Guest sidebar filtered list
   const filteredGuests = (() => {
     let list = guests;
+    // RSVP filter (applied first)
+    if (rsvpFilter === 'attending') {
+      list = list.filter((g) => g.rsvpStatus === 'ATTENDING');
+    } else if (rsvpFilter === 'pending') {
+      list = list.filter((g) => g.rsvpStatus === 'PENDING' || !g.rsvpStatus);
+    } else if (rsvpFilter === 'declined') {
+      list = list.filter((g) => g.rsvpStatus === 'DECLINED');
+    }
+    // Table assignment filter
     if (guestFilter === 'unassigned') {
       list = list.filter((g) => g.tableNumber == null);
     } else if (guestFilter.startsWith('table-')) {
       const num = parseInt(guestFilter.split('-')[1], 10);
       list = list.filter((g) => g.tableNumber === num);
     }
+    // Search filter
     if (guestSearch.trim()) {
       const q = guestSearch.toLowerCase();
       list = list.filter(
@@ -281,6 +310,9 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
 
   const assignedCount = guests.filter((g) => g.tableNumber != null).length;
   const totalCount = guests.length;
+  const totalSeats = tables.reduce((sum, t) => sum + t.capacity, 0);
+  const remainingSeats = Math.max(0, totalSeats - assignedCount);
+  const fillPct = totalSeats > 0 ? Math.round((assignedCount / totalSeats) * 100) : 0;
 
   // ======== Table CRUD ========
   const handleDeleteTable = async () => {
@@ -450,6 +482,9 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
   };
 
   // ======== Drag handlers (table reposition) ========
+  // Ref to track latest dragged position for API persistence (avoids stale closure)
+  const latestDragPos = useRef<{ posX: number; posY: number } | null>(null);
+
   const handleDragStart = (e: React.MouseEvent, tableId: string) => {
     if (canvasLocked) return;
     e.preventDefault();
@@ -462,13 +497,19 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
       origPosX: tbl.posX,
       origPosY: tbl.posY,
     };
+    latestDragPos.current = { posX: tbl.posX, posY: tbl.posY };
 
     const handleMove = (ev: MouseEvent) => {
       if (!dragRef.current) return;
       const dx = (ev.clientX - dragRef.current.startX) / (canvasScale / 100);
       const dy = (ev.clientY - dragRef.current.startY) / (canvasScale / 100);
-      const newPosX = Math.max(0, dragRef.current.origPosX + dx);
-      const newPosY = Math.max(0, dragRef.current.origPosY + dy);
+      let newPosX = Math.max(0, dragRef.current.origPosX + dx);
+      let newPosY = Math.max(0, dragRef.current.origPosY + dy);
+      if (gridSnap) {
+        newPosX = Math.round(newPosX / 20) * 20;
+        newPosY = Math.round(newPosY / 20) * 20;
+      }
+      latestDragPos.current = { posX: newPosX, posY: newPosY };
       setTables((prev) =>
         prev.map((t) => (t.id === tableId ? { ...t, posX: newPosX, posY: newPosY } : t))
       );
@@ -477,19 +518,18 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
     const handleUp = async () => {
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleUp);
-      if (!dragRef.current) return;
-      const moved = tables.find((t) => t.id === tableId);
-      if (!moved) { dragRef.current = null; return; }
+      if (!dragRef.current || !latestDragPos.current) return;
       try {
         await fetch(TABLES_API, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: tableId, posX: moved.posX, posY: moved.posY }),
+          body: JSON.stringify({ id: tableId, posX: latestDragPos.current.posX, posY: latestDragPos.current.posY }),
         });
       } catch {
         // silent persist
       }
       dragRef.current = null;
+      latestDragPos.current = null;
     };
 
     document.addEventListener('mousemove', handleMove);
@@ -562,6 +602,189 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
     }
   };
 
+  // ======== Auto-Assign ========
+  const handleAutoAssign = async () => {
+    const unassigned = guests.filter(
+      (g) => g.tableNumber == null && g.rsvpStatus !== 'DECLINED'
+    );
+    if (unassigned.length === 0) {
+      toast({ title: 'Info', description: 'No unassigned guests to place' });
+      return;
+    }
+    if (tables.length === 0) {
+      toast({ title: 'Info', description: 'No tables available' });
+      return;
+    }
+
+    setAutoAssigning(true);
+    let assigned = 0;
+
+    try {
+      // Sort tables by fill ratio descending (nearly full first)
+      const sortedTables = [...tables].sort((a, b) => {
+        const aFill = getGuestCountForTable(a.tableNum) / a.capacity;
+        const bFill = getGuestCountForTable(b.tableNum) / b.capacity;
+        return bFill - aFill;
+      });
+
+      for (const guest of unassigned) {
+        // Find first table with room
+        const target = sortedTables.find(
+          (t) => getGuestCountForTable(t.tableNum) < t.capacity
+        );
+        if (!target) break;
+
+        try {
+          const res = await fetch(API_BASE, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: guest.id, name: guest.name, tableNumber: target.tableNum }),
+          });
+          if (res.ok) {
+            assigned++;
+            // Optimistic update
+            setGuests((prev) =>
+              prev.map((g) => (g.id === guest.id ? { ...g, tableNumber: target.tableNum } : g))
+            );
+          }
+        } catch {
+          // skip this guest
+        }
+      }
+
+      await fetchAllGuests();
+      toast({ title: 'Auto-Assign Complete', description: `${assigned} guest${assigned !== 1 ? 's' : ''} assigned to tables` });
+    } catch {
+      toast({ title: 'Error', description: 'Auto-assign failed', variant: 'destructive' });
+    } finally {
+      setAutoAssigning(false);
+    }
+  };
+
+  // ======== Export PNG ========
+  const handleExportPng = async () => {
+    if (!canvasRef.current) return;
+    setExporting(true);
+    try {
+      const dataUrl = await toPng(canvasRef.current, { backgroundColor: '#ffffff' });
+      const link = document.createElement('a');
+      link.download = 'seating-chart.png';
+      link.href = dataUrl;
+      link.click();
+      toast({ title: 'Success', description: 'Seating chart exported as PNG' });
+    } catch {
+      toast({ title: 'Error', description: 'Failed to export seating chart', variant: 'destructive' });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // ======== Export CSV ========
+  const handleExportCsv = () => {
+    const header = 'Guest Name,Email,Phone,Table Number,Table Name,Zone,RSVP Status,Dietary Notes,Plus One,Group';
+    const rows = guests.map((g) => {
+      const tbl = g.tableNumber != null ? tables.find((t) => t.tableNum === g.tableNumber) : null;
+      const name = `"${(g.name || '').replace(/"/g, '""')}"`;
+      const email = `"${(g.email || '').replace(/"/g, '""')}"`;
+      const phone = `"${(g.phone || '').replace(/"/g, '""')}"`;
+      const tblName = `"${(tbl?.name || '').replace(/"/g, '""')}"`;
+      const zone = tbl?.zone || '';
+      const rsvp = g.rsvpStatus || 'PENDING';
+      const dietary = `"${(getEffectiveDietary(g) || '').replace(/"/g, '""')}"`;
+      const plusOne = g.plusOne ? 'Yes' : 'No';
+      const group = `"${(g.groupName || '').replace(/"/g, '""')}"`;
+      return [name, email, phone, g.tableNumber ?? '', tblName, zone, rsvp, dietary, plusOne, group].join(',');
+    });
+    const csv = [header, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = 'seating-export.csv';
+    link.href = url;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast({ title: 'Success', description: `Exported ${guests.length} guests as CSV` });
+  };
+
+  // ======== Duplicate Table ========
+  const handleDuplicateTable = async () => {
+    if (!selectedTable) return;
+    const tbl = selectedTable;
+    const nextNum = tables.length > 0 ? Math.max(...tables.map((t) => t.tableNum)) + 1 : 1;
+    try {
+      const res = await fetch(TABLES_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tableNum: nextNum,
+          name: `${tbl.name || `Table ${tbl.tableNum}`} (copy)`,
+          shape: tbl.shape,
+          capacity: tbl.capacity,
+          zone: tbl.zone,
+          posX: tbl.posX + 40,
+          posY: tbl.posY + 40,
+          notes: tbl.notes,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to duplicate table');
+      await fetchTables();
+      toast({ title: 'Success', description: `Duplicated as Table ${nextNum}` });
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to duplicate', variant: 'destructive' });
+    }
+  };
+
+  // ======== Bulk Create Tables ========
+  const handleBulkCreate = async () => {
+    const nextNum = tables.length > 0 ? Math.max(...tables.map((t) => t.tableNum)) + 1 : 1;
+    const startPosX = 60;
+    const startPosY = 60;
+    let created = 0;
+    try {
+      for (let i = 0; i < bulkCount; i++) {
+        const col = i % 5;
+        const row = Math.floor(i / 5);
+        const res = await fetch(TABLES_API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tableNum: nextNum + i,
+            shape: bulkShape,
+            capacity: 8,
+            posX: startPosX + col * 180,
+            posY: startPosY + row * 180,
+          }),
+        });
+        if (res.ok) created++;
+      }
+      await fetchTables();
+      setBulkDialogOpen(false);
+      toast({ title: 'Success', description: `${created} table${created !== 1 ? 's' : ''} created` });
+    } catch {
+      toast({ title: 'Error', description: 'Bulk creation failed', variant: 'destructive' });
+    }
+  };
+
+  // ======== Keyboard Shortcuts ========
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedTableId) {
+        e.preventDefault();
+        handleDeleteTable();
+      }
+      if (e.key === 'Escape') {
+        setSelectedTableId(null);
+        setReassigningGuestId(null);
+        setDetailGuestId(null);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [selectedTableId]);
+
   // ======== Detail Drawer Guest ========
   const detailGuest = guests.find((g) => g.id === detailGuestId);
 
@@ -605,6 +828,25 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
                 className="h-7 pl-8 text-xs border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
               />
             </div>
+          </div>
+
+          {/* RSVP Filter */}
+          <div className="px-3 py-1.5 border-b border-champagne-silk flex items-center gap-1">
+            {([['all', 'All', UsersRound], ['attending', 'Attending', CheckCircle2], ['pending', 'Pending', Clock], ['declined', 'Declined', XCircle]] as const).map(([val, label, Icon]) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setRsvpFilter(val)}
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors duration-150 ${
+                  rsvpFilter === val
+                    ? 'bg-cinematic-gold/10 text-cinematic-gold border-cinematic-gold/30'
+                    : 'text-charcoal-ink/40 border-transparent hover:text-charcoal-ink/60 hover:border-charcoal-ink/10'
+                }`}
+              >
+                <Icon className="size-2.5" />
+                <span className="hidden sm:inline">{label}</span>
+              </button>
+            ))}
           </div>
 
           {/* Filter */}
@@ -716,6 +958,20 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
               <TooltipContent>{canvasLocked ? 'Unlock tables' : 'Lock tables'}</TooltipContent>
             </Tooltip>
 
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setGridSnap(!gridSnap)}
+                  className={`h-8 px-2 ${gridSnap ? 'text-cinematic-gold bg-cinematic-gold/5' : 'text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5'}`}
+                >
+                  <Grid3x3 className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{gridSnap ? 'Disable grid snap' : 'Enable grid snap (20px)'}</TooltipContent>
+            </Tooltip>
+
             <div className="w-px h-5 bg-champagne-silk mx-1" />
 
             <label
@@ -765,6 +1021,111 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
             />
             <ZoomIn className="size-3.5 text-charcoal-ink/40 shrink-0" />
             <span className="text-[10px] text-charcoal-ink/50 font-medium w-8 text-right">{canvasScale}%</span>
+
+            <div className="w-px h-5 bg-champagne-silk mx-1" />
+
+            {/* Add Table dropdown */}
+            <DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5"
+                    >
+                      <Plus className="size-3.5" />
+                      <ChevronsUpDown className="size-2" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent>Add tables</TooltipContent>
+              </Tooltip>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={async () => { await onAddTable(); await fetchTables(); }}>Add 1 Table</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setBulkCount(5); setBulkShape('circle'); setBulkDialogOpen(true); }}>Add 5 Tables</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setBulkCount(10); setBulkShape('circle'); setBulkDialogOpen(true); }}>Add 10 Tables</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setBulkCount(20); setBulkShape('circle'); setBulkDialogOpen(true); }}>Add 20 Tables</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Export buttons */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleExportPng}
+                  disabled={exporting}
+                  className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5"
+                >
+                  {exporting ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export as PNG</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPrintDialogOpen(true)}
+                  className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5"
+                >
+                  <Printer className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Print-ready view</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleExportCsv}
+                  className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5"
+                >
+                  <FileDown className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export CSV</TooltipContent>
+            </Tooltip>
+          </div>
+
+          {/* Capacity Overview Bar */}
+          <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-champagne-silk bg-paper-cream/50 text-xs text-charcoal-ink/70 flex-wrap">
+            <span className="font-medium text-charcoal-ink/60"><UsersRound className="size-3 inline mr-1" />{totalSeats} seats</span>
+            <span className="text-charcoal-ink/30">|</span>
+            <span className="text-emerald-600"><CheckCircle2 className="size-3 inline mr-0.5" />{assignedCount} assigned</span>
+            <span className="text-charcoal-ink/30">|</span>
+            <span className="text-amber-600"><Clock className="size-3 inline mr-0.5" />{remainingSeats} remaining</span>
+            <span className="text-charcoal-ink/30">|</span>
+            <span className="text-charcoal-ink/50">{unassignedGuests.length} unassigned</span>
+            <div className="flex-1 min-w-[80px]">
+              <div className="w-full h-1.5 rounded-full bg-charcoal-ink/5 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    fillPct > 90 ? 'bg-red-400' : fillPct > 70 ? 'bg-amber-400' : 'bg-emerald-400'
+                  }`}
+                  style={{ width: `${Math.min(fillPct, 100)}%` }}
+                />
+              </div>
+            </div>
+            <span className={`font-semibold text-[10px] ${
+              fillPct > 90 ? 'text-red-500' : fillPct > 70 ? 'text-amber-500' : 'text-emerald-500'
+            }`}>{fillPct}%</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleAutoAssign}
+              disabled={autoAssigning}
+              className="h-7 px-2 text-[11px] font-medium text-cinematic-gold hover:bg-cinematic-gold/10 ml-auto"
+            >
+              {autoAssigning ? <Loader2 className="size-3 animate-spin mr-1" /> : <Wand2 className="size-3 mr-1" />}
+              Auto-Assign
+            </Button>
           </div>
 
           {/* Reassigning indicator */}
@@ -897,6 +1258,15 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
                             {tbl.zone.replace('_', ' ')}
                           </span>
                         )}
+                        {/* Balance bar */}
+                        <div className="absolute bottom-0.5 left-2 right-2 h-[2px] rounded-full bg-charcoal-ink/5 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-300 ${
+                              isOverCapacity ? 'bg-red-400' : count / tbl.capacity > 0.9 ? 'bg-amber-400' : count / tbl.capacity > 0.7 ? 'bg-amber-300' : 'bg-emerald-400'
+                            }`}
+                            style={{ width: `${Math.min((count / tbl.capacity) * 100, 100)}%` }}
+                          />
+                        </div>
                       </div>
 
                       {/* Guest labels around table */}
@@ -962,6 +1332,19 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
                   {selectedTable.name || `Table ${selectedTable.tableNum}`}
                 </h3>
                 <div className="flex items-center gap-1">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleDuplicateTable}
+                        className="h-8 w-8 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
+                      >
+                        <Copy className="size-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Duplicate table</TooltipContent>
+                  </Tooltip>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1338,6 +1721,139 @@ export default function CoupleSeatingCanvas({ onAddTable }: CoupleSeatingCanvasP
           )}
         </SheetContent>
       </Sheet>
+
+      {/* ======== PRINT DIALOG ======== */}
+      <Dialog open={printDialogOpen} onOpenChange={setPrintDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-charcoal-ink">Print-Ready Seating Chart</DialogTitle>
+            <DialogDescription className="text-charcoal-ink/50">
+              Clean layout for printing. Use the Print button below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="print-area space-y-6 p-4">
+            {tables.sort((a, b) => a.tableNum - b.tableNum).map((tbl) => {
+              const tblGuests = guestsAtTable(tbl.tableNum);
+              return (
+                <div key={tbl.id} className="border border-charcoal-ink/10 rounded-lg p-4 print:break-inside-avoid">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="text-sm font-bold text-charcoal-ink">
+                      {tbl.name || `Table ${tbl.tableNum}`}
+                    </h3>
+                    <span className="text-xs text-charcoal-ink/50">({tblGuests.length}/{tbl.capacity})</span>
+                    {tbl.zone && (
+                      <Badge variant="outline" className={`text-[10px] ${ZONE_COLORS[tbl.zone] || ''}`}>
+                        {tbl.zone.replace('_', ' ')}
+                      </Badge>
+                    )}
+                  </div>
+                  {tblGuests.length > 0 ? (
+                    <ul className="space-y-1">
+                      {tblGuests.map((g) => {
+                        const dietary = getEffectiveDietary(g);
+                        return (
+                          <li key={g.id} className="text-xs text-charcoal-ink/80">
+                            {g.name}{dietary ? ` (${dietary})` : ''}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-charcoal-ink/30 italic">No guests assigned</p>
+                  )}
+                </div>
+              );
+            })}
+            {unassignedGuests.length > 0 && (
+              <div className="border border-amber-200 rounded-lg p-4 bg-amber-50/30 print:break-inside-avoid">
+                <h3 className="text-sm font-bold text-amber-700 mb-2">
+                  Unassigned Guests ({unassignedGuests.length})
+                </h3>
+                <ul className="space-y-1">
+                  {unassignedGuests.map((g) => {
+                    const dietary = getEffectiveDietary(g);
+                    return (
+                      <li key={g.id} className="text-xs text-charcoal-ink/70">
+                        {g.name}{dietary ? ` (${dietary})` : ''}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPrintDialogOpen(false)}
+              className="border-charcoal-ink/15 text-charcoal-ink"
+            >
+              Close
+            </Button>
+            <Button
+              onClick={() => window.print()}
+              className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90"
+            >
+              <Printer className="size-4 mr-1.5" />
+              Print
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ======== BULK ADD DIALOG ======== */}
+      <Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-charcoal-ink">Bulk Create Tables</DialogTitle>
+            <DialogDescription className="text-charcoal-ink/50">
+              Create multiple tables at once with staggered positions.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-charcoal-ink/70">Number of Tables</Label>
+              <Input
+                type="number"
+                min={1}
+                max={50}
+                value={bulkCount}
+                onChange={(e) => setBulkCount(Math.max(1, Math.min(50, parseInt(e.target.value, 10) || 1)))}
+                className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-charcoal-ink/70">Shape</Label>
+              <Select value={bulkShape} onValueChange={setBulkShape}>
+                <SelectTrigger className="h-8 text-sm border-charcoal-ink/10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="circle">Circle</SelectItem>
+                  <SelectItem value="rectangle">Rectangle</SelectItem>
+                  <SelectItem value="oval">Oval</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBulkDialogOpen(false)}
+              className="border-charcoal-ink/15 text-charcoal-ink"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleBulkCreate}
+              className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90"
+            >
+              <Plus className="size-4 mr-1.5" />
+              Create {bulkCount} Tables
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   );
 }
