@@ -1678,7 +1678,7 @@ export default function CoupleSeatingCanvas() {
                 <p className="text-xs text-charcoal-ink/30">Click &quot;Add Table&quot; to start arranging seating.</p>
               </div>
             ) : (
-              <div className="w-full h-full flex items-center justify-center">
+              <div className="w-full h-full relative">
                 <div
                   style={{
                     transform: 'translate(' + panX + 'px, ' + panY + 'px) scale(' + (canvasScale / 100) + ')',
