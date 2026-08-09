@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
+import sharp from 'sharp';
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const MAX_DIMENSION = 2000; // Resize longest side to max 2000px
+const JPEG_QUALITY = 80; // 80% quality — good balance of size vs clarity
 
 export async function POST(req: NextRequest) {
   try {
@@ -41,20 +42,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'File too large. Max 10 MB.' }, { status: 400 });
     }
 
-    // Ensure upload directory exists
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'floorplans');
-    await mkdir(uploadDir, { recursive: true });
+    // Convert uploaded file to buffer and process with sharp
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
 
-    // Generate unique filename
-    const ext = file.name.split('.').pop() || 'png';
-    const filename = `${wedding.id}-${Date.now()}.${ext}`;
-    const filePath = path.join(uploadDir, filename);
+    // Get image metadata to check if resize is needed
+    const metadata = await sharp(fileBuffer).metadata();
+    const { width = 0, height = 0 } = metadata;
 
-    const bytes = await file.arrayBuffer();
-    await writeFile(filePath, Buffer.from(bytes));
+    // Resize if longest side exceeds MAX_DIMENSION, then convert to JPEG
+    let processedBuffer: Buffer;
+    const needsResize = width > MAX_DIMENSION || height > MAX_DIMENSION;
 
-    // Store the floor plan URL on the wedding account
-    const floorPlanUrl = `/uploads/floorplans/${filename}`;
+    if (needsResize) {
+      processedBuffer = await sharp(fileBuffer)
+        .resize(MAX_DIMENSION, MAX_DIMENSION, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: JPEG_QUALITY })
+        .toBuffer();
+    } else {
+      processedBuffer = await sharp(fileBuffer)
+        .jpeg({ quality: JPEG_QUALITY })
+        .toBuffer();
+    }
+
+    // Store as base64 data URL directly in the database (survives Railway restarts)
+    const base64 = processedBuffer.toString('base64');
+    const floorPlanUrl = `data:image/jpeg;base64,${base64}`;
+
     await db.weddingAccount.update({
       where: { id: wedding.id },
       data: { floorPlanUrl },
