@@ -33,9 +33,23 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ pat
   }
 
   try {
-    const data = await fs.readFile(resolvedPath);
+    let data: Buffer;
+    try {
+      data = await fs.readFile(resolvedPath);
+    } catch {
+      // Fallback: handle double extensions from legacy uploads
+      // e.g. "hero-image.png.png" → try "hero-image.png"
+      const ext = path.extname(resolvedPath).toLowerCase();
+      const secondExt = path.extname(resolvedPath.slice(0, -ext.length)).toLowerCase();
+      if (secondExt && secondExt === ext) {
+        const fallbackPath = resolvedPath.slice(0, -ext.length);
+        data = await fs.readFile(fallbackPath);
+      } else {
+        throw new Error('not found');
+      }
+    }
 
-    const ext = path.extname(resolvedPath).toLowerCase();
+    const finalExt = path.extname(resolvedPath).toLowerCase();
     const contentTypes: Record<string, string> = {
       '.jpg': 'image/jpeg',
       '.jpeg': 'image/jpeg',
@@ -49,7 +63,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ pat
       '.wav': 'audio/wav',
       '.m4a': 'audio/m4a',
     };
-    const contentType = contentTypes[ext] || 'application/octet-stream';
+    const contentType = contentTypes[finalExt] || 'application/octet-stream';
 
     return new NextResponse(data, {
       status: 200,
