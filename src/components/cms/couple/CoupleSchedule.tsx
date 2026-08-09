@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { invalidateWeddingCache } from '@/hooks/usePublicWedding';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 
 const API_BASE = '/api/cms/schedule?XTransformPort=3000';
 
@@ -78,6 +79,7 @@ const emptyForm: FormData = {
 };
 
 export default function CoupleSchedule() {
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -300,7 +302,8 @@ export default function CoupleSchedule() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this event? This action cannot be undone.')) return;
+    const ok = await confirm('Delete this event?', 'This action cannot be undone.');
+    if (!ok) return;
 
     try {
       setDeleting(id);
@@ -692,6 +695,7 @@ export default function CoupleSchedule() {
           </Button>
         </div>
       )}
+      <ConfirmDialog />
     </div>
   );
 }

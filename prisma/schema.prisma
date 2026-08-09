@@ -155,6 +155,7 @@ model WeddingAccount {
   stories   StoryItem[]
   guests    Guest[]
   seatingTables SeatingTable[]
+  seatingHistory SeatingHistory?
   rsvps     RSVPSubmission[]
   wishes    Wish[]
   contacts      ContactSubmission[]
@@ -458,4 +459,18 @@ model HoneymoonSuggestion {
   suggestedBy  String
   createdAt    DateTime        @default(now())
   @@index([weddingId])
+}
+
+// ============================================================
+// SEATING CANVAS UNDO/REDO HISTORY (persists across page reloads)
+// ============================================================
+
+model SeatingHistory {
+  id        String          @id @default(cuid())
+  weddingId String          @unique
+  wedding   WeddingAccount  @relation(fields: [weddingId], references: [id], onDelete: Cascade)
+  undoStack String          // JSON array of HistoryEntry snapshots
+  redoStack String          // JSON array of HistoryEntry snapshots
+  updatedAt DateTime        @updatedAt
+  createdAt DateTime        @default(now())
 }

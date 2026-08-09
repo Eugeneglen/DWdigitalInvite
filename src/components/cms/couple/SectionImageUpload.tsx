@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { invalidateWeddingCache } from '@/hooks/usePublicWedding';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 
 const MEDIA_API = '/api/cms/media?XTransformPort=3000';
 
@@ -39,6 +40,7 @@ export default function SectionImageUpload({ category, label, maxImages }: Secti
   const [dragOver, setDragOver] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   const fetchImages = useCallback(async () => {
     try {
@@ -137,7 +139,8 @@ export default function SectionImageUpload({ category, label, maxImages }: Secti
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this image? This action cannot be undone.')) return;
+    const ok = await confirm('Delete this image?', 'This action cannot be undone.');
+    if (!ok) return;
 
     try {
       setDeleting(id);
@@ -284,6 +287,8 @@ export default function SectionImageUpload({ category, label, maxImages }: Secti
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog />
 
       {/* Hidden file input */}
       <input

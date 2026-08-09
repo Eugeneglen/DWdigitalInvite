@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { invalidateWeddingCache } from '@/hooks/usePublicWedding';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import SectionContentFields, { type ContentField } from './SectionContentFields';
 
 const WISHES_CONTENT_FIELDS: ContentField[] = [
@@ -63,6 +64,7 @@ function timeAgo(dateStr: string): string {
 }
 
 export default function CoupleWishes() {
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const [wishes, setWishes] = useState<WishItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -115,7 +117,8 @@ export default function CoupleWishes() {
   }, [fetchWishes]);
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this wish? This action cannot be undone.')) return;
+    const ok = await confirm('Delete this wish?', 'This action cannot be undone.');
+    if (!ok) return;
 
     try {
       setDeleting(id);
@@ -296,6 +299,7 @@ export default function CoupleWishes() {
         description="Customise the section header and form labels"
         fields={WISHES_CONTENT_FIELDS}
       />
+      <ConfirmDialog />
     </div>
   );
 }

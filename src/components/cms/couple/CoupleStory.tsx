@@ -21,6 +21,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { invalidateWeddingCache } from '@/hooks/usePublicWedding';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 
 const API_BASE = '/api/cms/stories?XTransformPort=3000';
 
@@ -66,6 +67,7 @@ function safeParseJSON<T>(str: string | undefined | null, fallback: T): T {
 }
 
 export default function CoupleStory() {
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const [stories, setStories] = useState<StoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -205,8 +207,9 @@ export default function CoupleStory() {
     autoSaveContent('tidbits', JSON.stringify(updated), 'TIDBITS');
   };
 
-  const handleDeleteTidbit = (idx: number) => {
-    if (!confirm('Remove this tidbit?')) return;
+  const handleDeleteTidbit = async (idx: number) => {
+    const ok = await confirm('Remove this tidbit?', '');
+    if (!ok) return;
     const updated = tidbits.filter((_, i) => i !== idx);
     setTidbits(updated);
     setTidbitsEdited(true);
@@ -245,8 +248,9 @@ export default function CoupleStory() {
     autoSaveContent('honeymoonDestinations', JSON.stringify(updated), 'DESTINATIONS');
   };
 
-  const handleDeleteDestination = (idx: number) => {
-    if (!confirm('Remove this destination?')) return;
+  const handleDeleteDestination = async (idx: number) => {
+    const ok = await confirm('Remove this destination?', '');
+    if (!ok) return;
     const updated = destinations.filter((_, i) => i !== idx);
     setDestinations(updated);
     setDestinationsEdited(true);
@@ -368,7 +372,8 @@ export default function CoupleStory() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this chapter? This action cannot be undone.')) return;
+    const ok = await confirm('Delete this chapter?', 'This action cannot be undone.');
+    if (!ok) return;
 
     try {
       setDeleting(id);
@@ -1044,6 +1049,7 @@ export default function CoupleStory() {
           </Button>
         </div>
       )}
+      <ConfirmDialog />
     </div>
   );
 }

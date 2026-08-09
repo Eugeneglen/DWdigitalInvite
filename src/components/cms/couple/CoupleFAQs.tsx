@@ -20,6 +20,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { invalidateWeddingCache } from '@/hooks/usePublicWedding';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 
 const API_BASE = '/api/cms/faqs?XTransformPort=3000';
 
@@ -54,6 +55,7 @@ const emptyForm: FormData = {
 };
 
 export default function CoupleFAQs() {
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const [faqs, setFaqs] = useState<FAQItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -146,7 +148,8 @@ export default function CoupleFAQs() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this FAQ? This action cannot be undone.')) return;
+    const ok = await confirm('Delete this FAQ?', 'This action cannot be undone.');
+    if (!ok) return;
 
     try {
       setDeleting(id);
@@ -407,6 +410,7 @@ export default function CoupleFAQs() {
         description="Customise the section header and contact information"
         fields={QA_CONTENT_FIELDS}
       />
+      <ConfirmDialog />
     </div>
   );
 }

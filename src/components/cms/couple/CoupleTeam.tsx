@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/dialog';
 import { useCoupleCMSStore } from '@/store/useCoupleCMSStore';
 import { useSession } from 'next-auth/react';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 
 interface Member {
   id: string;
@@ -91,6 +92,7 @@ function getRoleBadgeClass(role: string): string {
 }
 
 export default function CoupleTeam() {
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const { weddingId } = useCoupleCMSStore();
   const { data: session } = useSession();
   const [members, setMembers] = useState<Member[]>([]);
@@ -169,7 +171,8 @@ export default function CoupleTeam() {
 
   const handleRemove = async (memberId: string, memberName: string) => {
     if (!weddingId) return;
-    if (!confirm(`Remove ${memberName} from this wedding? They will lose access immediately.`)) return;
+    const ok = await confirm(`Remove ${memberName}?`, 'They will lose access to this wedding immediately.');
+    if (!ok) return;
 
     try {
       const res = await fetch(`/api/cms/tenants/${weddingId}/members?memberId=${memberId}&XTransformPort=3000`, {
@@ -380,6 +383,7 @@ export default function CoupleTeam() {
           </form>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog />
     </div>
   );
 }

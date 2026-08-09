@@ -42,6 +42,7 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ALL_PERMISSIONS, ALL_PLATFORM_PERMISSIONS, ALL_WEDDING_PERMISSIONS } from '@/lib/permissions';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 
 interface Role {
   id: string;
@@ -97,6 +98,7 @@ export default function MasterRoles() {
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [form, setForm] = useState(EMPTY_ROLE_FORM);
   const [submitting, setSubmitting] = useState(false);
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   const fetchRoles = useCallback(async () => {
     try {
@@ -184,7 +186,8 @@ export default function MasterRoles() {
   }
 
   async function handleDelete(role: Role) {
-    if (!confirm(`Delete the role "${role.label}"? This cannot be undone.`)) return;
+    const ok = await confirm(`Delete the role "${role.label}"?`, 'This cannot be undone.');
+    if (!ok) return;
     try {
       const res = await fetch(`/api/master/roles?id=${role.id}&XTransformPort=3000`, { method: 'DELETE' });
       if (!res.ok) {
@@ -432,6 +435,7 @@ export default function MasterRoles() {
           </form>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog />
     </div>
   );
 }

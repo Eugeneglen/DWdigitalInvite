@@ -62,6 +62,7 @@ import GuestListSheet from './GuestListSheet';
 
 // ---- Constants (canvas-only) ----
 const FLOORPLAN_API = '/api/cms/floorplan?XTransformPort=3000';
+const HISTORY_API = '/api/cms/seating-history?XTransformPort=3000';
 
 const SHAPE_ICONS: Record<string, React.ReactNode> = {
   circle: <Circle className="size-3.5" />,
@@ -191,6 +192,42 @@ export default function CoupleSeatingCanvas() {
 
   // Debounce save ref
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // History persistence debounce ref
+  const historyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ======== Undo/Redo Persistence ========
+  const saveHistoryDebounced = useCallback(() => {
+    if (historyTimerRef.current) clearTimeout(historyTimerRef.current);
+    historyTimerRef.current = setTimeout(() => {
+      fetch(HISTORY_API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          undoStack: undoStackRef.current,
+          redoStack: redoStackRef.current,
+        }),
+      }).catch(() => { /* silent */ });
+    }, 2000);
+  }, []);
+
+  const loadHistory = useCallback(() => {
+    fetch(HISTORY_API)
+      .then((res) => {
+        if (!res.ok) return null;
+        return res.json();
+      })
+      .then((data) => {
+        if (!data) return;
+        const undo: HistoryEntry[] = data.undoStack ?? [];
+        const redo: HistoryEntry[] = data.redoStack ?? [];
+        if (undo.length === 0 && redo.length === 0) return;
+        undoStackRef.current = undo;
+        redoStackRef.current = redo;
+        setUndoCount(undo.length);
+        setRedoCount(redo.length);
+      })
+      .catch(() => { /* silent */ });
+  }, []);
 
   // ======== Data Fetching ========
   const fetchAllGuests = useCallback(async () => {
@@ -233,7 +270,8 @@ export default function CoupleSeatingCanvas() {
     fetchTables();
     fetchAllGuests();
     fetchFloorPlan();
-  }, [fetchTables, fetchAllGuests, fetchFloorPlan]);
+    loadHistory();
+  }, [fetchTables, fetchAllGuests, fetchFloorPlan, loadHistory]);
 
   // ======== Derived Data ========
   const selectedTable = tables.find((t) => t.id === selectedTableId);
@@ -415,7 +453,8 @@ export default function CoupleSeatingCanvas() {
     redoStackRef.current = [];
     setUndoCount(undoStackRef.current.length);
     setRedoCount(0);
-  }, [tables, guests]);
+    saveHistoryDebounced();
+  }, [tables, guests, saveHistoryDebounced]);
 
   const handleUndo = useCallback(() => {
     if (undoStackRef.current.length === 0) return;
@@ -438,7 +477,8 @@ export default function CoupleSeatingCanvas() {
     );
     setRedoCount(redoStackRef.current.length);
     toast({ title: 'Undo', description: entry.label });
-  }, [tables, guests]);
+    saveHistoryDebounced();
+  }, [tables, guests, saveHistoryDebounced]);
 
   const handleRedo = useCallback(() => {
     if (redoStackRef.current.length === 0) return;
@@ -460,7 +500,8 @@ export default function CoupleSeatingCanvas() {
     );
     setUndoCount(undoStackRef.current.length);
     toast({ title: 'Redo', description: entry.label });
-  }, [tables, guests]);
+    saveHistoryDebounced();
+  }, [tables, guests, saveHistoryDebounced]);
 
   const canUndo = undoCount > 0;
   const canRedo = redoCount > 0;

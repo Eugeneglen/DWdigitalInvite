@@ -26,6 +26,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -289,6 +290,7 @@ function SimpleImageGallery({ media, onAdd, onRemove, maxImages, aspectClass, la
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
+  const { confirm: galleryConfirm, ConfirmDialog: GalleryConfirmDialog } = useConfirmDialog();
 
   const canAddMore = media.length < maxImages;
 
@@ -309,8 +311,9 @@ function SimpleImageGallery({ media, onAdd, onRemove, maxImages, aspectClass, la
     });
   }
 
-  function handleRemove(idx: number) {
-    if (!confirm('Delete this image? This action cannot be undone.')) return;
+  async function handleRemove(idx: number) {
+    const ok = await galleryConfirm('Delete this image?', 'This action cannot be undone.');
+    if (!ok) return;
     setDeleting(idx);
     onRemove(idx);
     setTimeout(() => setDeleting(null), 300);
@@ -425,6 +428,7 @@ function SimpleImageGallery({ media, onAdd, onRemove, maxImages, aspectClass, la
           )}
         </DialogContent>
       </Dialog>
+      <GalleryConfirmDialog />
     </div>
   );
 }
@@ -652,6 +656,7 @@ export default function TemplateEditor() {
   const [faqForm, setFaqForm] = useState<{ question: string; answer: string; isActive: boolean }>({
     question: '', answer: '', isActive: true,
   });
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   // ── Fetch ──────────────────────────────────────────────────────────────
 
@@ -747,9 +752,10 @@ export default function TemplateEditor() {
     setDirty(true);
   }
 
-  function deleteSchedule(idx: number) {
+  async function deleteSchedule(idx: number) {
     if (!data) return;
-    if (!confirm('Remove this event from the template?')) return;
+    const ok = await confirm('Remove this event?', 'This will remove the event from the template.');
+    if (!ok) return;
     setData({ ...data, schedule: data.schedule.filter((_, i) => i !== idx) });
     setDirty(true);
   }
@@ -821,9 +827,10 @@ export default function TemplateEditor() {
     setDirty(true);
   }
 
-  function deleteStory(idx: number) {
+  async function deleteStory(idx: number) {
     if (!data) return;
-    if (!confirm('Delete this chapter? This action cannot be undone.')) return;
+    const ok = await confirm('Delete this chapter?', 'This action cannot be undone.');
+    if (!ok) return;
     setData({ ...data, stories: data.stories.filter((_, i) => i !== idx) });
     setDirty(true);
   }
@@ -873,9 +880,10 @@ export default function TemplateEditor() {
     setDirty(true);
   }
 
-  function deleteFaq(idx: number) {
+  async function deleteFaq(idx: number) {
     if (!data) return;
-    if (!confirm('Delete this FAQ? This action cannot be undone.')) return;
+    const ok = await confirm('Delete this FAQ?', 'This action cannot be undone.');
+    if (!ok) return;
     setData({ ...data, faqs: data.faqs.filter((_, i) => i !== idx) });
     setDirty(true);
   }
@@ -989,9 +997,10 @@ export default function TemplateEditor() {
     }
   }
 
-  function handleDiscard() {
+  async function handleDiscard() {
     if (!baselineData) return;
-    if (!confirm('Discard all unsaved changes? This cannot be undone.')) return;
+    const ok = await confirm('Discard all unsaved changes?', 'This cannot be undone.');
+    if (!ok) return;
     setData(JSON.parse(JSON.stringify(baselineData)));
     setDirty(false);
   }
@@ -1040,8 +1049,11 @@ export default function TemplateEditor() {
 
   const dirtyCount = getDirtyCount();
 
-  function handleBack() {
-    if (dirty && !confirm('You have unsaved changes. Leave anyway?')) return;
+  async function handleBack() {
+    if (dirty) {
+      const ok = await confirm('You have unsaved changes.', 'Leave anyway?');
+      if (!ok) return;
+    }
     setPage('templates');
   }
 
@@ -2440,6 +2452,7 @@ export default function TemplateEditor() {
           </div>
         </div>
       )}
+      <ConfirmDialog />
     </div>
   );
 }
