@@ -1575,12 +1575,18 @@ export default function CoupleSeatingCanvas() {
                   }
 
                   // Shape
-                  let shapeCls = 'rounded-full';
-                  let circleDepthCls = tbl.shape === 'circle'
-                    ? 'shadow-[inset_0_1px_2px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.08)]'
-                    : '';
-                  if (tbl.shape === 'rectangle') shapeCls = 'rounded-md';
-                  if (tbl.shape === 'oval') shapeCls = 'rounded-lg';
+                  let shapeCls = '';
+                  let shapeStyle: React.CSSProperties = {};
+                  let circleDepthCls = '';
+                  if (tbl.shape === 'circle') {
+                    shapeStyle.borderRadius = '50%';
+                    circleDepthCls = 'shadow-[inset_0_1px_2px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.08)]';
+                  } else if (tbl.shape === 'rectangle') {
+                    shapeCls = 'rounded-md';
+                  } else if (tbl.shape === 'oval') {
+                    shapeStyle.borderRadius = '50%';
+                    shapeCls = 'rounded-lg';
+                  }
 
                   const isDragging = dragRef.current?.tableId === tbl.id;
 
@@ -1605,13 +1611,14 @@ export default function CoupleSeatingCanvas() {
                         onDragOver={(e) => handleTableDragOver(e, tbl.id)}
                         onDragLeave={handleTableDragLeave}
                         onDrop={(e) => handleTableDrop(e, tbl.id)}
-                        className={`absolute inset-0 border-2 ${borderCls} ${shapeCls} ${circleDepthCls} bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center cursor-grab active:cursor-grabbing transition-all duration-200 will-change-transform ${isDragging ? 'z-50' : ''} ${
+                        className={`absolute inset-0 border-2 ${borderCls} ${shapeCls} ${circleDepthCls} bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center cursor-grab active:cursor-grabbing will-change-transform ${isDragging ? 'z-50' : ''} ${
                           isSelected
                             ? 'shadow-[0_0_0_3px_rgba(212,175,55,0.3)] ring-2 ring-cinematic-gold/30'
                             : 'hover:shadow-md'
                         } ${reassigningGuestId && !isSelected ? 'hover:border-cinematic-gold hover:bg-cinematic-gold/5' : ''} ${
                           canvasLocked ? 'cursor-default' : ''
                         }`}
+                        style={shapeStyle}
                       >
                         <span className="text-xs font-bold text-charcoal-ink leading-none">
                           {displayName.length > 8 ? truncate(displayName, 8) : displayName}
