@@ -159,8 +159,12 @@ function getExtensionFromMime(mimeType: string): string {
  * Removes path components, replaces spaces, keeps it ASCII-safe.
  */
 function sanitizeFileName(name: string): string {
-  const base = path.basename(name);
-  const safe = base.replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-').toLowerCase();
+  let base = path.basename(name);
+  // Strip existing extension so uploadFile can append the correct one
+  // from the MIME type (prevents double extensions like .png.png)
+  const ext = path.extname(base);
+  if (ext) base = base.slice(0, -ext.length);
+  const safe = base.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-').toLowerCase();
   return safe.substring(0, 50) || 'file';
 }
 

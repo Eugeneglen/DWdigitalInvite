@@ -83,24 +83,30 @@ export default function HoneymoonVoteAnalytics() {
   const [data, setData] = useState<HoneymoonAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchVotes = useCallback(async () => {
+  const fetchVotes = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await fetch('/api/cms/honeymoon-analytics?XTransformPort=3000');
+      const res = await fetch('/api/cms/honeymoon-analytics?XTransformPort=3000', { signal });
       if (!res.ok) return;
       const json = await res.json();
-      setData(json);
-    } catch {
-      // silently retry on next poll
+      if (!signal?.aborted) setData(json);
+    } catch (err) {
+      if ((err as Error)?.name !== 'AbortError') {
+        // silently retry on next poll
+      }
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchVotes();
+    const controller = new AbortController();
+    fetchVotes(controller.signal);
     // Poll every 15s for live updates
-    const interval = setInterval(fetchVotes, 15_000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => fetchVotes(controller.signal), 15_000);
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+    };
   }, [fetchVotes]);
 
   if (loading) {

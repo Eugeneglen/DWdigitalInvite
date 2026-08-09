@@ -85,22 +85,30 @@ export function NotificationBell({ variant = 'master' }: { variant?: 'master' | 
   const [clearingAll, setClearingAll] = useState(false);
 
   // Fetch notifications on mount and poll every 30 seconds
-  const fetchNotifications = useCallback(async () => {
+  const fetchNotifications = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await fetch('/api/notifications?XTransformPort=3000');
+      const res = await fetch('/api/notifications?XTransformPort=3000', { signal });
       if (res.ok) {
         const data = await res.json();
-        setNotifications(data.notifications || [], data.unreadCount || 0);
+        if (!signal?.aborted) {
+          setNotifications(data.notifications || [], data.unreadCount || 0);
+        }
       }
-    } catch {
-      // Silent — notifications are non-critical
+    } catch (err) {
+      if ((err as Error)?.name !== 'AbortError') {
+        // Silent — notifications are non-critical
+      }
     }
   }, [setNotifications]);
 
   useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
+    const controller = new AbortController();
+    fetchNotifications(controller.signal);
+    const interval = setInterval(() => fetchNotifications(controller.signal), 30000);
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+    };
   }, [fetchNotifications]);
 
   // Close dropdown on outside click
