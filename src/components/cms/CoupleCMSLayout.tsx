@@ -86,9 +86,14 @@ export default function CoupleCMSLayout({ children }: { children: React.ReactNod
           throw new Error('Failed to load wedding data');
         }
         const data = await res.json();
-        setWeddingData(data.wedding ?? data);
-        if (data?.wedding?.id) {
-          setWeddingId(String(data.wedding.id));
+        const wedding = data?.wedding ?? data;
+        if (!wedding || typeof wedding !== 'object') {
+          setError('We could not load your wedding details. Please try again later.');
+          return;
+        }
+        setWeddingData(wedding);
+        if (wedding?.id) {
+          setWeddingId(String(wedding.id));
         }
       } catch (err) {
         setError('Something went wrong. Please try again later.');
@@ -151,6 +156,31 @@ export default function CoupleCMSLayout({ children }: { children: React.ReactNod
             className="border-charcoal-ink/15 text-charcoal-ink hover:border-cinematic-gold hover:text-cinematic-gold rounded px-6 py-2.5 text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300"
           >
             Sign Out
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Guard against rendering children with a null wedding data payload. This can
+  // happen if the fetch resolves successfully but the store update hasn't been
+  // reflected yet, or the response shape didn't match what we expected.
+  if (!weddingData) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-paper-cream p-6">
+        <div className="flex flex-col items-center gap-6 max-w-md text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-cinematic-gold/10">
+            <Heart className="size-8 text-cinematic-gold" />
+          </div>
+          <h2 className="text-xl font-semibold text-charcoal-ink">
+            We couldn&apos;t load your wedding details. Please refresh the page or try again later.
+          </h2>
+          <Button
+            variant="outline"
+            onClick={() => window.location.reload()}
+            className="border-charcoal-ink/15 text-charcoal-ink hover:border-cinematic-gold hover:text-cinematic-gold rounded px-6 py-2.5 text-[13px] font-medium uppercase tracking-[0.08em] transition-colors duration-300"
+          >
+            Refresh
           </Button>
         </div>
       </div>
