@@ -179,6 +179,8 @@ export default function CoupleSeatingCanvas() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const outerRef = useRef<HTMLDivElement>(null);
   const panRef = useRef<{ startX: number; startY: number; origPanX: number; origPanY: number } | null>(null);
+  const isDraggingRef = useRef(false);
+  const frozenBoundsRef = useRef<{ w: number; h: number } | null>(null);
   const undoStackRef = useRef<HistoryEntry[]>([]);
   const redoStackRef = useRef<HistoryEntry[]>([]);
   const shiftHeldRef = useRef(false);
@@ -744,6 +746,9 @@ export default function CoupleSeatingCanvas() {
     const tbl = tables.find((t) => t.id === tableId);
     if (!tbl) return;
     pushHistory('Drag table');
+    // Freeze contentBounds during drag to prevent layout shifts
+    isDraggingRef.current = true;
+    frozenBoundsRef.current = contentBounds;
     dragRef.current = {
       tableId,
       startX: e.clientX,
@@ -798,6 +803,9 @@ export default function CoupleSeatingCanvas() {
       }
       dragRef.current = null;
       latestDragPos.current = null;
+      // Unfreeze contentBounds after drag
+      isDraggingRef.current = false;
+      frozenBoundsRef.current = null;
     };
 
     document.addEventListener('mousemove', handleMove);
@@ -1114,8 +1122,13 @@ export default function CoupleSeatingCanvas() {
     return { zoneStats, rsvpByTable, dietaryCounts };
   }, [tables, guests]);
 
+  // Sub-linear text scale: small tables get proportionally larger text for readability
+  const textScale = useMemo(() => Math.pow(tableSizeScale, 0.6), [tableSizeScale]);
+  const showGuestLabels = tableSizeScale >= 0.4;
+
   // ======== Content Bounds (dynamic virtual canvas) ========
-  const contentBounds = useMemo(() => {
+  // During drag, return frozen bounds to prevent wrapper div from resizing every frame
+  const rawBounds = useMemo(() => {
     if (tables.length === 0) return { w: 800, h: 500 };
     let maxX = 0, maxY = 0;
     tables.forEach(t => {
@@ -1128,6 +1141,13 @@ export default function CoupleSeatingCanvas() {
     });
     return { w: Math.max(maxX + 40, 400), h: Math.max(maxY + 40, 300) };
   }, [tables, tableSizeScale]);
+
+  const contentBounds = useMemo(() => {
+    if (isDraggingRef.current && frozenBoundsRef.current) {
+      return frozenBoundsRef.current;
+    }
+    return rawBounds;
+  }, [rawBounds]);
 
   // ======== Auto-Fit Scale ========
   const autoFitScale = useCallback(() => {
@@ -1390,7 +1410,7 @@ export default function CoupleSeatingCanvas() {
                 <button
                   type="button"
                   onClick={() => {
-                    const next = Math.max(50, Math.round(tableSizeScale * 100) - 10);
+                    const next = Math.max(20, Math.round(tableSizeScale * 100) - 10);
                     setTableSizeScale(next / 100);
                   }}
                   className="p-1 rounded-md hover:bg-charcoal-ink/[0.06] text-charcoal-ink/35 hover:text-charcoal-ink active:scale-90 transition-all cursor-pointer"
@@ -1406,7 +1426,7 @@ export default function CoupleSeatingCanvas() {
               onValueCommit={() => {
                 requestAnimationFrame(() => autoFitScale());
               }}
-              min={50}
+              min={20}
               max={200}
               step={5}
               className="w-16 sm:w-24"
@@ -1434,11 +1454,11 @@ export default function CoupleSeatingCanvas() {
               value={Math.round(tableSizeScale * 100)}
               onChange={(e) => {
                 const v = parseInt(e.target.value, 10);
-                if (!isNaN(v)) setTableSizeScale(Math.max(50, Math.min(200, v)) / 100);
+                if (!isNaN(v)) setTableSizeScale(Math.max(20, Math.min(200, v)) / 100);
               }}
               onBlur={(e) => {
                 const v = parseInt(e.target.value, 10);
-                if (isNaN(v) || v < 50) setTableSizeScale(0.5);
+                if (isNaN(v) || v < 20) setTableSizeScale(0.2);
                 else if (v > 200) setTableSizeScale(2);
                 else setTableSizeScale(v / 100);
                 requestAnimationFrame(() => autoFitScale());
@@ -1770,16 +1790,16 @@ export default function CoupleSeatingCanvas() {
                         }`}
                         style={shapeStyle}
                       >
-                        <span className={`font-bold text-charcoal-ink leading-none`} style={{ fontSize: Math.max(8, 12 * tableSizeScale) }}>
+                        <span className={`font-bold text-charcoal-ink leading-none`} style={{ fontSize: Math.max(6, 12 * textScale) }}>
                           {displayName.length > 8 ? truncate(displayName, 8) : displayName}
                         </span>
-                        <span className={`font-medium ${isOverCapacity ? 'text-red-500' : 'text-charcoal-ink/50'}`} style={{ fontSize: Math.max(7, 10 * tableSizeScale) }}>
+                        <span className={`font-medium ${isOverCapacity ? 'text-red-500' : 'text-charcoal-ink/50'}`} style={{ fontSize: Math.max(5, 10 * textScale) }}>
                           {count}/{tbl.capacity}
                         </span>
                         {tbl.zone && (
                           <span
                             className={`px-1 rounded mt-0.5 ${ZONE_COLORS[tbl.zone] || 'bg-gray-100 text-gray-600'}`}
-                            style={{ fontSize: Math.max(6, 8 * tableSizeScale) }}
+                            style={{ fontSize: Math.max(5, 8 * textScale) }}
                           >
                             {tbl.zone.replace('_', ' ')}
                           </span>
@@ -1795,14 +1815,14 @@ export default function CoupleSeatingCanvas() {
                         </div>
                       </div>
 
-                      {/* Guest labels around table — shape-aware distribution */}
-                      {tableGuests.map((guest, gi) => {
+                      {/* Guest labels around table — shape-aware distribution (hidden below 40% size) */}
+                      {showGuestLabels && tableGuests.map((guest, gi) => {
                         const dietary = getEffectiveDietary(guest);
                         const total = tableGuests.length;
 
                         // Shape-aware position calculation
                         let gx: number, gy: number;
-                        const padding = 38 * tableSizeScale;
+                        const padding = 38 * Math.pow(tableSizeScale, 0.8);
 
                         if (tbl.shape === 'oval') {
                           const angle = (gi / Math.max(total, 1)) * 2 * Math.PI - Math.PI / 2;
@@ -1854,7 +1874,7 @@ export default function CoupleSeatingCanvas() {
                                   left: gx,
                                   top: gy,
                                   transform: 'translate(-50%, -50%)',
-                                  fontSize: Math.max(7, 9 * tableSizeScale),
+                                  fontSize: Math.max(7, 9 * textScale),
                                 }}
                               >
                                 {guest.name.split(' ')[0]}
