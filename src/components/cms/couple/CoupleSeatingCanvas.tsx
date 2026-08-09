@@ -1141,10 +1141,12 @@ export default function CoupleSeatingCanvas() {
     if (cw === 0 || ch === 0) return;
     const scaleX = cw / contentBounds.w;
     const scaleY = ch / contentBounds.h;
-    const fit = Math.min(scaleX, scaleY) * 100;
-    setCanvasScale(Math.max(30, Math.min(200, Math.round(fit / 5) * 5)));
-    setPanX(0);
-    setPanY(0);
+    const fit = Math.min(scaleX, scaleY);
+    const scale = Math.max(0.3, Math.min(2, Math.round(fit * 20) / 20));
+    setCanvasScale(Math.round(scale * 100));
+    // Center content in viewport using pan (transformOrigin is '0 0')
+    setPanX(Math.round((cw - contentBounds.w * scale) / 2));
+    setPanY(Math.round((ch - contentBounds.h * scale) / 2));
   }, [contentBounds]);
 
   const initialFitDoneRef = useRef(false);
@@ -1173,7 +1175,9 @@ export default function CoupleSeatingCanvas() {
         {/* ======== SECTION 1: CANVAS AREA (top) ======== */}
         <div className="flex flex-col gap-2 min-w-0"> 
           {/* Toolbar */}
-          <div className="flex items-center gap-2 px-1 flex-wrap">
+          <div className="flex items-center gap-1.5 px-1.5 py-1.5 flex-wrap">
+            {/* ── History & View ── */}
+            <div className="flex items-center gap-0.5 rounded-lg bg-charcoal-ink/[0.03] p-0.5">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -1181,7 +1185,7 @@ export default function CoupleSeatingCanvas() {
                   size="sm"
                   onClick={handleUndo}
                   disabled={!canUndo}
-                  className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5 disabled:opacity-30"
+                  className="h-7 px-2 text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06] active:scale-95 disabled:opacity-30 transition-all"
                 >
                   <Undo2 className="size-3.5" />
                 </Button>
@@ -1196,7 +1200,7 @@ export default function CoupleSeatingCanvas() {
                   size="sm"
                   onClick={handleRedo}
                   disabled={!canRedo}
-                  className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5 disabled:opacity-30"
+                  className="h-7 px-2 text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06] active:scale-95 disabled:opacity-30 transition-all"
                 >
                   <Redo2 className="size-3.5" />
                 </Button>
@@ -1210,7 +1214,7 @@ export default function CoupleSeatingCanvas() {
                   variant="ghost"
                   size="sm"
                   onClick={autoFitScale}
-                  className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5"
+                  className="h-7 px-2 text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06] active:scale-95 transition-all"
                 >
                   <Maximize className="size-3.5" />
                 </Button>
@@ -1225,21 +1229,28 @@ export default function CoupleSeatingCanvas() {
                   size="sm"
                   onClick={handleRenumber}
                   disabled={tables.length === 0}
-                  className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5 disabled:opacity-30"
+                  className="h-7 px-2 text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06] active:scale-95 disabled:opacity-30 transition-all"
                 >
                   <ArrowDownUp className="size-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Renumber tables by position</TooltipContent>
             </Tooltip>
+            </div>
 
+            {/* ── Canvas Options ── */}
+            <div className="flex items-center gap-0.5 rounded-lg bg-charcoal-ink/[0.03] p-0.5">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setCanvasLocked(!canvasLocked)}
-                  className={`h-8 px-2 ${canvasLocked ? 'text-cinematic-gold bg-cinematic-gold/5' : 'text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5'}`}
+                  className={`h-7 px-2 transition-all active:scale-95 ${
+                    canvasLocked
+                      ? 'text-cinematic-gold bg-cinematic-gold/10 hover:bg-cinematic-gold/15'
+                      : 'text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06]'
+                  }`}
                 >
                   {canvasLocked ? <Lock className="size-3.5" /> : <Unlock className="size-3.5" />}
                 </Button>
@@ -1253,21 +1264,26 @@ export default function CoupleSeatingCanvas() {
                   variant="ghost"
                   size="sm"
                   onClick={() => setGridSnap(!gridSnap)}
-                  className={`h-8 px-2 ${gridSnap ? 'text-cinematic-gold bg-cinematic-gold/5' : 'text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5'}`}
+                  className={`h-7 px-2 transition-all active:scale-95 ${
+                    gridSnap
+                      ? 'text-cinematic-gold bg-cinematic-gold/10 hover:bg-cinematic-gold/15'
+                      : 'text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06]'
+                  }`}
                 >
                   <Grid3x3 className="size-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>{gridSnap ? 'Disable grid snap' : 'Enable grid snap (20px)'}</TooltipContent>
             </Tooltip>
+            </div>
 
-            <div className="w-px h-5 bg-champagne-silk mx-1" />
-
+            {/* ── Floor Plan ── */}
+            <div className="flex items-center gap-0.5 rounded-lg bg-charcoal-ink/[0.03] p-0.5">
             <label
-              className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium cursor-pointer transition-colors duration-150 ${
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium cursor-pointer transition-all duration-150 active:scale-[0.97] ${
                 floorPlanUrl
-                  ? 'text-cinematic-gold bg-cinematic-gold/5'
-                  : 'text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5'
+                  ? 'text-cinematic-gold bg-cinematic-gold/10 hover:bg-cinematic-gold/15'
+                  : 'text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06]'
               }`}
             >
               <ImagePlus className="size-3.5" />
@@ -1288,7 +1304,7 @@ export default function CoupleSeatingCanvas() {
                     variant="ghost"
                     size="sm"
                     onClick={handleFloorPlanRemove}
-                    className="h-8 px-2 text-red-400 hover:text-red-600 hover:bg-red-50"
+                    className="h-7 px-2 text-red-400/70 hover:text-red-500 hover:bg-red-50 active:scale-95 transition-all"
                   >
                     <ImageOff className="size-3.5" />
                   </Button>
@@ -1296,52 +1312,150 @@ export default function CoupleSeatingCanvas() {
                 <TooltipContent>Remove floor plan</TooltipContent>
               </Tooltip>
             )}
+            </div>
 
-            <div className="w-px h-5 bg-champagne-silk mx-1" />
-
-            <ZoomOut className="size-3.5 text-charcoal-ink/40 shrink-0" />
+            {/* ── Zoom ── */}
+            <div className="flex items-center gap-1 rounded-lg bg-charcoal-ink/[0.03] px-1 py-0.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => setCanvasScale((s) => Math.max(30, s - 10))}
+                  className="p-1 rounded-md hover:bg-charcoal-ink/[0.06] text-charcoal-ink/35 hover:text-charcoal-ink active:scale-90 transition-all cursor-pointer"
+                >
+                  <ZoomOut className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Zoom out</TooltipContent>
+            </Tooltip>
             <Slider
               value={[canvasScale]}
               onValueChange={(v) => setCanvasScale(v[0])}
               min={30}
               max={200}
-              step={10}
-              className="w-24 sm:w-32"
+              step={5}
+              className="w-20 sm:w-28"
             />
-            <ZoomIn className="size-3.5 text-charcoal-ink/40 shrink-0" />
-            <span className="text-[10px] text-charcoal-ink/50 font-medium w-8 text-right">{canvasScale}%</span>
-
-            <div className="w-px h-5 bg-champagne-silk mx-1" />
-
-            {/* Table Size slider */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="flex items-center gap-1 shrink-0">
-                  <Ruler className="size-3.5 text-charcoal-ink/40" />
-                  <Slider
-                    value={[tableSizeScale * 100]}
-                    onValueChange={(v) => {
-                      const newScale = v[0] / 100;
-                      setTableSizeScale(newScale);
-                    }}
-                    onValueCommit={() => {
-                      // Re-fit viewport after table size change
-                      requestAnimationFrame(() => autoFitScale());
-                    }}
-                    min={50}
-                    max={200}
-                    step={10}
-                    className="w-20 sm:w-28"
-                  />
-                  <span className="text-[10px] text-charcoal-ink/50 font-medium w-8 text-right">{Math.round(tableSizeScale * 100)}%</span>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setCanvasScale((s) => Math.min(200, s + 10))}
+                  className="p-1 rounded-md hover:bg-charcoal-ink/[0.06] text-charcoal-ink/35 hover:text-charcoal-ink active:scale-90 transition-all cursor-pointer"
+                >
+                  <ZoomIn className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Zoom in</TooltipContent>
+            </Tooltip>
+            <div className="flex items-center">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={canvasScale}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (!isNaN(v)) setCanvasScale(Math.max(30, Math.min(200, v)));
+              }}
+              onBlur={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (isNaN(v) || v < 30) setCanvasScale(30);
+                else if (v > 200) setCanvasScale(200);
+                else setCanvasScale(v);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+              }}
+              className="w-9 text-[10px] text-charcoal-ink/50 font-medium text-right bg-transparent border border-transparent focus:border-champagne-silk/60 focus:bg-white focus:ring-1 focus:ring-champagne-silk/20 rounded-md px-1 py-0.5 outline-none tabular-nums transition-all"
+            />
+            <span className="text-[10px] text-charcoal-ink/25 ml-0.5">%</span>
+            </div>
+            </div>
+
+            {/* ── Table Size ── */}
+            <div className="flex items-center gap-1 rounded-lg bg-charcoal-ink/[0.03] px-1 py-0.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="p-1 rounded-md hover:bg-charcoal-ink/[0.06] text-charcoal-ink/35 hover:text-charcoal-ink active:scale-90 transition-all cursor-pointer"
+                >
+                  <Ruler className="size-3.5" />
+                </button>
               </TooltipTrigger>
               <TooltipContent>Table size (visual only)</TooltipContent>
             </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = Math.max(50, Math.round(tableSizeScale * 100) - 10);
+                    setTableSizeScale(next / 100);
+                  }}
+                  className="p-1 rounded-md hover:bg-charcoal-ink/[0.06] text-charcoal-ink/35 hover:text-charcoal-ink active:scale-90 transition-all cursor-pointer"
+                >
+                  <ZoomOut className="size-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Smaller tables</TooltipContent>
+            </Tooltip>
+            <Slider
+              value={[Math.round(tableSizeScale * 100)]}
+              onValueChange={(v) => setTableSizeScale(v[0] / 100)}
+              onValueCommit={() => {
+                requestAnimationFrame(() => autoFitScale());
+              }}
+              min={50}
+              max={200}
+              step={5}
+              className="w-16 sm:w-24"
+            />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = Math.min(200, Math.round(tableSizeScale * 100) + 10);
+                    setTableSizeScale(next / 100);
+                    requestAnimationFrame(() => autoFitScale());
+                  }}
+                  className="p-1 rounded-md hover:bg-charcoal-ink/[0.06] text-charcoal-ink/35 hover:text-charcoal-ink active:scale-90 transition-all cursor-pointer"
+                >
+                  <ZoomIn className="size-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Larger tables</TooltipContent>
+            </Tooltip>
+            <div className="flex items-center">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={Math.round(tableSizeScale * 100)}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (!isNaN(v)) setTableSizeScale(Math.max(50, Math.min(200, v)) / 100);
+              }}
+              onBlur={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (isNaN(v) || v < 50) setTableSizeScale(0.5);
+                else if (v > 200) setTableSizeScale(2);
+                else setTableSizeScale(v / 100);
+                requestAnimationFrame(() => autoFitScale());
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
+              className="w-9 text-[10px] text-charcoal-ink/50 font-medium text-right bg-transparent border border-transparent focus:border-champagne-silk/60 focus:bg-white focus:ring-1 focus:ring-champagne-silk/20 rounded-md px-1 py-0.5 outline-none tabular-nums transition-all"
+            />
+            <span className="text-[10px] text-charcoal-ink/25 ml-0.5">%</span>
+            </div>
+            </div>
 
-            <div className="w-px h-5 bg-champagne-silk mx-1" />
-
-            {/* Add Table dropdown */}
+            {/* ── Add & Export ── */}
+            <div className="flex items-center gap-0.5 rounded-lg bg-charcoal-ink/[0.03] p-0.5">
             <DropdownMenu>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -1349,7 +1463,7 @@ export default function CoupleSeatingCanvas() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5"
+                      className="h-7 px-2 text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06] active:scale-95 transition-all"
                     >
                       <Plus className="size-3.5" />
                       <ChevronsUpDown className="size-2" />
@@ -1366,7 +1480,6 @@ export default function CoupleSeatingCanvas() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Export buttons */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -1374,7 +1487,7 @@ export default function CoupleSeatingCanvas() {
                   size="sm"
                   onClick={handleExportPng}
                   disabled={exporting}
-                  className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5"
+                  className="h-7 px-2 text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06] active:scale-95 disabled:opacity-30 transition-all"
                 >
                   {exporting ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
                 </Button>
@@ -1388,7 +1501,7 @@ export default function CoupleSeatingCanvas() {
                   variant="ghost"
                   size="sm"
                   onClick={() => setPrintDialogOpen(true)}
-                  className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5"
+                  className="h-7 px-2 text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06] active:scale-95 transition-all"
                 >
                   <Printer className="size-3.5" />
                 </Button>
@@ -1402,21 +1515,24 @@ export default function CoupleSeatingCanvas() {
                   variant="ghost"
                   size="sm"
                   onClick={handleExportCsv}
-                  className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5"
+                  className="h-7 px-2 text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06] active:scale-95 transition-all"
                 >
                   <FileDown className="size-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Export CSV</TooltipContent>
             </Tooltip>
+            </div>
 
+            {/* ── Guest Actions ── */}
+            <div className="flex items-center gap-0.5 rounded-lg bg-cinematic-gold/[0.06] p-0.5">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => { setEditingGuest(null); setGuestFormOpen(true); }}
-                  className="h-8 px-2 text-charcoal-ink/50 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
+                  className="h-7 px-2 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/10 active:scale-95 transition-all"
                 >
                   <UserPlus className="size-3.5" />
                   <span className="hidden xl:inline text-xs ml-1.5">Add Guest</span>
@@ -1431,7 +1547,7 @@ export default function CoupleSeatingCanvas() {
                   variant="ghost"
                   size="sm"
                   onClick={() => setGuestListOpen(true)}
-                  className="h-8 px-2 text-charcoal-ink/50 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
+                  className="h-7 px-2 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/10 active:scale-95 transition-all"
                 >
                   <List className="size-4" />
                   <span className="hidden xl:inline text-xs ml-1.5">Guest List</span>
@@ -1439,28 +1555,29 @@ export default function CoupleSeatingCanvas() {
               </TooltipTrigger>
               <TooltipContent>Full Guest List</TooltipContent>
             </Tooltip>
+            </div>
           </div>
 
           {/* Capacity Overview Bar */}
-          <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-champagne-silk bg-paper-cream/50 text-xs text-charcoal-ink/70 flex-wrap">
-            <span className="font-medium text-charcoal-ink/60"><UsersRound className="size-3 inline mr-1" />{totalSeats} seats</span>
-            <span className="text-charcoal-ink/30">|</span>
-            <span className="text-emerald-600"><CheckCircle2 className="size-3 inline mr-0.5" />{assignedCount} assigned</span>
-            <span className="text-charcoal-ink/30">|</span>
-            <span className="text-amber-600"><Clock className="size-3 inline mr-0.5" />{remainingSeats} remaining</span>
-            <span className="text-charcoal-ink/30">|</span>
-            <span className="text-charcoal-ink/50">{unassignedGuests.length} unassigned</span>
+          <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-champagne-silk/60 bg-paper-cream/40 text-xs text-charcoal-ink/60 flex-wrap">
+            <span className="font-medium text-charcoal-ink/50 flex items-center gap-1"><UsersRound className="size-3" />{totalSeats} seats</span>
+            <span className="text-charcoal-ink/15">·</span>
+            <span className="text-emerald-600/80 flex items-center gap-1"><CheckCircle2 className="size-3" />{assignedCount} assigned</span>
+            <span className="text-charcoal-ink/15">·</span>
+            <span className="text-amber-600/80 flex items-center gap-1"><Clock className="size-3" />{remainingSeats} remaining</span>
+            <span className="text-charcoal-ink/15">·</span>
+            <span className="text-charcoal-ink/40">{unassignedGuests.length} unassigned</span>
             <div className="flex-1 min-w-[80px]">
-              <div className="w-full h-1.5 rounded-full bg-charcoal-ink/5 overflow-hidden">
+              <div className="w-full h-1.5 rounded-full bg-charcoal-ink/[0.04] overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all duration-500 ${
+                  className={`h-full rounded-full transition-all duration-500 ease-out ${
                     fillPct > 90 ? 'bg-red-400' : fillPct > 70 ? 'bg-amber-400' : 'bg-emerald-400'
                   }`}
                   style={{ width: `${Math.min(fillPct, 100)}%` }}
                 />
               </div>
             </div>
-            <span className={`font-semibold text-[10px] ${
+            <span className={`font-semibold tabular-nums text-[10px] ${
               fillPct > 90 ? 'text-red-500' : fillPct > 70 ? 'text-amber-500' : 'text-emerald-500'
             }`}>{fillPct}%</span>
             <Button
@@ -1468,7 +1585,7 @@ export default function CoupleSeatingCanvas() {
               size="sm"
               onClick={() => setSmartAssignOpen(true)}
               disabled={autoAssigning}
-              className="h-7 px-2 text-[11px] font-medium text-cinematic-gold hover:bg-cinematic-gold/10 ml-auto"
+              className="h-7 px-2.5 text-[11px] font-medium text-cinematic-gold hover:bg-cinematic-gold/10 active:scale-95 transition-all ml-auto rounded-md"
             >
               {autoAssigning ? <Loader2 className="size-3 animate-spin mr-1" /> : <Wand2 className="size-3 mr-1" />}
               Smart Assign
@@ -1565,7 +1682,7 @@ export default function CoupleSeatingCanvas() {
                 <div
                   style={{
                     transform: 'translate(' + panX + 'px, ' + panY + 'px) scale(' + (canvasScale / 100) + ')',
-                    transformOrigin: 'center center',
+                    transformOrigin: '0 0',
                     width: contentBounds.w + 'px',
                     height: contentBounds.h + 'px',
                   }}
