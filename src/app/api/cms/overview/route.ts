@@ -145,7 +145,10 @@ export async function GET() {
             some: {
               guests: {
                 some: {
-                  dietary: { not: null, not: '' },
+                  AND: [
+                    { dietary: { not: null } },
+                    { dietary: { not: '' } },
+                  ],
                 },
               },
             },
