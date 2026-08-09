@@ -151,7 +151,7 @@ export default function CoupleSeatingCanvas() {
   // Phase 5: Canvas pan state
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
-  const [isPanning] = useState(false);
+  const [isPanning, setIsPanning] = useState(false);
 
   // Phase 5: Smart auto-assign state
   const [smartAssignOpen, setSmartAssignOpen] = useState(false);
@@ -508,8 +508,42 @@ export default function CoupleSeatingCanvas() {
 
   // ======== Canvas Pan Handler ========
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
+    // Pan with left-click in pan mode, or middle-click always
+    if (isPanning && e.button === 0) {
+      e.preventDefault();
+      e.stopPropagation();
+      panRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        origPanX: panX,
+        origPanY: panY,
+      };
+      document.body.style.cursor = 'grabbing';
+      document.body.style.userSelect = 'none';
+
+      const handleMove = (ev: MouseEvent) => {
+        if (!panRef.current) return;
+        const scale = canvasScale / 100;
+        const dx = (ev.clientX - panRef.current.startX) / scale;
+        const dy = (ev.clientY - panRef.current.startY) / scale;
+        setPanX(panRef.current.origPanX + dx);
+        setPanY(panRef.current.origPanY + dy);
+      };
+
+      const handleUp = () => {
+        panRef.current = null;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        document.removeEventListener('mousemove', handleMove);
+        document.removeEventListener('mouseup', handleUp);
+      };
+
+      document.addEventListener('mousemove', handleMove);
+      document.addEventListener('mouseup', handleUp);
+      return;
+    }
     if (e.button === 1) {
-      // Middle mouse button
+      // Middle mouse button always pans
       e.preventDefault();
       panRef.current = {
         startX: e.clientX,
@@ -536,7 +570,7 @@ export default function CoupleSeatingCanvas() {
       document.addEventListener('mousemove', handleMove);
       document.addEventListener('mouseup', handleUp);
     }
-  }, [panX, panY, canvasScale]);
+  }, [panX, panY, canvasScale, isPanning]);
 
   // ======== Batch Operations ========
   const handleBatchDelete = useCallback(async () => {
@@ -809,7 +843,7 @@ export default function CoupleSeatingCanvas() {
   const latestDragPos = useRef<{ posX: number; posY: number } | null>(null);
 
   const handleDragStart = (e: React.MouseEvent, tableId: string) => {
-    if (canvasLocked) return;
+    if (canvasLocked || isPanning) return;
     e.preventDefault();
     const tbl = tables.find((t) => t.id === tableId);
     if (!tbl) return;
@@ -1304,6 +1338,24 @@ export default function CoupleSeatingCanvas() {
               </TooltipTrigger>
               <TooltipContent>{gridSnap ? 'Disable grid snap' : 'Enable grid snap (20px)'}</TooltipContent>
             </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsPanning(!isPanning)}
+                  className={`h-7 px-2 transition-all active:scale-95 ${
+                    isPanning
+                      ? 'text-cinematic-gold bg-cinematic-gold/10 hover:bg-cinematic-gold/15'
+                      : 'text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06]'
+                  }`}
+                >
+                  <Move className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{isPanning ? 'Exit grab mode' : 'Grab & move canvas'}</TooltipContent>
+            </Tooltip>
             </div>
 
             {/* ── Floor Plan ── */}
@@ -1686,7 +1738,7 @@ export default function CoupleSeatingCanvas() {
           {/* Canvas */}
           <div
             ref={canvasRef}
-            className="relative h-[58vh] min-h-[400px] border border-champagne-silk rounded-lg bg-[radial-gradient(circle,_#d4d4d4_1px,_transparent_1px)] [background-size:20px_20px] overflow-hidden"
+            className={`relative h-[58vh] min-h-[400px] border border-champagne-silk rounded-lg bg-[radial-gradient(circle,_#d4d4d4_1px,_transparent_1px)] [background-size:20px_20px] overflow-hidden ${isPanning ? 'cursor-grab' : ''}`}
             onMouseDown={handleCanvasMouseDown}
             onWheel={(e) => {
               if (canvasLocked) return;
@@ -1695,6 +1747,7 @@ export default function CoupleSeatingCanvas() {
               setCanvasScale((s) => Math.max(30, Math.min(200, s + delta)));
             }}
             onClick={(e) => {
+              if (isPanning) return;
               if (e.target === e.currentTarget) {
                 if (reassigningGuestId) setReassigningGuestId(null);
                 setSelectedTableId(null);
