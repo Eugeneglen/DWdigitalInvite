@@ -193,16 +193,6 @@ export default function HomePage() {
             )}
           </div>
 
-          {/* Bottom gradient overlay — ensures text readability on busy images */}
-          <div
-            className="absolute inset-0 z-[1] pointer-events-none"
-            style={{
-              background: heroContrast.isDark
-                ? 'linear-gradient(to bottom, rgba(0,0,0,0) 30%, rgba(0,0,0,0.55) 100%)'
-                : 'linear-gradient(to bottom, rgba(255,255,255,0) 30%, rgba(255,255,255,0.6) 100%)',
-            }}
-          />
-
           {/* Content Overlay */}
           <div className="relative z-10 w-full px-8 md:px-24 pb-20 md:pb-32 flex flex-col items-center text-center">
             {/* Master Date Badge */}

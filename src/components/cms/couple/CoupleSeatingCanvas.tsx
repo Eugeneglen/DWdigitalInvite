@@ -9,7 +9,7 @@ import {
   UserPlus, ArrowRightLeft, Ban, X, Pencil,
   Wand2, Grid3x3, Download, Printer, Copy, FileDown,
   UsersRound, CheckCircle2, Clock, ChevronsUpDown,
-  List, Undo2, Redo2, ArrowDownUp, Move, Ruler,
+  List, Undo2, Redo2, ArrowDownUp, Move, Ruler, Eye,
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import {
@@ -162,6 +162,7 @@ export default function CoupleSeatingCanvas() {
     balanceFill: true,
   });
   const [smartClearExisting, setSmartClearExisting] = useState(false);
+  const [dryRunResult, setDryRunResult] = useState<{ assigned: number; unassigned: number; tablesUsed: number; plan: { guestId: string; guestName: string; tableNum: number }[] } | null>(null);
 
   // Phase 5: Multi-select state
   const [multiSelectedIds, setMultiSelectedIds] = useState<Set<string>>(new Set());
@@ -663,9 +664,54 @@ export default function CoupleSeatingCanvas() {
   }, [tables, pushHistory, fetchTables, fetchAllGuests]);
 
   // ======== Smart Auto-Assign ========
+  const handleDryRun = useCallback(async () => {
+    try {
+      setAutoAssigning(true);
+      const res = await fetch('/api/cms/tables/auto-assign?XTransformPort=3000', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          strategies: smartStrategies,
+          clearExisting: smartClearExisting,
+          dryRun: true,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        if (res.status === 429) {
+          throw new Error('Please wait — an assignment is already in progress.');
+        }
+        const msg = Array.isArray(err.error) ? err.error.map((e: { message?: string }) => e.message).join(', ') : err.error;
+        throw new Error(msg || 'Preview failed');
+      }
+      const data = await res.json();
+      setDryRunResult(data);
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Preview failed', variant: 'destructive' });
+    } finally {
+      setAutoAssigning(false);
+    }
+  }, [smartStrategies, smartClearExisting]);
+
   const handleSmartAssign = useCallback(async () => {
     try {
       setAutoAssigning(true);
+
+      // Capacity hard-stop warning
+      if (unassignedGuests.length > remainingSeats) {
+        const ok = await confirm(
+          'Not Enough Seats',
+          `You have ${unassignedGuests.length} unassigned guests but only ${remainingSeats} remaining seats. Some guests will not be assigned. Continue anyway?`,
+        );
+        if (!ok) {
+          setAutoAssigning(false);
+          return;
+        }
+      }
+
+      // Save undo snapshot before assigning
+      pushHistory('Smart Assign');
+
       const res = await fetch('/api/cms/tables/auto-assign?XTransformPort=3000', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -676,9 +722,14 @@ export default function CoupleSeatingCanvas() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Smart assign failed');
+        if (res.status === 429) {
+          throw new Error('Please wait — an assignment is already in progress.');
+        }
+        const msg = Array.isArray(err.error) ? err.error.map((e: { message?: string }) => e.message).join(', ') : err.error;
+        throw new Error(msg || 'Smart assign failed');
       }
       const data = await res.json();
+      setDryRunResult(null);
       await fetchAllGuests();
       await fetchTables();
       setSmartAssignOpen(false);
@@ -691,7 +742,7 @@ export default function CoupleSeatingCanvas() {
     } finally {
       setAutoAssigning(false);
     }
-  }, [smartStrategies, smartClearExisting, fetchAllGuests, fetchTables]);
+  }, [smartStrategies, smartClearExisting, fetchAllGuests, fetchTables, pushHistory, unassignedGuests.length, remainingSeats, confirm]);
 
   // Populate edit fields when a table is selected
   useEffect(() => {
@@ -2631,7 +2682,7 @@ export default function CoupleSeatingCanvas() {
       </div>
 
       {/* ======== SMART ASSIGN DIALOG ======== */}
-      <Dialog open={smartAssignOpen} onOpenChange={setSmartAssignOpen}>
+      <Dialog open={smartAssignOpen} onOpenChange={(open) => { if (open) setDryRunResult(null); setSmartAssignOpen(open); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-charcoal-ink">Smart Assign</DialogTitle>
@@ -2701,6 +2752,20 @@ export default function CoupleSeatingCanvas() {
                 <p className="text-[11px] text-charcoal-ink/50">Unassign all guests before running smart assign</p>
               </div>
             </div>
+            {/* Dry-run preview results */}
+            {dryRunResult && (
+              <div className="rounded-lg border border-cinematic-gold/30 bg-cinematic-gold/5 p-3 space-y-2">
+                <p className="text-xs font-medium text-charcoal-ink">Preview Results:</p>
+                <div className="flex gap-4 text-xs text-charcoal-ink/70">
+                  <span className="text-emerald-600 font-medium">{dryRunResult.assigned} would be assigned</span>
+                  <span className="text-amber-600 font-medium">{dryRunResult.unassigned} would remain unassigned</span>
+                  <span>{dryRunResult.tablesUsed} tables used</span>
+                </div>
+                {dryRunResult.unassigned > 0 && (
+                  <p className="text-[10px] text-amber-600/70">Some guests cannot be placed — consider adding more tables or increasing capacity.</p>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button
@@ -2709,6 +2774,15 @@ export default function CoupleSeatingCanvas() {
               className="border-charcoal-ink/15 text-charcoal-ink"
             >
               Cancel
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleDryRun}
+              disabled={autoAssigning}
+              className="border-charcoal-ink/15 text-charcoal-ink"
+            >
+              <Eye className="size-4 mr-1.5" />
+              Preview
             </Button>
             <Button
               onClick={handleSmartAssign}
