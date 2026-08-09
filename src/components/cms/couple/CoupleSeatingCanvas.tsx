@@ -761,6 +761,20 @@ export default function CoupleSeatingCanvas() {
   const handleReassignGuest = async (guestId: string, newTableNum: number | null) => {
     const guest = guests.find((g) => g.id === guestId);
     if (!guest) return;
+
+    // Frontend capacity guard — block if target table is full
+    if (newTableNum != null) {
+      const table = tables.find((t) => t.tableNum === newTableNum);
+      if (table) {
+        const isSameTable = guest.tableNumber === newTableNum;
+        const currentCount = getGuestCountForTable(newTableNum) - (isSameTable ? 1 : 0);
+        if (currentCount >= table.capacity) {
+          toast({ title: 'Table Full', description: `Table ${newTableNum} has reached its capacity of ${table.capacity}.`, variant: 'destructive' });
+          return;
+        }
+      }
+    }
+
     try {
       const res = await fetch(API_BASE, {
         method: 'PUT',
@@ -2122,28 +2136,27 @@ export default function CoupleSeatingCanvas() {
                       <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-charcoal-ink/50">
                         Add Guest
                       </h4>
-                      <span className="text-[10px] text-charcoal-ink/30">{unassignedGuests.length} available</span>
+                      <span className="text-[10px] text-charcoal-ink/30">{getGuestCountForTable(selectedTable.tableNum)}/{selectedTable.capacity} seats</span>
                     </div>
-                    <Select
-                      onValueChange={(v) => {
-                        const guestId = v;
-                        const count = getGuestCountForTable(selectedTable.tableNum);
-                        if (count < selectedTable.capacity) {
-                          handleReassignGuest(guestId, selectedTable.tableNum);
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="h-8 text-xs border-charcoal-ink/10 focus:border-cinematic-gold">
-                        <SelectValue placeholder="Select a guest to add..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {unassignedGuests.map((g) => (
-                          <SelectItem key={g.id} value={g.id}>
-                            {g.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {(() => {
+                      const tableFull = getGuestCountForTable(selectedTable.tableNum) >= selectedTable.capacity;
+                      return (
+                        <Select disabled={tableFull}
+                          onValueChange={(v) => handleReassignGuest(v, selectedTable.tableNum)}
+                        >
+                          <SelectTrigger className="h-8 text-xs border-charcoal-ink/10 focus:border-cinematic-gold">
+                            <SelectValue placeholder={tableFull ? `Full (${selectedTable.capacity} seats)` : 'Select a guest to add...'} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {unassignedGuests.map((g) => (
+                              <SelectItem key={g.id} value={g.id}>
+                                {g.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      );
+                    })()}
                   </div>
                 </>
               )}
