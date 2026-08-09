@@ -9,7 +9,7 @@ import {
   UserPlus, ArrowRightLeft, Ban, X, Pencil,
   Wand2, Grid3x3, Download, Printer, Copy, FileDown,
   UsersRound, CheckCircle2, Clock, ChevronsUpDown,
-  List, Undo2, Redo2, ArrowDownUp, Move,
+  List, Undo2, Redo2, ArrowDownUp, Move, Ruler,
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import {
@@ -102,6 +102,7 @@ export default function CoupleSeatingCanvas() {
   const [tablesLoading, setTablesLoading] = useState(false);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [canvasScale, setCanvasScale] = useState(100);
+  const [tableSizeScale, setTableSizeScale] = useState(1.0);
   const [canvasLocked, setCanvasLocked] = useState(false);
   const [reassigningGuestId, setReassigningGuestId] = useState<string | null>(null);
   const [dragOverTableId, setDragOverTableId] = useState<string | null>(null);
@@ -1119,12 +1120,14 @@ export default function CoupleSeatingCanvas() {
     let maxX = 0, maxY = 0;
     tables.forEach(t => {
       const dims = TABLE_DIMS[t.shape] || TABLE_DIMS.circle;
-      const r = (Math.max(dims.w, dims.h) / 2) + 100;
-      maxX = Math.max(maxX, t.posX + dims.w + r);
-      maxY = Math.max(maxY, t.posY + dims.h + 60);
+      const sw = dims.w * tableSizeScale;
+      const sh = dims.h * tableSizeScale;
+      const r = (Math.max(sw, sh) / 2) + 100 * tableSizeScale;
+      maxX = Math.max(maxX, t.posX + sw + r);
+      maxY = Math.max(maxY, t.posY + sh + 60 * tableSizeScale);
     });
     return { w: Math.max(maxX + 40, 400), h: Math.max(maxY + 40, 300) };
-  }, [tables]);
+  }, [tables, tableSizeScale]);
 
   // ======== Auto-Fit Scale ========
   const autoFitScale = useCallback(() => {
@@ -1307,6 +1310,34 @@ export default function CoupleSeatingCanvas() {
             />
             <ZoomIn className="size-3.5 text-charcoal-ink/40 shrink-0" />
             <span className="text-[10px] text-charcoal-ink/50 font-medium w-8 text-right">{canvasScale}%</span>
+
+            <div className="w-px h-5 bg-champagne-silk mx-1" />
+
+            {/* Table Size slider */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Ruler className="size-3.5 text-charcoal-ink/40" />
+                  <Slider
+                    value={[tableSizeScale * 100]}
+                    onValueChange={(v) => {
+                      const newScale = v[0] / 100;
+                      setTableSizeScale(newScale);
+                    }}
+                    onValueCommit={() => {
+                      // Re-fit viewport after table size change
+                      requestAnimationFrame(() => autoFitScale());
+                    }}
+                    min={50}
+                    max={200}
+                    step={10}
+                    className="w-20 sm:w-28"
+                  />
+                  <span className="text-[10px] text-charcoal-ink/50 font-medium w-8 text-right">{Math.round(tableSizeScale * 100)}%</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>Table size (visual only)</TooltipContent>
+            </Tooltip>
 
             <div className="w-px h-5 bg-champagne-silk mx-1" />
 
@@ -1551,7 +1582,9 @@ export default function CoupleSeatingCanvas() {
                   )}
 
                 {tables.map((tbl) => {
-                  const dims = TABLE_DIMS[tbl.shape] || TABLE_DIMS.circle;
+                  const baseDims = TABLE_DIMS[tbl.shape] || TABLE_DIMS.circle;
+                  const scaledW = baseDims.w * tableSizeScale;
+                  const scaledH = baseDims.h * tableSizeScale;
                   const count = getGuestCountForTable(tbl.tableNum);
                   const isOverCapacity = count > tbl.capacity;
                   const isEmpty = count === 0;
@@ -1597,8 +1630,8 @@ export default function CoupleSeatingCanvas() {
                       style={{
                         left: tbl.posX,
                         top: tbl.posY,
-                        width: dims.w,
-                        height: dims.h,
+                        width: scaledW,
+                        height: scaledH,
                       }}
                     >
                       {/* Table shape */}
@@ -1620,15 +1653,16 @@ export default function CoupleSeatingCanvas() {
                         }`}
                         style={shapeStyle}
                       >
-                        <span className="text-xs font-bold text-charcoal-ink leading-none">
+                        <span className={`font-bold text-charcoal-ink leading-none`} style={{ fontSize: Math.max(8, 12 * tableSizeScale) }}>
                           {displayName.length > 8 ? truncate(displayName, 8) : displayName}
                         </span>
-                        <span className={`text-[10px] font-medium ${isOverCapacity ? 'text-red-500' : 'text-charcoal-ink/50'}`}>
+                        <span className={`font-medium ${isOverCapacity ? 'text-red-500' : 'text-charcoal-ink/50'}`} style={{ fontSize: Math.max(7, 10 * tableSizeScale) }}>
                           {count}/{tbl.capacity}
                         </span>
                         {tbl.zone && (
                           <span
-                            className={`text-[8px] px-1 rounded mt-0.5 ${ZONE_COLORS[tbl.zone] || 'bg-gray-100 text-gray-600'}`}
+                            className={`px-1 rounded mt-0.5 ${ZONE_COLORS[tbl.zone] || 'bg-gray-100 text-gray-600'}`}
+                            style={{ fontSize: Math.max(6, 8 * tableSizeScale) }}
                           >
                             {tbl.zone.replace('_', ' ')}
                           </span>
@@ -1651,36 +1685,36 @@ export default function CoupleSeatingCanvas() {
 
                         // Shape-aware position calculation
                         let gx: number, gy: number;
-                        const padding = 38;
+                        const padding = 38 * tableSizeScale;
 
                         if (tbl.shape === 'oval') {
                           const angle = (gi / Math.max(total, 1)) * 2 * Math.PI - Math.PI / 2;
-                          const rx = dims.w / 2 + padding;
-                          const ry = dims.h / 2 + padding;
-                          gx = dims.w / 2 + Math.cos(angle) * rx;
-                          gy = dims.h / 2 + Math.sin(angle) * ry;
+                          const rx = scaledW / 2 + padding;
+                          const ry = scaledH / 2 + padding;
+                          gx = scaledW / 2 + Math.cos(angle) * rx;
+                          gy = scaledH / 2 + Math.sin(angle) * ry;
                         } else if (tbl.shape === 'rectangle') {
-                          const perimeter = 2 * (dims.w + dims.h);
+                          const perimeter = 2 * (scaledW + scaledH);
                           const step = perimeter / Math.max(total, 1);
                           let dist = step * gi;
-                          if (dist < dims.w) {
+                          if (dist < scaledW) {
                             gx = dist; gy = -padding;
-                          } else if (dist < dims.w + dims.h) {
-                            gx = dims.w + padding; gy = dist - dims.w;
-                          } else if (dist < 2 * dims.w + dims.h) {
-                            gx = dims.w - (dist - dims.w - dims.h); gy = dims.h + padding;
+                          } else if (dist < scaledW + scaledH) {
+                            gx = scaledW + padding; gy = dist - scaledW;
+                          } else if (dist < 2 * scaledW + scaledH) {
+                            gx = scaledW - (dist - scaledW - scaledH); gy = scaledH + padding;
                           } else {
-                            gx = -padding; gy = dims.h - (dist - 2 * dims.w - dims.h);
+                            gx = -padding; gy = scaledH - (dist - 2 * scaledW - scaledH);
                           }
                         } else {
                           const angle = (gi / Math.max(total, 1)) * 2 * Math.PI - Math.PI / 2;
-                          const radius = dims.w / 2 + padding;
-                          gx = dims.w / 2 + Math.cos(angle) * radius;
-                          gy = dims.h / 2 + Math.sin(angle) * radius;
+                          const radius = scaledW / 2 + padding;
+                          gx = scaledW / 2 + Math.cos(angle) * radius;
+                          gy = scaledH / 2 + Math.sin(angle) * radius;
                         }
 
-                        gx = Math.max(-20, Math.min(dims.w + 20, gx));
-                        gy = Math.max(-10, Math.min(dims.h + 20, gy));
+                        gx = Math.max(-20, Math.min(scaledW + 20, gx));
+                        gy = Math.max(-10, Math.min(scaledH + 20, gy));
 
                         return (
                           <Tooltip key={guest.id}>
@@ -1694,7 +1728,7 @@ export default function CoupleSeatingCanvas() {
                                   e.stopPropagation();
                                   setDetailGuestId(guest.id);
                                 }}
-                                className={`absolute flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium whitespace-nowrap cursor-pointer transition-colors duration-150 ${
+                                className={`absolute flex items-center gap-0.5 px-1.5 py-0.5 rounded font-medium whitespace-nowrap cursor-pointer transition-colors duration-150 ${
                                   reassigningGuestId === guest.id
                                     ? 'bg-cinematic-gold text-charcoal-ink ring-2 ring-cinematic-gold/50'
                                     : 'bg-white border border-charcoal-ink/10 text-charcoal-ink/70 hover:border-cinematic-gold hover:text-charcoal-ink'
@@ -1703,6 +1737,7 @@ export default function CoupleSeatingCanvas() {
                                   left: gx,
                                   top: gy,
                                   transform: 'translate(-50%, -50%)',
+                                  fontSize: Math.max(7, 9 * tableSizeScale),
                                 }}
                               >
                                 {guest.name.split(' ')[0]}
