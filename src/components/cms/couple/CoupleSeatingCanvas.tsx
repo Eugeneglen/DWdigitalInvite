@@ -2090,12 +2090,22 @@ export default function CoupleSeatingCanvas() {
                           </span>
                         )}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleReassignGuest(g.id, null)}
-                        className="text-[10px] text-red-400 hover:text-red-600 shrink-0 underline"
-                        title="Unassign"
-                      >Remove</button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => { setEditingGuest(g); setGuestFormOpen(true); }}
+                          className="text-charcoal-ink/30 hover:text-cinematic-gold transition-colors"
+                          title="Edit guest"
+                        >
+                          <Pencil className="size-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleReassignGuest(g.id, null)}
+                          className="text-[10px] text-red-400 hover:text-red-600 underline"
+                          title="Unassign"
+                        >Remove</button>
+                      </div>
                     </div>
                   );
                 })}
