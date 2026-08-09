@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
 const contactSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -12,6 +13,16 @@ const contactSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    // Rate limit: 5 contact submissions per minute per IP
+    const ip = getClientIp(request);
+    const { success, resetAt } = rateLimit(`contact:${ip}`, 5, 60_000);
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Too many messages. Please wait a moment.', retryAfter: Math.ceil((resetAt - Date.now()) / 1000) },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil((resetAt - Date.now()) / 1000)) } }
+      );
+    }
+
     const body = await request.json();
     const parsed = contactSchema.safeParse(body);
 

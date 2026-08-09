@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from '@/hooks/use-toast';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -102,6 +103,7 @@ export default function CoupleSeatingCanvas() {
   const [tablesLoading, setTablesLoading] = useState(false);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [canvasScale, setCanvasScale] = useState(100);
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const [tableSizeScale, setTableSizeScale] = useState(1.0);
   const [canvasLocked, setCanvasLocked] = useState(false);
   const [reassigningGuestId, setReassigningGuestId] = useState<string | null>(null);
@@ -292,7 +294,8 @@ export default function CoupleSeatingCanvas() {
   const handleDeleteTable = async () => {
     const tbl = tables.find((t) => t.id === selectedTableId);
     if (!tbl) return;
-    if (!confirm(`Delete Table ${tbl.tableNum}? All guests at this table will be unassigned.`)) return;
+    const ok = await confirm(`Delete Table ${tbl.tableNum}?`, 'All guests at this table will be unassigned.');
+    if (!ok) return;
     try {
       const res = await fetch(`${TABLES_API}&id=${tbl.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to delete table');
@@ -497,7 +500,8 @@ export default function CoupleSeatingCanvas() {
   // ======== Batch Operations ========
   const handleBatchDelete = useCallback(async () => {
     if (multiSelectedIds.size === 0) return;
-    if (!confirm('Delete ' + multiSelectedIds.size + ' selected tables? All guests at these tables will be unassigned.')) return;
+    const ok = await confirm(`Delete ${multiSelectedIds.size} Tables?`, 'All guests at these tables will be unassigned.');
+    if (!ok) return;
     try {
       for (const tableId of multiSelectedIds) {
         await fetch(TABLES_API + '&id=' + tableId, { method: 'DELETE' });
@@ -658,7 +662,8 @@ export default function CoupleSeatingCanvas() {
 
   // ======== Guest CRUD (sidebar) ========
   const handleDeleteGuest = async (id: string) => {
-    if (!confirm('Delete this guest? This action cannot be undone.')) return;
+    const ok = await confirm('Delete Guest', 'This action cannot be undone. The guest will be permanently removed.');
+    if (!ok) return;
     try {
       setDeletingGuestId(id);
       const res = await fetch(`${API_BASE}&id=${encodeURIComponent(id)}`, { method: 'DELETE' });
@@ -897,65 +902,6 @@ export default function CoupleSeatingCanvas() {
       setSwapTargetTableId(null);
     } catch (err) {
       toast({ title: 'Error', description: 'Swap failed', variant: 'destructive' });
-    }
-  };
-
-  // ======== Auto-Assign ========
-  const handleAutoAssign = async () => {
-    const unassigned = guests.filter(
-      (g) => g.tableNumber == null && g.rsvpStatus !== 'DECLINED'
-    );
-    if (unassigned.length === 0) {
-      toast({ title: 'Info', description: 'No unassigned guests to place' });
-      return;
-    }
-    if (tables.length === 0) {
-      toast({ title: 'Info', description: 'No tables available' });
-      return;
-    }
-
-    setAutoAssigning(true);
-    let assigned = 0;
-
-    try {
-      // Sort tables by fill ratio descending (nearly full first)
-      const sortedTables = [...tables].sort((a, b) => {
-        const aFill = getGuestCountForTable(a.tableNum) / a.capacity;
-        const bFill = getGuestCountForTable(b.tableNum) / b.capacity;
-        return bFill - aFill;
-      });
-
-      for (const guest of unassigned) {
-        // Find first table with room
-        const target = sortedTables.find(
-          (t) => getGuestCountForTable(t.tableNum) < t.capacity
-        );
-        if (!target) break;
-
-        try {
-          const res = await fetch(API_BASE, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: guest.id, name: guest.name, tableNumber: target.tableNum }),
-          });
-          if (res.ok) {
-            assigned++;
-            // Optimistic update
-            setGuests((prev) =>
-              prev.map((g) => (g.id === guest.id ? { ...g, tableNumber: target.tableNum } : g))
-            );
-          }
-        } catch {
-          // skip this guest
-        }
-      }
-
-      await fetchAllGuests();
-      toast({ title: 'Auto-Assign Complete', description: `${assigned} guest${assigned !== 1 ? 's' : ''} assigned to tables` });
-    } catch {
-      toast({ title: 'Error', description: 'Auto-assign failed', variant: 'destructive' });
-    } finally {
-      setAutoAssigning(false);
     }
   };
 
@@ -1232,7 +1178,7 @@ export default function CoupleSeatingCanvas() {
                   <Undo2 className="size-3.5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Undo (Ctrl+Z)</TooltipContent>
+              <TooltipContent>{canUndo ? `Undo (${undoCount}) — unsaved local changes` : 'Undo (Ctrl+Z)'}</TooltipContent>
             </Tooltip>
 
             <Tooltip>
@@ -1247,7 +1193,7 @@ export default function CoupleSeatingCanvas() {
                   <Redo2 className="size-3.5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Redo (Ctrl+Y)</TooltipContent>
+              <TooltipContent>{canRedo ? `Redo (${redoCount})` : 'Redo (Ctrl+Y)'}</TooltipContent>
             </Tooltip>
 
             <Tooltip>
@@ -1701,6 +1647,12 @@ export default function CoupleSeatingCanvas() {
             ref={canvasRef}
             className="relative h-[58vh] min-h-[400px] border border-champagne-silk rounded-lg bg-[radial-gradient(circle,_#d4d4d4_1px,_transparent_1px)] [background-size:20px_20px] overflow-hidden"
             onMouseDown={handleCanvasMouseDown}
+            onWheel={(e) => {
+              if (canvasLocked) return;
+              e.preventDefault();
+              const delta = e.deltaY > 0 ? -5 : 5;
+              setCanvasScale((s) => Math.max(30, Math.min(200, s + delta)));
+            }}
             onClick={(e) => {
               if (e.target === e.currentTarget) {
                 if (reassigningGuestId) setReassigningGuestId(null);
@@ -2766,6 +2718,7 @@ export default function CoupleSeatingCanvas() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {ConfirmDialog}
     </TooltipProvider>
   );
 }

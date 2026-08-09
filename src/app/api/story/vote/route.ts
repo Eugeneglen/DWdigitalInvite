@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
 const voteSchema = z.object({
   destination: z.string().min(1, 'Destination is required'),
@@ -10,6 +11,16 @@ const voteSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    // Rate limit: 10 votes per minute per IP
+    const ip = getClientIp(request);
+    const { success, resetAt } = rateLimit(`vote:${ip}`, 10, 60_000);
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Too many votes. Please wait a moment.' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil((resetAt - Date.now()) / 1000)) } }
+      );
+    }
+
     const body = await request.json();
     const parsed = voteSchema.safeParse(body);
 

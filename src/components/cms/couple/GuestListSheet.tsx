@@ -6,6 +6,7 @@ import {
   Download, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, UtensilsCrossed,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,6 +62,7 @@ export default function GuestListSheet({ open, onOpenChange, onGuestsChanged }: 
   // --- Guest list state ---
   const [guests, setGuests] = useState<GuestItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -115,7 +117,8 @@ export default function GuestListSheet({ open, onOpenChange, onGuestsChanged }: 
 
   // ======== Guest CRUD ========
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this guest? This action cannot be undone.')) return;
+    const ok = await confirm('Delete Guest', 'This action cannot be undone. The guest will be permanently removed.');
+    if (!ok) return;
     try {
       setDeleting(id);
       const res = await fetch(`${API_BASE}&id=${encodeURIComponent(id)}`, { method: 'DELETE' });
@@ -716,6 +719,7 @@ export default function GuestListSheet({ open, onOpenChange, onGuestsChanged }: 
           onGuestsChanged();
         }}
       />
+      {ConfirmDialog}
     </>
   );
 }

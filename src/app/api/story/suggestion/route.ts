@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
 const suggestionSchema = z.object({
   name: z.string().min(1, 'Suggestion is required'),
@@ -10,6 +11,16 @@ const suggestionSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    // Rate limit: 5 suggestions per minute per IP
+    const ip = getClientIp(request);
+    const { success, resetAt } = rateLimit(`suggestion:${ip}`, 5, 60_000);
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Too many suggestions. Please wait a moment.' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil((resetAt - Date.now()) / 1000)) } }
+      );
+    }
+
     const body = await request.json();
     const parsed = suggestionSchema.safeParse(body);
 

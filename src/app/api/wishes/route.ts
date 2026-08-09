@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
 const wishSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -12,6 +13,16 @@ const wishSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    // Rate limit: 5 wishes per minute per IP
+    const ip = getClientIp(request);
+    const { success, remaining, resetAt } = rateLimit(`wish:${ip}`, 5, 60_000);
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Too many wishes. Please wait a moment.', retryAfter: Math.ceil((resetAt - Date.now()) / 1000) },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil((resetAt - Date.now()) / 1000)) } }
+      );
+    }
+
     const body = await request.json();
     const parsed = wishSchema.safeParse(body);
 
@@ -84,8 +95,13 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const weddingId = searchParams.get('weddingId');
 
+    // Require weddingId — don't allow dumping all wishes across weddings
+    if (!weddingId) {
+      return NextResponse.json({ error: 'weddingId is required' }, { status: 400 });
+    }
+
     const wishes = await db.wish.findMany({
-      where: weddingId ? { weddingId } : undefined,
+      where: { weddingId },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
