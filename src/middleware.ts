@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import { resolveSecret } from '@/lib/auth';
 
 // Role prefixes that grant admin access
 const ADMIN_ROLE_PREFIXES = ['SUPER_ADMIN', 'CONSULTANT', 'SUPPORT'];
@@ -15,8 +14,9 @@ export async function middleware(request: NextRequest) {
 
   if (!isAdmin && !isWorkspace) return NextResponse.next();
 
-  // Read JWT cookie without full session — lightweight check
-  const secret = resolveSecret();
+  // Read NEXTAUTH_SECRET directly from env (Edge Runtime compatible —
+  // cannot import @/lib/auth which uses Node.js fs/path/process.cwd APIs)
+  const secret = process.env.NEXTAUTH_SECRET;
   if (!secret) return NextResponse.next(); // Let the page handle missing secret
 
   const token = await getToken({
