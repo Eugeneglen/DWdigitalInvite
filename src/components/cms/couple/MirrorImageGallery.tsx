@@ -295,7 +295,7 @@ export default function MirrorImageGallery({
         </DialogContent>
       </Dialog>
 
-      <ConfirmDialog />
+      {ConfirmDialog}
 
       {/* Hidden file input */}
       <input

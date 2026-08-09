@@ -695,7 +695,7 @@ export default function CoupleSchedule() {
           </Button>
         </div>
       )}
-      <ConfirmDialog />
+      {ConfirmDialog}
     </div>
   );
 }

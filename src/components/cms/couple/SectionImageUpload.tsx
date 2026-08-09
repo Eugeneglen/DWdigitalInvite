@@ -288,7 +288,7 @@ export default function SectionImageUpload({ category, label, maxImages }: Secti
         </DialogContent>
       </Dialog>
 
-      <ConfirmDialog />
+      {ConfirmDialog}
 
       {/* Hidden file input */}
       <input

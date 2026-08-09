@@ -383,7 +383,7 @@ export default function CoupleTeam() {
           </form>
         </DialogContent>
       </Dialog>
-      <ConfirmDialog />
+      {ConfirmDialog}
     </div>
   );
 }

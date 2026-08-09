@@ -299,7 +299,7 @@ export default function CoupleWishes() {
         description="Customise the section header and form labels"
         fields={WISHES_CONTENT_FIELDS}
       />
-      <ConfirmDialog />
+      {ConfirmDialog}
     </div>
   );
 }

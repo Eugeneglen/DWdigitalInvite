@@ -410,7 +410,7 @@ export default function CoupleFAQs() {
         description="Customise the section header and contact information"
         fields={QA_CONTENT_FIELDS}
       />
-      <ConfirmDialog />
+      {ConfirmDialog}
     </div>
   );
 }

@@ -1049,7 +1049,7 @@ export default function CoupleStory() {
           </Button>
         </div>
       )}
-      <ConfirmDialog />
+      {ConfirmDialog}
     </div>
   );
 }

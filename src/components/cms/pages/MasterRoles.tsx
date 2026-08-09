@@ -435,7 +435,7 @@ export default function MasterRoles() {
           </form>
         </DialogContent>
       </Dialog>
-      <ConfirmDialog />
+      {ConfirmDialog}
     </div>
   );
 }

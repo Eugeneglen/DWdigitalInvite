@@ -428,7 +428,7 @@ function SimpleImageGallery({ media, onAdd, onRemove, maxImages, aspectClass, la
           )}
         </DialogContent>
       </Dialog>
-      <GalleryConfirmDialog />
+      {GalleryConfirmDialog}
     </div>
   );
 }
@@ -2452,7 +2452,7 @@ export default function TemplateEditor() {
           </div>
         </div>
       )}
-      <ConfirmDialog />
+      {ConfirmDialog}
     </div>
   );
 }
