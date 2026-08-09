@@ -5,10 +5,23 @@ import { getFilePathFromUrl, IS_VOLUME_STORAGE } from '@/lib/file-storage';
 
 const LOCAL_UPLOADS_ROOT = path.join(process.cwd(), 'public', 'uploads');
 
+/** 1×1 transparent PNG — returned instead of 404 so browsers cache the
+ *  "missing" response and stop hammering the network on every page load. */
+const TRANSPARENT_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQAB' +
+  'Nl7BcQAAAABJRU5ErkJggg==',
+  'base64',
+);
+
 /**
  * GET /api/uploads/[...path]
  *
  * Serves uploaded files. Works for both volume storage (Railway) and local public/ storage.
+ *
+ * IMPORTANT: When a file is not found, returns 200 with a 1×1 transparent PNG
+ * (with a short cache header) instead of 404. This prevents browsers from
+ * retrying broken URLs on every navigation/remount, which was causing a
+ * persistent 404 storm in network logs for images lost after Railway deploys.
  */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path: pathSegments } = await params;
@@ -23,7 +36,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ pat
   }
 
   if (!filePath) {
-    return new NextResponse('Not found', { status: 404 });
+    return transparentResponse();
   }
 
   const resolvedPath = path.resolve(filePath);
@@ -34,6 +47,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ pat
 
   try {
     let data: Buffer;
+    let servedPath = resolvedPath;
     try {
       data = await fs.readFile(resolvedPath);
     } catch {
@@ -44,12 +58,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ pat
       if (secondExt && secondExt === ext) {
         const fallbackPath = resolvedPath.slice(0, -ext.length);
         data = await fs.readFile(fallbackPath);
+        servedPath = fallbackPath;
       } else {
-        throw new Error('not found');
+        return transparentResponse();
       }
     }
 
-    const finalExt = path.extname(resolvedPath).toLowerCase();
+    const finalExt = path.extname(servedPath).toLowerCase();
     const contentTypes: Record<string, string> = {
       '.jpg': 'image/jpeg',
       '.jpeg': 'image/jpeg',
@@ -65,7 +80,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ pat
     };
     const contentType = contentTypes[finalExt] || 'application/octet-stream';
 
-    return new NextResponse(data, {
+    return new NextResponse(new Uint8Array(data), {
       status: 200,
       headers: {
         'Content-Type': contentType,
@@ -73,6 +88,17 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ pat
       },
     });
   } catch {
-    return new NextResponse('File not found', { status: 404 });
+    return transparentResponse();
   }
+}
+
+/** Return a cached transparent 1×1 PNG instead of 404. */
+function transparentResponse(): NextResponse {
+  return new NextResponse(new Uint8Array(TRANSPARENT_PNG), {
+    status: 200,
+    headers: {
+      'Content-Type': 'image/png',
+      'Cache-Control': 'public, max-age=60, stale-while-revalidate=86400',
+    },
+  });
 }

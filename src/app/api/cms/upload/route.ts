@@ -3,10 +3,17 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { uploadFile, isMimeTypeAllowed, getMaxFileSize, type FileCategory } from '@/lib/file-storage';
+import sharp from 'sharp';
 
 // Allow up to 60 MB request body (hero video can be 50 MB + multipart overhead)
 export const maxDuration = 30;
 export const dynamic = 'force-dynamic';
+
+const MAX_DIMENSION = 2000;
+const JPEG_QUALITY = 80;
+
+/** Categories whose images should be stored as base64 in DB (survives Railway deploys). */
+const DB_STORED_CATEGORIES: FileCategory[] = ['hero', 'banner'];
 
 /**
  * POST /api/cms/upload
@@ -14,6 +21,10 @@ export const dynamic = 'force-dynamic';
  * Accepts multipart FormData with:
  *   - file: the file data
  *   - category: hero | banner | music | gallery | story | wishes | moments | schedule | couple-photo
+ *
+ * For hero (image) and banner: compresses with sharp and returns a base64 data URL
+ * that persists in the database across Railway container restarts.
+ * For hero (video) and all other categories: saves to filesystem as before.
  *
  * Returns: { url: string, fileName: string, mimeType: string, fileSize: number, category: string }
  */
@@ -66,7 +77,38 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Upload via file-storage backend
+    // ── Hero (image) and Banner: store as base64 data URL in DB ──
+    // This survives Railway container restarts (no ephemeral filesystem dependency).
+    // Hero videos and all other categories still use filesystem storage.
+    const isDbStored = DB_STORED_CATEGORIES.includes(category) && file.type.startsWith('image/');
+
+    if (isDbStored) {
+      const metadata = await sharp(buffer).metadata();
+      const { width = 0, height = 0 } = metadata;
+      const needsResize = width > MAX_DIMENSION || height > MAX_DIMENSION;
+
+      const processedBuffer = needsResize
+        ? await sharp(buffer)
+            .resize(MAX_DIMENSION, MAX_DIMENSION, { fit: 'inside', withoutEnlargement: true })
+            .jpeg({ quality: JPEG_QUALITY })
+            .toBuffer()
+        : await sharp(buffer)
+            .jpeg({ quality: JPEG_QUALITY })
+            .toBuffer();
+
+      const base64 = processedBuffer.toString('base64');
+      const dataUrl = `data:image/jpeg;base64,${base64}`;
+
+      return NextResponse.json({
+        url: dataUrl,
+        fileName: file.name,
+        mimeType: 'image/jpeg',
+        fileSize: processedBuffer.length,
+        category,
+      });
+    }
+
+    // ── All other files (hero video, gallery, music, etc.): filesystem storage ──
     const result = await uploadFile({
       weddingId: wedding.id,
       category,
