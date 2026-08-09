@@ -29,15 +29,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    try {
-      const path = await import('path');
-      const { unlink } = await import('fs/promises');
-      const filePath = path.join(process.cwd(), 'public', media.url);
-      await unlink(filePath);
-    } catch {
-      // File may not exist on disk
-    }
-
+    // No filesystem cleanup needed — media is stored as base64 in DB
     await db.mediaAsset.delete({
       where: { id },
     });

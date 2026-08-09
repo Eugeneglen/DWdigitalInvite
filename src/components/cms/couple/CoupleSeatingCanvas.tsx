@@ -183,6 +183,8 @@ export default function CoupleSeatingCanvas() {
   const frozenBoundsRef = useRef<{ w: number; h: number } | null>(null);
   const undoStackRef = useRef<HistoryEntry[]>([]);
   const redoStackRef = useRef<HistoryEntry[]>([]);
+  const [undoCount, setUndoCount] = useState(0);
+  const [redoCount, setRedoCount] = useState(0);
   const shiftHeldRef = useRef(false);
 
   // Debounce save ref
@@ -234,14 +236,28 @@ export default function CoupleSeatingCanvas() {
   // ======== Derived Data ========
   const selectedTable = tables.find((t) => t.id === selectedTableId);
 
-  const guestsAtTable = (tableNum: number) =>
-    guests.filter((g) => g.tableNumber === tableNum);
+  // O(N) pre-computed guest count map instead of O(N*M) per-table filter calls
+  const guestCountMap = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const g of guests) {
+      if (g.tableNumber != null) {
+        map.set(g.tableNumber, (map.get(g.tableNumber) ?? 0) + 1);
+      }
+    }
+    return map;
+  }, [guests]);
+
+  const getGuestCountForTable = useCallback((tableNum: number) =>
+    guestCountMap.get(tableNum) ?? 0,
+  [guestCountMap]
+  );
+
+  const guestsAtTable = useCallback((tableNum: number) =>
+    guests.filter((g) => g.tableNumber === tableNum),
+  [guests]
+  );
 
   const unassignedGuests = guests.filter((g) => g.tableNumber == null);
-
-  const getGuestCountForTable = (tableNum: number) =>
-    guests.filter((g) => g.tableNumber === tableNum).length;
-
 
   const assignedCount = guests.filter((g) => g.tableNumber != null).length;
   const totalCount = guests.length;
@@ -394,11 +410,14 @@ export default function CoupleSeatingCanvas() {
     if (undoStackRef.current.length >= 50) undoStackRef.current.shift();
     undoStackRef.current.push(entry);
     redoStackRef.current = [];
+    setUndoCount(undoStackRef.current.length);
+    setRedoCount(0);
   }, [tables, guests]);
 
   const handleUndo = useCallback(() => {
     if (undoStackRef.current.length === 0) return;
     const entry = undoStackRef.current.pop()!;
+    setUndoCount(undoStackRef.current.length);
     // Push current state to redo
     redoStackRef.current.push({
       tables: JSON.parse(JSON.stringify(tables)),
@@ -414,12 +433,14 @@ export default function CoupleSeatingCanvas() {
         return tblNum !== undefined ? { ...g, tableNumber: tblNum } : g;
       })
     );
+    setRedoCount(redoStackRef.current.length);
     toast({ title: 'Undo', description: entry.label });
   }, [tables, guests]);
 
   const handleRedo = useCallback(() => {
     if (redoStackRef.current.length === 0) return;
     const entry = redoStackRef.current.pop()!;
+    setRedoCount(redoStackRef.current.length);
     // Push current state to undo
     undoStackRef.current.push({
       tables: JSON.parse(JSON.stringify(tables)),
@@ -434,11 +455,12 @@ export default function CoupleSeatingCanvas() {
         return tblNum !== undefined ? { ...g, tableNumber: tblNum } : g;
       })
     );
+    setUndoCount(undoStackRef.current.length);
     toast({ title: 'Redo', description: entry.label });
   }, [tables, guests]);
 
-  const canUndo = undoStackRef.current.length > 0;
-  const canRedo = redoStackRef.current.length > 0;
+  const canUndo = undoCount > 0;
+  const canRedo = redoCount > 0;
 
   // ======== Canvas Pan Handler ========
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -30,9 +30,10 @@ export default function GuestFormDialog({ open, onOpenChange, editGuest, default
   const [form, setForm] = useState<GuestFormData>(emptyGuestForm);
   const [saving, setSaving] = useState(false);
 
-  // Reset form when dialog opens
-  const handleOpenChange = (nextOpen: boolean) => {
-    if (nextOpen) {
+  // Populate form when dialog opens — useEffect because Radix Dialog
+  // does NOT fire onOpenChange(true) when opened via controlled `open` prop
+  useEffect(() => {
+    if (open) {
       if (editGuest) {
         setForm({
           name: editGuest.name,
@@ -48,8 +49,7 @@ export default function GuestFormDialog({ open, onOpenChange, editGuest, default
         setForm({ ...emptyGuestForm, tableNumber: defaultTableNumber ?? '' });
       }
     }
-    onOpenChange(nextOpen);
-  };
+  }, [open, editGuest, defaultTableNumber]);
 
   const handleSave = async () => {
     if (!form.name.trim()) {
@@ -98,7 +98,7 @@ export default function GuestFormDialog({ open, onOpenChange, editGuest, default
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-charcoal-ink">

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getServerSession } from '@/lib/auth';
 import { resolveWorkspaceAccountId } from '@/lib/tenant';
+import sharp from 'sharp';
 
 export async function GET() {
   try {
@@ -12,9 +13,21 @@ export async function GET() {
       return NextResponse.json({ error: 'No account found' }, { status: 404 });
     }
 
+    // Don't return the full base64 data URL in list — too heavy.
+    // Return metadata only; the frontend loads the full URL on demand.
     const media = await db.mediaAsset.findMany({
       where: { accountId },
       orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        fileName: true,
+        originalName: true,
+        mimeType: true,
+        size: true,
+        createdAt: true,
+        // Return a truncated URL indicator so the UI knows the media exists
+        url: true,
+      },
     });
 
     return NextResponse.json({ media });
@@ -25,6 +38,8 @@ export async function GET() {
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_DIMENSION = 2000;
+const JPEG_QUALITY = 80;
 
 export async function POST(request: Request) {
   try {
@@ -56,29 +71,36 @@ export async function POST(request: Request) {
       );
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
 
-    const { writeFile, mkdir } = await import('fs/promises');
-    const path = await import('path');
+    // Resize if needed, then convert to JPEG for consistent storage
+    const metadata = await sharp(fileBuffer).metadata();
+    const needsResize = (metadata.width ?? 0) > MAX_DIMENSION || (metadata.height ?? 0) > MAX_DIMENSION;
 
-    const ext = path.extname(file.name) || `.${file.type.split('/')[1]}`;
-    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`;
+    let processedBuffer: Buffer;
+    if (needsResize) {
+      processedBuffer = await sharp(fileBuffer)
+        .resize(MAX_DIMENSION, MAX_DIMENSION, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: JPEG_QUALITY })
+        .toBuffer();
+    } else {
+      processedBuffer = await sharp(fileBuffer)
+        .jpeg({ quality: JPEG_QUALITY })
+        .toBuffer();
+    }
 
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', accountId);
-    await mkdir(uploadDir, { recursive: true });
-
-    const filePath = path.join(uploadDir, fileName);
-    await writeFile(filePath, buffer);
+    // Store as base64 data URL directly in DB (survives Railway restarts)
+    const base64 = processedBuffer.toString('base64');
+    const dataUrl = `data:image/jpeg;base64,${base64}`;
 
     const media = await db.mediaAsset.create({
       data: {
         accountId,
-        fileName,
+        fileName: `${Date.now()}.jpg`,
         originalName: file.name,
-        mimeType: file.type,
-        size: file.size,
-        url: `/uploads/${accountId}/${fileName}`,
+        mimeType: 'image/jpeg',
+        size: processedBuffer.length,
+        url: dataUrl,
         uploadedById: session?.user?.id,
       },
     });

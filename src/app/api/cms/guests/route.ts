@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { z } from 'zod/v4';
+import crypto from 'crypto';
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -25,7 +26,7 @@ const updateGuestSchema = z.object({
   email: z.string().email().optional(),
   phone: z.string().optional(),
   groupName: z.string().optional(),
-  tableNumber: z.number().int().optional(),
+  tableNumber: z.number().int().optional().nullable(),
   rsvpStatus: z.enum(['PENDING', 'ATTENDING', 'DECLINED', 'PARTIAL']).optional(),
   plusOne: z.boolean().optional(),
   plusOneName: z.string().optional(),
@@ -47,7 +48,7 @@ async function getWeddingId(userId: string): Promise<string | null> {
 }
 
 function generateInvitationCode(): string {
-  return Math.random().toString(36).substring(2, 8).toUpperCase();
+  return crypto.randomBytes(3).toString('hex').toUpperCase();
 }
 
 async function createAuditLog(
@@ -109,13 +110,15 @@ export async function GET(req: NextRequest) {
       where.groupName = group;
     }
 
-    const guests = await db.guest.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: 200,
-    });
+    const [guests, total] = await Promise.all([
+      db.guest.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+      }),
+      db.guest.count({ where }),
+    ]);
 
-    return NextResponse.json({ guests });
+    return NextResponse.json({ guests, total });
   } catch (error) {
     console.error('Get guests error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -200,7 +203,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
     }
 
-    const { id, sentVia, ...updates } = parsed.data;
+    const { id, sentVia, tableNumber, ...updates } = parsed.data;
     if (!id) {
       return NextResponse.json({ error: 'Guest ID required' }, { status: 400 });
     }
@@ -210,8 +213,28 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
+    // If assigning to a table, verify the table exists and check capacity
+    if (tableNumber !== undefined && tableNumber !== null) {
+      const table = await db.seatingTable.findFirst({
+        where: { weddingId, tableNum: tableNumber },
+        select: { capacity: true },
+      });
+      if (!table) {
+        return NextResponse.json({ error: `Table ${tableNumber} does not exist` }, { status: 400 });
+      }
+      const currentCount = await db.guest.count({
+        where: { weddingId, tableNumber, id: { not: id } },
+      });
+      if (currentCount >= table.capacity) {
+        return NextResponse.json(
+          { error: `Table ${tableNumber} is full (${currentCount}/${table.capacity})` },
+          { status: 400 }
+        );
+      }
+    }
+
     // If sentVia is provided, also set sentAt to now()
-    const data: Record<string, unknown> = { ...updates };
+    const data: Record<string, unknown> = { ...updates, tableNumber };
     if (sentVia) {
       data.sentVia = sentVia;
       data.sentAt = new Date();

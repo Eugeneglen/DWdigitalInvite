@@ -53,18 +53,26 @@ export async function GET(req: NextRequest) {
     switch (type) {
       // ── Guests (with RSVP data cross-populated) ─────────
       case 'guests': {
-        const guests = await db.guest.findMany({
-          where: { weddingId },
-          include: {
-            rsvps: {
-              orderBy: { createdAt: 'desc' },
-              take: 1, // most recent RSVP submission
-              include: { guests: true },
+        const [guests, wishCounts] = await Promise.all([
+          db.guest.findMany({
+            where: { weddingId },
+            include: {
+              rsvps: {
+                orderBy: { createdAt: 'desc' },
+                take: 1, // most recent RSVP submission
+                include: { guests: true },
+              },
             },
-            wishes: { select: { id: true, createdAt: true } },
-          },
-          orderBy: { createdAt: 'desc' },
-        });
+            orderBy: { createdAt: 'desc' },
+          }),
+          // Count wishes per guest name (Wish model has no direct Guest FK)
+          db.wish.groupBy({
+            by: ['name'],
+            where: { weddingId },
+            _count: { id: true },
+          }),
+        ]);
+        const wishMap = new Map(wishCounts.map(w => [w.name, w._count.id]));
 
         const rows: string[] = [
           csvRow([
@@ -106,7 +114,7 @@ export async function GET(req: NextRequest) {
               .filter((d: string | null): d is string => !!d)
               .join('; ') ||
             '';
-          const wishCount = g.wishes?.length ?? 0;
+          const wishCount = wishMap.get(g.name) ?? 0;
           rows.push(
             csvRow([
               g.name,
@@ -209,9 +217,15 @@ export async function GET(req: NextRequest) {
 
       // ── Wishes (with Guest data cross-populated) ─────────
       case 'wishes': {
+        // Build a name → guest lookup for optional cross-reference
+        const allGuests = await db.guest.findMany({
+          where: { weddingId },
+          select: { name: true, invitationCode: true },
+        });
+        const guestByName = new Map(allGuests.map(g => [g.name.toLowerCase(), g]));
+
         const wishes = await db.wish.findMany({
           where: { weddingId },
-          include: { guest: { select: { id: true, name: true, invitationCode: true } } },
           orderBy: { createdAt: 'desc' },
         });
 
@@ -220,11 +234,12 @@ export async function GET(req: NextRequest) {
         ];
 
         for (const w of wishes) {
+          const matchedGuest = guestByName.get(w.name.toLowerCase());
           rows.push(
             csvRow([
               w.name,
-              w.guest?.name ?? '',
-              w.guest?.invitationCode ?? '',
+              matchedGuest?.name ?? '',
+              matchedGuest?.invitationCode ?? '',
               w.relationship,
               w.message,
               w.imageUrl,

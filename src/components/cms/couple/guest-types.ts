@@ -113,14 +113,35 @@ export interface ImportResult {
 export const CSV_TEMPLATE_HEADERS = 'name,email,phone,group,tableNumber,plusOne,plusOneName,dietaryNotes';
 export const CSV_TEMPLATE_EXAMPLE = "John Smith,john@email.com,+65 9123 4567,Bride's Family,1,yes,Jane Smith,Vegetarian";
 
+/** RFC 4180 compliant CSV line parser — handles quoted fields with commas */
+function parseCSVLine(line: string): string[] {
+  const fields: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"' && line[i + 1] === '"') { current += '"'; i++; }
+      else if (ch === '"') { inQuotes = false; }
+      else { current += ch; }
+    } else {
+      if (ch === '"') { inQuotes = true; }
+      else if (ch === ',') { fields.push(current.trim()); current = ''; }
+      else { current += ch; }
+    }
+  }
+  fields.push(current.trim());
+  return fields;
+}
+
 export function parseCSV(text: string): { headers: string[]; rows: ParsedRow[] } {
   const cleanText = text.replace(/^\ufeff/, '');
   const lines = cleanText.trim().split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) return { headers: [], rows: [] };
-  const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
+  const headers = parseCSVLine(lines[0]);
   const rows: ParsedRow[] = [];
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',').map((v) => v.trim().replace(/^"|"$/g, ''));
+    const values = parseCSVLine(lines[i]);
     const row: ParsedRow = {} as ParsedRow;
     headers.forEach((h, idx) => {
       row[h] = values[idx] ?? '';

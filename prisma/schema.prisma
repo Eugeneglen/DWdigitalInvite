@@ -308,6 +308,9 @@ model Guest {
   updatedAt      DateTime        @updatedAt
 
   rsvps RSVPSubmission[]
+
+  @@index([weddingId])
+  @@index([weddingId, tableNumber])
 }
 
 // ============================================================

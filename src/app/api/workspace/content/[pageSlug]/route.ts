@@ -84,7 +84,7 @@ export async function PUT(
     )
   }
 
-  // Verify the page belongs to this account
+  // Verify the page belongs to this account AND collect valid block IDs
   const page = await db.contentPage.findUnique({
     where: {
       accountId_slug: {
@@ -92,11 +92,29 @@ export async function PUT(
         slug: pageSlug,
       },
     },
-    select: { id: true },
+    select: {
+      id: true,
+      sections: {
+        select: {
+          blocks: { select: { id: true } },
+        },
+      },
+    },
   })
 
   if (!page) {
     return NextResponse.json({ error: 'Page not found' }, { status: 404 })
+  }
+
+  // Build a set of valid block IDs owned by this account's page
+  const validBlockIds = new Set(
+    page.sections.flatMap(s => s.blocks.map(b => b.id))
+  )
+
+  // Reject any block IDs that don't belong to this page (IDOR prevention)
+  const invalidBlocks = body.blocks.filter(b => !validBlockIds.has(b.id))
+  if (invalidBlocks.length > 0) {
+    return NextResponse.json({ error: 'One or more block IDs are invalid' }, { status: 400 })
   }
 
   // Update all provided blocks in a transaction

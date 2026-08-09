@@ -62,7 +62,14 @@ export default function GuestListSheet({ open, onOpenChange, onGuestsChanged }: 
   const [guests, setGuests] = useState<GuestItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  // Debounce search to avoid API call on every keystroke
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
   const [deleting, setDeleting] = useState<string | null>(null);
 
   // --- CSV Export state ---
@@ -88,7 +95,7 @@ export default function GuestListSheet({ open, onOpenChange, onGuestsChanged }: 
       setLoading(true);
       let url = API_BASE;
       const params: string[] = [];
-      if (search) params.push(`search=${encodeURIComponent(search)}`);
+      if (debouncedSearch) params.push(`search=${encodeURIComponent(debouncedSearch)}`);
       if (statusFilter !== 'all') params.push(`status=${statusFilter}`);
       if (params.length > 0) url += '&' + params.join('&');
       const res = await fetch(url);
@@ -100,7 +107,7 @@ export default function GuestListSheet({ open, onOpenChange, onGuestsChanged }: 
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter]);
+  }, [debouncedSearch, statusFilter]);
 
   useEffect(() => {
     if (open) fetchGuests();
