@@ -1,15 +1,15 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
-  Loader2, Plus, Trash2, Pencil, Users, Search,
-  ZoomIn, ZoomOut, GripVertical, Circle, Square, CircleEllipsis,
-  AlertCircle, UtensilsCrossed, X, Lock, Unlock,
+  Loader2, Plus, Trash2, Users,
+  ZoomIn, ZoomOut, Circle, Square, RectangleHorizontal,
+  AlertCircle, UtensilsCrossed, Lock, Unlock,
   ImagePlus, ImageOff, Maximize, ChevronRight, Mail, Phone,
-  UserPlus, ArrowRightLeft, Ban,
+  UserPlus, ArrowRightLeft, Ban, X, Pencil, Search,
   Wand2, Grid3x3, Download, Printer, Copy, FileDown,
-  UsersRound, CheckCircle2, XCircle, Clock, ChevronsUpDown,
-  List, Undo2, Redo2, Hand, Tags, ChevronDown, ChevronUp,
+  UsersRound, CheckCircle2, Clock, ChevronsUpDown,
+  List, Undo2, Redo2, ArrowDownUp, Move, Ruler, Eye,
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import {
@@ -18,8 +18,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Progress } from '@/components/ui/progress';
 import { toast } from '@/hooks/use-toast';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,7 +27,8 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import {
   Dialog,
@@ -54,21 +55,22 @@ import { invalidateWeddingCache } from '@/hooks/usePublicWedding';
 import {
   API_BASE, TABLES_API, TABLE_DIMS,
   type GuestItem, type SeatingTableItem,
-  getEffectiveDietary, truncate, dietaryBadgeColor,
+  getEffectiveDietary, truncate,
 } from './guest-types';
 import GuestFormDialog from './GuestFormDialog';
 import GuestListSheet from './GuestListSheet';
 
 // ---- Constants (canvas-only) ----
 const FLOORPLAN_API = '/api/cms/floorplan?XTransformPort=3000';
+const HISTORY_API = '/api/cms/seating-history?XTransformPort=3000';
 
 const SHAPE_ICONS: Record<string, React.ReactNode> = {
   circle: <Circle className="size-3.5" />,
   rectangle: <Square className="size-3.5" />,
-  oval: <CircleEllipsis className="size-3.5" />,
+  oval: <RectangleHorizontal className="size-3.5" />,
 };
 const ZONE_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: '', label: 'None' },
+  { value: '__none__', label: 'None' },
   { value: 'VIP', label: 'VIP' },
   { value: 'BRIDE_FAMILY', label: "Bride's Family" },
   { value: 'GROOM_FAMILY', label: "Groom's Family" },
@@ -85,6 +87,13 @@ const ZONE_COLORS: Record<string, string> = {
   CUSTOM: 'bg-gray-100 text-gray-700 border-gray-300',
 };
 
+// ---- History Entry for Undo/Redo ----
+interface HistoryEntry {
+  tables: SeatingTableItem[];
+  guestTableNumbers: { guestId: string; tableNumber: number | null }[];
+  label: string;
+}
+
 // ---- Main Component ----
 export default function CoupleSeatingCanvas() {
   // --- Guest state ---
@@ -95,6 +104,8 @@ export default function CoupleSeatingCanvas() {
   const [tablesLoading, setTablesLoading] = useState(false);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [canvasScale, setCanvasScale] = useState(100);
+  const { confirm, ConfirmDialog } = useConfirmDialog();
+  const [tableSizeScale, setTableSizeScale] = useState(1.0);
   const [canvasLocked, setCanvasLocked] = useState(false);
   const [reassigningGuestId, setReassigningGuestId] = useState<string | null>(null);
   const [dragOverTableId, setDragOverTableId] = useState<string | null>(null);
@@ -108,13 +119,10 @@ export default function CoupleSeatingCanvas() {
   const [editingTableNum, setEditingTableNum] = useState('');
   const [editingShape, setEditingShape] = useState('circle');
   const [editingCapacity, setEditingCapacity] = useState(8);
-  const [editingZone, setEditingZone] = useState('');
+  const [editingZone, setEditingZone] = useState('__none__');
   const [editingNotes, setEditingNotes] = useState('');
   const [savingTable, setSavingTable] = useState(false);
 
-  // Guest sidebar search/filter
-  const [guestSearch, setGuestSearch] = useState('');
-  const [guestFilter, setGuestFilter] = useState<string>('all'); // all | unassigned | table-N
 
   // Guest detail drawer
   const [detailGuestId, setDetailGuestId] = useState<string | null>(null);
@@ -125,7 +133,6 @@ export default function CoupleSeatingCanvas() {
   const [swapGuestId, setSwapGuestId] = useState<string | null>(null);
 
   // Phase 3+4 state
-  const [rsvpFilter, setRsvpFilter] = useState<string>('all');
   const [autoAssigning, setAutoAssigning] = useState(false);
   const [gridSnap, setGridSnap] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -139,46 +146,33 @@ export default function CoupleSeatingCanvas() {
   const [guestFormOpen, setGuestFormOpen] = useState(false);
   const [editingGuest, setEditingGuest] = useState<GuestItem | null>(null);
   const [deletingGuestId, setDeletingGuestId] = useState<string | null>(null);
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
 
-  // Feature 1: Undo/Redo
-  const [historyStack, setHistoryStack] = useState<SeatingTableItem[][]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
-
-  // Feature 2: Guest Labels
-  const [showGuestLabels, setShowGuestLabels] = useState(false);
-
-  // Feature 3: Table Size Slider
-  const [tableSize, setTableSize] = useState(100);
-
-  // Feature 4: Pan Mode
-  const [isPanMode, setIsPanMode] = useState(false);
-  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  // Phase 5: Canvas pan state
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
   const [isPanning, setIsPanning] = useState(false);
-  const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
 
-  // Feature 5: Venue Elements
-  const [venueElements, setVenueElements] = useState<
-    Array<{ id: string; type: 'STAGE' | 'COUPLE'; x: number; y: number; width: number; height: number }>
-  >([
-    { id: 'stage-1', type: 'STAGE', x: 50, y: 100, width: 120, height: 200 },
-    { id: 'couple-1', type: 'COUPLE', x: 150, y: 600, width: 120, height: 120 },
-  ]);
-  const venueDragRef = useRef<{
-    id: string;
-    startX: number;
-    startY: number;
-    origX: number;
-    origY: number;
-  } | null>(null);
+  // Phase 5: Smart auto-assign state
+  const [smartAssignOpen, setSmartAssignOpen] = useState(false);
+  const [smartStrategies, setSmartStrategies] = useState({
+    groupTogether: true,
+    pairPlusOnes: true,
+    matchZones: false,
+    balanceFill: true,
+  });
+  const [smartClearExisting, setSmartClearExisting] = useState(false);
+  const [dryRunResult, setDryRunResult] = useState<{ assigned: number; unassigned: number; tablesUsed: number; plan: { guestId: string; guestName: string; tableNum: number }[] } | null>(null);
 
-  // Feature 7: Canvas Search
+  // Phase 5: Multi-select state
+  const [multiSelectedIds, setMultiSelectedIds] = useState<Set<string>>(new Set());
+  const [batchZoneDialogOpen, setBatchZoneDialogOpen] = useState(false);
+  const [batchZone, setBatchZone] = useState('__none__');
+  const [batchShapeDialogOpen, setBatchShapeDialogOpen] = useState(false);
+  const [batchShape, setBatchShape] = useState('circle');
+
+  // Canvas search
   const [canvasSearch, setCanvasSearch] = useState('');
-
-  // Feature 8: Multi-select
-  const [selectedTableIds, setSelectedTableIds] = useState<Set<string>>(new Set());
-
-  // Feature 6: Zone panel
-  const [zonePanelOpen, setZonePanelOpen] = useState(true);
 
   // Drag state (table drag)
   const dragRef = useRef<{
@@ -188,10 +182,56 @@ export default function CoupleSeatingCanvas() {
     origPosX: number;
     origPosY: number;
   } | null>(null);
+  const rafRef = useRef<number | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const outerRef = useRef<HTMLDivElement>(null);
+  const panRef = useRef<{ startX: number; startY: number; origPanX: number; origPanY: number } | null>(null);
+  const isDraggingRef = useRef(false);
+  const frozenBoundsRef = useRef<{ w: number; h: number } | null>(null);
+  const undoStackRef = useRef<HistoryEntry[]>([]);
+  const redoStackRef = useRef<HistoryEntry[]>([]);
+  const [undoCount, setUndoCount] = useState(0);
+  const [redoCount, setRedoCount] = useState(0);
+  const shiftHeldRef = useRef(false);
 
   // Debounce save ref
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // History persistence debounce ref
+  const historyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ======== Undo/Redo Persistence ========
+  const saveHistoryDebounced = useCallback(() => {
+    if (historyTimerRef.current) clearTimeout(historyTimerRef.current);
+    historyTimerRef.current = setTimeout(() => {
+      fetch(HISTORY_API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          undoStack: undoStackRef.current,
+          redoStack: redoStackRef.current,
+        }),
+      }).catch(() => { /* silent */ });
+    }, 2000);
+  }, []);
+
+  const loadHistory = useCallback(() => {
+    fetch(HISTORY_API)
+      .then((res) => {
+        if (!res.ok) return null;
+        return res.json();
+      })
+      .then((data) => {
+        if (!data) return;
+        const undo: HistoryEntry[] = data.undoStack ?? [];
+        const redo: HistoryEntry[] = data.redoStack ?? [];
+        if (undo.length === 0 && redo.length === 0) return;
+        undoStackRef.current = undo;
+        redoStackRef.current = redo;
+        setUndoCount(undo.length);
+        setRedoCount(redo.length);
+      })
+      .catch(() => { /* silent */ });
+  }, []);
 
   // ======== Data Fetching ========
   const fetchAllGuests = useCallback(async () => {
@@ -234,49 +274,34 @@ export default function CoupleSeatingCanvas() {
     fetchTables();
     fetchAllGuests();
     fetchFloorPlan();
-  }, [fetchTables, fetchAllGuests, fetchFloorPlan]);
+    loadHistory();
+  }, [fetchTables, fetchAllGuests, fetchFloorPlan, loadHistory]);
 
   // ======== Derived Data ========
   const selectedTable = tables.find((t) => t.id === selectedTableId);
 
-  const guestsAtTable = (tableNum: number) =>
-    guests.filter((g) => g.tableNumber === tableNum);
+  // O(N) pre-computed guest count map instead of O(N*M) per-table filter calls
+  const guestCountMap = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const g of guests) {
+      if (g.tableNumber != null) {
+        map.set(g.tableNumber, (map.get(g.tableNumber) ?? 0) + 1);
+      }
+    }
+    return map;
+  }, [guests]);
+
+  const getGuestCountForTable = useCallback((tableNum: number) =>
+    guestCountMap.get(tableNum) ?? 0,
+  [guestCountMap]
+  );
+
+  const guestsAtTable = useCallback((tableNum: number) =>
+    guests.filter((g) => g.tableNumber === tableNum),
+  [guests]
+  );
 
   const unassignedGuests = guests.filter((g) => g.tableNumber == null);
-
-  const getGuestCountForTable = (tableNum: number) =>
-    guests.filter((g) => g.tableNumber === tableNum).length;
-
-  // Guest sidebar filtered list
-  const filteredGuests = (() => {
-    let list = guests;
-    // RSVP filter (applied first)
-    if (rsvpFilter === 'attending') {
-      list = list.filter((g) => g.rsvpStatus === 'ATTENDING');
-    } else if (rsvpFilter === 'pending') {
-      list = list.filter((g) => g.rsvpStatus === 'PENDING' || !g.rsvpStatus);
-    } else if (rsvpFilter === 'declined') {
-      list = list.filter((g) => g.rsvpStatus === 'DECLINED');
-    }
-    // Table assignment filter
-    if (guestFilter === 'unassigned') {
-      list = list.filter((g) => g.tableNumber == null);
-    } else if (guestFilter.startsWith('table-')) {
-      const num = parseInt(guestFilter.split('-')[1], 10);
-      list = list.filter((g) => g.tableNumber === num);
-    }
-    // Search filter
-    if (guestSearch.trim()) {
-      const q = guestSearch.toLowerCase();
-      list = list.filter(
-        (g) =>
-          g.name.toLowerCase().includes(q) ||
-          (g.email && g.email.toLowerCase().includes(q)) ||
-          (g.groupName && g.groupName.toLowerCase().includes(q))
-      );
-    }
-    return list;
-  })();
 
   const assignedCount = guests.filter((g) => g.tableNumber != null).length;
   const totalCount = guests.length;
@@ -284,69 +309,8 @@ export default function CoupleSeatingCanvas() {
   const remainingSeats = Math.max(0, totalSeats - assignedCount);
   const fillPct = totalSeats > 0 ? Math.round((assignedCount / totalSeats) * 100) : 0;
 
-  // ======== Feature 1: History (Undo/Redo) ========
-  const pushHistory = useCallback(() => {
-    setHistoryStack((prev) => {
-      const snapshot = JSON.parse(JSON.stringify(tables)) as SeatingTableItem[];
-      const newStack = prev.slice(0, historyIndex + 1);
-      newStack.push(snapshot);
-      if (newStack.length > 50) newStack.shift();
-      return newStack;
-    });
-    setHistoryIndex((prev) => Math.min(prev + 1, 49));
-  }, [tables, historyIndex]);
-
-  const handleUndo = useCallback(() => {
-    if (historyIndex <= 0) return;
-    const newIndex = historyIndex - 1;
-    setHistoryIndex(newIndex);
-    setTables(JSON.parse(JSON.stringify(historyStack[newIndex])));
-  }, [historyIndex, historyStack]);
-
-  const handleRedo = useCallback(() => {
-    if (historyIndex >= historyStack.length - 1) return;
-    const newIndex = historyIndex + 1;
-    setHistoryIndex(newIndex);
-    setTables(JSON.parse(JSON.stringify(historyStack[newIndex])));
-  }, [historyIndex, historyStack]);
-
-  // ======== Feature 6: Zone & Dietary derived data ========
-  const zoneSummary = (() => {
-    const zones: Record<string, { tables: number; capacity: number; assigned: number }> = {};
-    for (const t of tables) {
-      const z = t.zone || '_none';
-      if (!zones[z]) zones[z] = { tables: 0, capacity: 0, assigned: 0 };
-      zones[z].tables++;
-      zones[z].capacity += t.capacity;
-      zones[z].assigned += getGuestCountForTable(t.tableNum);
-    }
-    return zones;
-  })();
-
-  const dietarySummary = (() => {
-    const counts: Record<string, number> = {};
-    const common = ['vegetarian', 'vegan', 'gluten-free', 'halal', 'kosher', 'nut-free', 'dairy-free'];
-    let otherCount = 0;
-    for (const g of guests) {
-      const d = getEffectiveDietary(g);
-      if (!d) continue;
-      const dl = d.toLowerCase();
-      let matched = false;
-      for (const c of common) {
-        if (dl.includes(c)) {
-          counts[c] = (counts[c] || 0) + 1;
-          matched = true;
-          break;
-        }
-      }
-      if (!matched) otherCount++;
-    }
-    return { counts, otherCount };
-  })();
-
   // ======== Table CRUD ========
   const handleAddTable = async () => {
-    pushHistory();
     const maxNum = tables.length > 0 ? Math.max(...tables.map((t) => t.tableNum)) : 0;
     const newNum = maxNum + 1;
     const offset = (newNum - 1) * 180;
@@ -372,8 +336,8 @@ export default function CoupleSeatingCanvas() {
   const handleDeleteTable = async () => {
     const tbl = tables.find((t) => t.id === selectedTableId);
     if (!tbl) return;
-    if (!confirm(`Delete Table ${tbl.tableNum}? All guests at this table will be unassigned.`)) return;
-    pushHistory();
+    const ok = await confirm(`Delete Table ${tbl.tableNum}?`, 'All guests at this table will be unassigned.');
+    if (!ok) return;
     try {
       const res = await fetch(`${TABLES_API}&id=${tbl.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to delete table');
@@ -397,7 +361,7 @@ export default function CoupleSeatingCanvas() {
           id: selectedTableId,
           name: editingTableName.trim() || undefined,
           tableNum: parseInt(editingTableNum, 10),
-          zone: editingZone || null,
+          zone: editingZone === '__none__' ? null : editingZone,
           shape: editingShape,
           capacity: editingCapacity,
           notes: editingNotes.trim() || undefined,
@@ -416,13 +380,372 @@ export default function CoupleSeatingCanvas() {
     }
   };
 
+  // Immediate save with explicit field values (avoids stale closure)
+  const handleSaveTableEditsWith = async (fields: { tableName?: string; tableNum?: string; zone?: string; shape?: string; capacity?: number; notes?: string }) => {
+    if (!selectedTableId) return;
+    try {
+      const res = await fetch(TABLES_API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedTableId,
+          name: (fields.tableName ?? '').trim() || undefined,
+          tableNum: parseInt(String(fields.tableNum), 10),
+          zone: fields.zone === '__none__' ? null : fields.zone,
+          shape: fields.shape,
+          capacity: fields.capacity,
+          notes: (fields.notes ?? '').trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to update table');
+      }
+      await fetchTables();
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to update table', variant: 'destructive' });
+    }
+  };
+
   // Debounced auto-save for table properties
+  // Use refs to avoid stale closure — the timeout fires after state updates
+  const editFieldsRef = useRef({
+    tableName: '', tableNum: '', shape: 'circle', capacity: 8, zone: '__none__', notes: '',
+  });
+  editFieldsRef.current = {
+    tableName: editingTableName, tableNum: editingTableNum, shape: editingShape,
+    capacity: editingCapacity, zone: editingZone, notes: editingNotes,
+  };
+
   const debouncedSaveTable = useCallback(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    debounceTimerRef.current = setTimeout(() => {
-      handleSaveTableEdits();
+    debounceTimerRef.current = setTimeout(async () => {
+      if (!selectedTableId) return;
+      const f = editFieldsRef.current;
+      try {
+        const res = await fetch(TABLES_API, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: selectedTableId,
+            name: f.tableName.trim() || undefined,
+            tableNum: parseInt(f.tableNum, 10),
+            zone: f.zone === '__none__' ? null : f.zone,
+            shape: f.shape,
+            capacity: f.capacity,
+            notes: f.notes.trim() || undefined,
+          }),
+        });
+        if (!res.ok) throw new Error('Failed to update table');
+        await fetchTables();
+        toast({ title: 'Success', description: 'Table updated' });
+      } catch (err) {
+        toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to update table', variant: 'destructive' });
+      }
     }, 800);
-  }, [selectedTableId, editingTableName, editingTableNum, editingZone, editingShape, editingCapacity, editingNotes]);
+  }, [selectedTableId]);
+
+  // ======== Undo/Redo System ========
+  const pushHistory = useCallback((label: string) => {
+    const entry: HistoryEntry = {
+      tables: JSON.parse(JSON.stringify(tables)),
+      guestTableNumbers: guests.map((g) => ({ guestId: g.id, tableNumber: g.tableNumber })),
+      label,
+    };
+    if (undoStackRef.current.length >= 50) undoStackRef.current.shift();
+    undoStackRef.current.push(entry);
+    redoStackRef.current = [];
+    setUndoCount(undoStackRef.current.length);
+    setRedoCount(0);
+    saveHistoryDebounced();
+  }, [tables, guests, saveHistoryDebounced]);
+
+  const handleUndo = useCallback(() => {
+    if (undoStackRef.current.length === 0) return;
+    const entry = undoStackRef.current.pop()!;
+    setUndoCount(undoStackRef.current.length);
+    // Push current state to redo
+    redoStackRef.current.push({
+      tables: JSON.parse(JSON.stringify(tables)),
+      guestTableNumbers: guests.map((g) => ({ guestId: g.id, tableNumber: g.tableNumber })),
+      label: entry.label,
+    });
+    setTables(entry.tables);
+    // Restore guest table numbers
+    const guestMap = new Map(entry.guestTableNumbers.map((g) => [g.guestId, g.tableNumber]));
+    setGuests((prev) =>
+      prev.map((g) => {
+        const tblNum = guestMap.get(g.id);
+        return tblNum !== undefined ? { ...g, tableNumber: tblNum } : g;
+      })
+    );
+    setRedoCount(redoStackRef.current.length);
+    toast({ title: 'Undo', description: entry.label });
+    saveHistoryDebounced();
+  }, [tables, guests, saveHistoryDebounced]);
+
+  const handleRedo = useCallback(() => {
+    if (redoStackRef.current.length === 0) return;
+    const entry = redoStackRef.current.pop()!;
+    setRedoCount(redoStackRef.current.length);
+    // Push current state to undo
+    undoStackRef.current.push({
+      tables: JSON.parse(JSON.stringify(tables)),
+      guestTableNumbers: guests.map((g) => ({ guestId: g.id, tableNumber: g.tableNumber })),
+      label: entry.label,
+    });
+    setTables(entry.tables);
+    const guestMap = new Map(entry.guestTableNumbers.map((g) => [g.guestId, g.tableNumber]));
+    setGuests((prev) =>
+      prev.map((g) => {
+        const tblNum = guestMap.get(g.id);
+        return tblNum !== undefined ? { ...g, tableNumber: tblNum } : g;
+      })
+    );
+    setUndoCount(undoStackRef.current.length);
+    toast({ title: 'Redo', description: entry.label });
+    saveHistoryDebounced();
+  }, [tables, guests, saveHistoryDebounced]);
+
+  const canUndo = undoCount > 0;
+  const canRedo = redoCount > 0;
+
+  // ======== Canvas Pan Handler ========
+  const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
+    // Pan with left-click in pan mode, or middle-click always
+    if (isPanning && e.button === 0) {
+      e.preventDefault();
+      e.stopPropagation();
+      panRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        origPanX: panX,
+        origPanY: panY,
+      };
+      document.body.style.cursor = 'grabbing';
+      document.body.style.userSelect = 'none';
+
+      const handleMove = (ev: MouseEvent) => {
+        if (!panRef.current) return;
+        const scale = canvasScale / 100;
+        const dx = (ev.clientX - panRef.current.startX) / scale;
+        const dy = (ev.clientY - panRef.current.startY) / scale;
+        setPanX(panRef.current.origPanX + dx);
+        setPanY(panRef.current.origPanY + dy);
+      };
+
+      const handleUp = () => {
+        panRef.current = null;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        document.removeEventListener('mousemove', handleMove);
+        document.removeEventListener('mouseup', handleUp);
+      };
+
+      document.addEventListener('mousemove', handleMove);
+      document.addEventListener('mouseup', handleUp);
+      return;
+    }
+    if (e.button === 1) {
+      // Middle mouse button always pans
+      e.preventDefault();
+      panRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        origPanX: panX,
+        origPanY: panY,
+      };
+
+      const handleMove = (ev: MouseEvent) => {
+        if (!panRef.current) return;
+        const scale = canvasScale / 100;
+        const dx = (ev.clientX - panRef.current.startX) / scale;
+        const dy = (ev.clientY - panRef.current.startY) / scale;
+        setPanX(panRef.current.origPanX + dx);
+        setPanY(panRef.current.origPanY + dy);
+      };
+
+      const handleUp = () => {
+        panRef.current = null;
+        document.removeEventListener('mousemove', handleMove);
+        document.removeEventListener('mouseup', handleUp);
+      };
+
+      document.addEventListener('mousemove', handleMove);
+      document.addEventListener('mouseup', handleUp);
+    }
+  }, [panX, panY, canvasScale, isPanning]);
+
+  // ======== Batch Operations ========
+  const handleBatchDelete = useCallback(async () => {
+    if (multiSelectedIds.size === 0) return;
+    const ok = await confirm(`Delete ${multiSelectedIds.size} Tables?`, 'All guests at these tables will be unassigned.');
+    if (!ok) return;
+    try {
+      for (const tableId of multiSelectedIds) {
+        await fetch(TABLES_API + '&id=' + tableId, { method: 'DELETE' });
+      }
+      setMultiSelectedIds(new Set());
+      setSelectedTableId(null);
+      await fetchTables();
+      await fetchAllGuests();
+      toast({ title: 'Success', description: multiSelectedIds.size + ' tables deleted' });
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Batch delete failed', variant: 'destructive' });
+    }
+  }, [multiSelectedIds, fetchTables, fetchAllGuests]);
+
+  const handleBatchZone = useCallback(async () => {
+    if (multiSelectedIds.size === 0 || batchZone === '__none__') return;
+    try {
+      const tablesArr = Array.from(multiSelectedIds);
+      await fetch(TABLES_API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tables: tablesArr.map((id) => ({
+            id,
+            zone: batchZone,
+          })),
+        }),
+      });
+      setBatchZoneDialogOpen(false);
+      await fetchTables();
+      toast({ title: 'Success', description: 'Zone updated for ' + multiSelectedIds.size + ' tables' });
+    } catch (err) {
+      toast({ title: 'Error', description: 'Batch zone update failed', variant: 'destructive' });
+    }
+  }, [multiSelectedIds, batchZone, fetchTables]);
+
+  const handleBatchShape = useCallback(async () => {
+    if (multiSelectedIds.size === 0) return;
+    try {
+      const tablesArr = Array.from(multiSelectedIds);
+      await fetch(TABLES_API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tables: tablesArr.map((id) => ({
+            id,
+            shape: batchShape,
+          })),
+        }),
+      });
+      setBatchShapeDialogOpen(false);
+      await fetchTables();
+      toast({ title: 'Success', description: 'Shape updated for ' + multiSelectedIds.size + ' tables' });
+    } catch (err) {
+      toast({ title: 'Error', description: 'Batch shape update failed', variant: 'destructive' });
+    }
+  }, [multiSelectedIds, batchShape, fetchTables]);
+
+  // ======== Table Renumber ========
+  const handleRenumber = useCallback(async () => {
+    if (tables.length === 0) return;
+    pushHistory('Renumber tables');
+    const sorted = [...tables].sort((a, b) => {
+      if (a.posY !== b.posY) return a.posY - b.posY;
+      return a.posX - b.posX;
+    });
+    try {
+      await fetch(TABLES_API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tables: sorted.map((t, i) => ({
+            id: t.id,
+            tableNum: i + 1,
+          })),
+        }),
+      });
+      await fetchTables();
+      await fetchAllGuests();
+      toast({ title: 'Success', description: 'Tables renumbered by position (top-left to bottom-right)' });
+    } catch (err) {
+      toast({ title: 'Error', description: 'Renumber failed', variant: 'destructive' });
+    }
+  }, [tables, pushHistory, fetchTables, fetchAllGuests]);
+
+  // ======== Smart Auto-Assign ========
+  const handleDryRun = useCallback(async () => {
+    try {
+      setAutoAssigning(true);
+      const res = await fetch('/api/cms/tables/auto-assign?XTransformPort=3000', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          strategies: smartStrategies,
+          clearExisting: smartClearExisting,
+          dryRun: true,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        if (res.status === 429) {
+          throw new Error('Please wait — an assignment is already in progress.');
+        }
+        const msg = Array.isArray(err.error) ? err.error.map((e: { message?: string }) => e.message).join(', ') : err.error;
+        throw new Error(msg || 'Preview failed');
+      }
+      const data = await res.json();
+      setDryRunResult(data);
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Preview failed', variant: 'destructive' });
+    } finally {
+      setAutoAssigning(false);
+    }
+  }, [smartStrategies, smartClearExisting]);
+
+  const handleSmartAssign = useCallback(async () => {
+    try {
+      setAutoAssigning(true);
+
+      // Capacity hard-stop warning
+      if (unassignedGuests.length > remainingSeats) {
+        const ok = await confirm(
+          'Not Enough Seats',
+          `You have ${unassignedGuests.length} unassigned guests but only ${remainingSeats} remaining seats. Some guests will not be assigned. Continue anyway?`,
+        );
+        if (!ok) {
+          setAutoAssigning(false);
+          return;
+        }
+      }
+
+      // Save undo snapshot before assigning
+      pushHistory('Smart Assign');
+
+      const res = await fetch('/api/cms/tables/auto-assign?XTransformPort=3000', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          strategies: smartStrategies,
+          clearExisting: smartClearExisting,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        if (res.status === 429) {
+          throw new Error('Please wait — an assignment is already in progress.');
+        }
+        const msg = Array.isArray(err.error) ? err.error.map((e: { message?: string }) => e.message).join(', ') : err.error;
+        throw new Error(msg || 'Smart assign failed');
+      }
+      const data = await res.json();
+      setDryRunResult(null);
+      await fetchAllGuests();
+      await fetchTables();
+      setSmartAssignOpen(false);
+      toast({
+        title: 'Smart Assign Complete',
+        description: data.assigned + ' guests assigned, ' + data.unassigned + ' unassigned, ' + data.tablesUsed + ' tables used',
+      });
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Smart assign failed', variant: 'destructive' });
+    } finally {
+      setAutoAssigning(false);
+    }
+  }, [smartStrategies, smartClearExisting, fetchAllGuests, fetchTables, pushHistory, unassignedGuests.length, remainingSeats, confirm]);
 
   // Populate edit fields when a table is selected
   useEffect(() => {
@@ -432,7 +755,7 @@ export default function CoupleSeatingCanvas() {
       setEditingTableNum(String(tbl.tableNum));
       setEditingShape(tbl.shape || 'circle');
       setEditingCapacity(tbl.capacity || 8);
-      setEditingZone(tbl.zone || '');
+      setEditingZone(tbl.zone || '__none__');
       setEditingNotes(tbl.notes || '');
     }
   }, [selectedTableId, tables]);
@@ -482,7 +805,8 @@ export default function CoupleSeatingCanvas() {
 
   // ======== Guest CRUD (sidebar) ========
   const handleDeleteGuest = async (id: string) => {
-    if (!confirm('Delete this guest? This action cannot be undone.')) return;
+    const ok = await confirm('Delete Guest', 'This action cannot be undone. The guest will be permanently removed.');
+    if (!ok) return;
     try {
       setDeletingGuestId(id);
       const res = await fetch(`${API_BASE}&id=${encodeURIComponent(id)}`, { method: 'DELETE' });
@@ -501,7 +825,7 @@ export default function CoupleSeatingCanvas() {
   };
 
   // Canvas table click: if a guest is selected, reassign them
-  const handleCanvasTableClick = (tableId: string, shiftKey?: boolean) => {
+  const handleCanvasTableClick = (tableId: string) => {
     if (reassigningGuestId) {
       const tbl = tables.find((t) => t.id === tableId);
       if (tbl) {
@@ -518,16 +842,19 @@ export default function CoupleSeatingCanvas() {
         handleReassignGuest(reassigningGuestId, tbl.tableNum);
       }
       setReassigningGuestId(null);
-    } else if (shiftKey) {
-      // Feature 8: Multi-select with Shift
-      setSelectedTableIds((prev) => {
+    } else if (shiftHeldRef.current) {
+      // Multi-select with shift+click
+      setMultiSelectedIds((prev) => {
         const next = new Set(prev);
-        if (next.has(tableId)) next.delete(tableId);
-        else next.add(tableId);
+        if (next.has(tableId)) {
+          next.delete(tableId);
+        } else {
+          next.add(tableId);
+        }
         return next;
       });
     } else {
-      setSelectedTableIds(new Set());
+      setMultiSelectedIds(new Set());
       setSelectedTableId(tableId === selectedTableId ? null : tableId);
     }
   };
@@ -584,11 +911,14 @@ export default function CoupleSeatingCanvas() {
   const latestDragPos = useRef<{ posX: number; posY: number } | null>(null);
 
   const handleDragStart = (e: React.MouseEvent, tableId: string) => {
-    if (canvasLocked) return;
+    if (canvasLocked || isPanning) return;
     e.preventDefault();
-    pushHistory();
     const tbl = tables.find((t) => t.id === tableId);
     if (!tbl) return;
+    pushHistory('Drag table');
+    // Freeze contentBounds during drag to prevent layout shifts
+    isDraggingRef.current = true;
+    frozenBoundsRef.current = contentBounds;
     dragRef.current = {
       tableId,
       startX: e.clientX,
@@ -598,25 +928,39 @@ export default function CoupleSeatingCanvas() {
     };
     latestDragPos.current = { posX: tbl.posX, posY: tbl.posY };
 
+    document.body.style.cursor = 'grabbing';
+    document.body.style.userSelect = 'none';
+
     const handleMove = (ev: MouseEvent) => {
       if (!dragRef.current) return;
-      const dx = (ev.clientX - dragRef.current.startX) / (canvasScale / 100);
-      const dy = (ev.clientY - dragRef.current.startY) / (canvasScale / 100);
-      let newPosX = Math.max(0, dragRef.current.origPosX + dx);
-      let newPosY = Math.max(0, dragRef.current.origPosY + dy);
-      if (gridSnap) {
-        newPosX = Math.round(newPosX / 20) * 20;
-        newPosY = Math.round(newPosY / 20) * 20;
-      }
-      latestDragPos.current = { posX: newPosX, posY: newPosY };
-      setTables((prev) =>
-        prev.map((t) => (t.id === tableId ? { ...t, posX: newPosX, posY: newPosY } : t))
-      );
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        if (!dragRef.current) return;
+        const scale = canvasScale / 100;
+        const dx = (ev.clientX - dragRef.current.startX) / scale;
+        const dy = (ev.clientY - dragRef.current.startY) / scale;
+        let newPosX = Math.max(0, dragRef.current.origPosX + dx);
+        let newPosY = Math.max(0, dragRef.current.origPosY + dy);
+        if (gridSnap) {
+          newPosX = Math.round(newPosX / 20) * 20;
+          newPosY = Math.round(newPosY / 20) * 20;
+        }
+        latestDragPos.current = { posX: newPosX, posY: newPosY };
+        setTables((prev) =>
+          prev.map((t) => (t.id === tableId ? { ...t, posX: newPosX, posY: newPosY } : t))
+        );
+      });
     };
 
     const handleUp = async () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
       if (!dragRef.current || !latestDragPos.current) return;
       try {
         await fetch(TABLES_API, {
@@ -629,6 +973,9 @@ export default function CoupleSeatingCanvas() {
       }
       dragRef.current = null;
       latestDragPos.current = null;
+      // Unfreeze contentBounds after drag
+      isDraggingRef.current = false;
+      frozenBoundsRef.current = null;
     };
 
     document.addEventListener('mousemove', handleMove);
@@ -698,65 +1045,6 @@ export default function CoupleSeatingCanvas() {
       setSwapTargetTableId(null);
     } catch (err) {
       toast({ title: 'Error', description: 'Swap failed', variant: 'destructive' });
-    }
-  };
-
-  // ======== Auto-Assign ========
-  const handleAutoAssign = async () => {
-    const unassigned = guests.filter(
-      (g) => g.tableNumber == null && g.rsvpStatus !== 'DECLINED'
-    );
-    if (unassigned.length === 0) {
-      toast({ title: 'Info', description: 'No unassigned guests to place' });
-      return;
-    }
-    if (tables.length === 0) {
-      toast({ title: 'Info', description: 'No tables available' });
-      return;
-    }
-
-    setAutoAssigning(true);
-    let assigned = 0;
-
-    try {
-      // Sort tables by fill ratio descending (nearly full first)
-      const sortedTables = [...tables].sort((a, b) => {
-        const aFill = getGuestCountForTable(a.tableNum) / a.capacity;
-        const bFill = getGuestCountForTable(b.tableNum) / b.capacity;
-        return bFill - aFill;
-      });
-
-      for (const guest of unassigned) {
-        // Find first table with room
-        const target = sortedTables.find(
-          (t) => getGuestCountForTable(t.tableNum) < t.capacity
-        );
-        if (!target) break;
-
-        try {
-          const res = await fetch(API_BASE, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: guest.id, name: guest.name, tableNumber: target.tableNum }),
-          });
-          if (res.ok) {
-            assigned++;
-            // Optimistic update
-            setGuests((prev) =>
-              prev.map((g) => (g.id === guest.id ? { ...g, tableNumber: target.tableNum } : g))
-            );
-          }
-        } catch {
-          // skip this guest
-        }
-      }
-
-      await fetchAllGuests();
-      toast({ title: 'Auto-Assign Complete', description: `${assigned} guest${assigned !== 1 ? 's' : ''} assigned to tables` });
-    } catch {
-      toast({ title: 'Error', description: 'Auto-assign failed', variant: 'destructive' });
-    } finally {
-      setAutoAssigning(false);
     }
   };
 
@@ -870,35 +1158,135 @@ export default function CoupleSeatingCanvas() {
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
 
-      // Feature 1: Undo/Redo shortcuts
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') {
-        e.preventDefault();
-        handleRedo();
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-        e.preventDefault();
-        handleUndo();
-        return;
-      }
+      // Shift tracking for multi-select
+      if (e.key === 'Shift') shiftHeldRef.current = true;
 
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedTableId) {
         e.preventDefault();
         handleDeleteTable();
       }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && multiSelectedIds.size > 0 && !selectedTableId) {
+        e.preventDefault();
+        handleBatchDelete();
+      }
       if (e.key === 'Escape') {
         setSelectedTableId(null);
         setReassigningGuestId(null);
         setDetailGuestId(null);
-        setSelectedTableIds(new Set()); // Feature 8: clear multi-select
+        setMultiSelectedIds(new Set());
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        handleUndo();
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
+        e.preventDefault();
+        handleRedo();
       }
     };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') shiftHeldRef.current = false;
+    };
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [selectedTableId, handleUndo, handleRedo]);
+    document.addEventListener('keyup', handleKeyUp);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [selectedTableId, multiSelectedIds, handleDeleteTable, handleBatchDelete, handleUndo, handleRedo]);
 
   // ======== Detail Drawer Guest ========
   const detailGuest = guests.find((g) => g.id === detailGuestId);
+
+  // ======== Seating Statistics (Phase 6) ========
+  const seatingStats = useMemo(() => {
+    const zoneStats: Record<string, { seats: number; assigned: number; tables: number }> = {};
+    const rsvpByTable: Record<number, { attending: number; pending: number; declined: number }> = {};
+    const dietaryCounts: Record<string, number> = {};
+
+    for (const tbl of tables) {
+      const zone = tbl.zone || 'Unzoned';
+      if (!zoneStats[zone]) zoneStats[zone] = { seats: 0, assigned: 0, tables: 0 };
+      zoneStats[zone].seats += tbl.capacity;
+      zoneStats[zone].tables += 1;
+
+      const tblGuests = guests.filter((g) => g.tableNumber === tbl.tableNum);
+      zoneStats[zone].assigned += tblGuests.length;
+
+      const rsvp = rsvpByTable[tbl.tableNum] || { attending: 0, pending: 0, declined: 0 };
+      for (const g of tblGuests) {
+        const status = (g.rsvpStatus || 'PENDING').toUpperCase();
+        if (status === 'ATTENDING') rsvp.attending++;
+        else if (status === 'DECLINED') rsvp.declined++;
+        else rsvp.pending++;
+        const dietary = getEffectiveDietary(g);
+        if (dietary) {
+          const d = dietary.split(';').map((s) => s.trim()).filter(Boolean);
+          for (const item of d) {
+            dietaryCounts[item] = (dietaryCounts[item] || 0) + 1;
+          }
+        }
+      }
+      rsvpByTable[tbl.tableNum] = rsvp;
+    }
+
+    return { zoneStats, rsvpByTable, dietaryCounts };
+  }, [tables, guests]);
+
+  // Sub-linear text scale: small tables get proportionally larger text for readability
+  const textScale = useMemo(() => Math.pow(tableSizeScale, 0.6), [tableSizeScale]);
+  const showGuestLabels = tableSizeScale >= 0.4;
+
+  // ======== Content Bounds (dynamic virtual canvas) ========
+  // During drag, return frozen bounds to prevent wrapper div from resizing every frame
+  const rawBounds = useMemo(() => {
+    if (tables.length === 0) return { w: 800, h: 500 };
+    let maxX = 0, maxY = 0;
+    tables.forEach(t => {
+      const dims = TABLE_DIMS[t.shape] || TABLE_DIMS.circle;
+      const sw = dims.w * tableSizeScale;
+      const sh = dims.h * tableSizeScale;
+      const r = (Math.max(sw, sh) / 2) + 100 * tableSizeScale;
+      maxX = Math.max(maxX, t.posX + sw + r);
+      maxY = Math.max(maxY, t.posY + sh + 60 * tableSizeScale);
+    });
+    return { w: Math.max(maxX + 40, 400), h: Math.max(maxY + 40, 300) };
+  }, [tables, tableSizeScale]);
+
+  const contentBounds = useMemo(() => {
+    if (isDraggingRef.current && frozenBoundsRef.current) {
+      return frozenBoundsRef.current;
+    }
+    return rawBounds;
+  }, [rawBounds]);
+
+  // ======== Auto-Fit Scale ========
+  const autoFitScale = useCallback(() => {
+    if (!canvasRef.current) {
+      setCanvasScale(100);
+      return;
+    }
+    const container = canvasRef.current;
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    if (cw === 0 || ch === 0) return;
+    const scaleX = cw / contentBounds.w;
+    const scaleY = ch / contentBounds.h;
+    const fit = Math.min(scaleX, scaleY);
+    const scale = Math.max(0.3, Math.min(2, Math.round(fit * 20) / 20));
+    setCanvasScale(Math.round(scale * 100));
+    // Center content in viewport using pan (transformOrigin is '0 0')
+    setPanX(Math.round((cw - contentBounds.w * scale) / 2));
+    setPanY(Math.round((ch - contentBounds.h * scale) / 2));
+  }, [contentBounds]);
+
+  const initialFitDoneRef = useRef(false);
+  useEffect(() => {
+    if (!tablesLoading && tables.length > 0 && !initialFitDoneRef.current) {
+      initialFitDoneRef.current = true;
+      requestAnimationFrame(() => autoFitScale());
+    }
+  }, [tablesLoading, tables.length, autoFitScale]);
 
   // ======== Cleanup ========
   useEffect(() => {
@@ -910,211 +1298,45 @@ export default function CoupleSeatingCanvas() {
   // ======== Render ========
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="flex flex-col lg:flex-row gap-0 h-full">
-        {/* ======== LEFT GUEST SIDEBAR ======== */}
-        <div className="w-full lg:w-64 shrink-0 border-r border-champagne-silk bg-paper-cream/50 flex flex-col lg:max-h-[580px] lg:h-auto max-h-[200px] lg:max-h-none order-2 lg:order-1">
-          {/* Summary */}
-          <div className="px-3 py-2.5 border-b border-champagne-silk">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.08em] text-charcoal-ink/60">Guests</span>
-              <div className="flex items-center gap-1">
-                <span className="text-xs font-medium text-charcoal-ink/50 mr-1">
-                  {assignedCount}/{totalCount} assigned
-                </span>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
-                      onClick={() => { setEditingGuest(null); setGuestFormOpen(true); }}
-                    >
-                      <Plus className="size-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Add Guest</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
-                      onClick={() => setGuestListOpen(true)}
-                    >
-                      <List className="size-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Full Guest List</TooltipContent>
-                </Tooltip>
-              </div>
-            </div>
-            {unassignedGuests.length > 0 && (
-              <Badge variant="outline" className="text-[10px] font-medium bg-amber-50 text-amber-700 border-amber-200">
-                <AlertCircle className="size-2.5 mr-1" />
-                {unassignedGuests.length} unassigned
-              </Badge>
-            )}
-          </div>
-
-          {/* Search */}
-          <div className="px-3 py-2 border-b border-champagne-silk">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-charcoal-ink/30" />
-              <Input
-                value={guestSearch}
-                onChange={(e) => setGuestSearch(e.target.value)}
-                placeholder="Search guests..."
-                className="h-7 pl-8 text-xs border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
-              />
-            </div>
-          </div>
-
-          {/* RSVP Filter */}
-          <div className="px-3 py-1.5 border-b border-champagne-silk flex items-center gap-1">
-            {([['all', 'All', UsersRound], ['attending', 'Attending', CheckCircle2], ['pending', 'Pending', Clock], ['declined', 'Declined', XCircle]] as const).map(([val, label, Icon]) => (
-              <button
-                key={val}
-                type="button"
-                onClick={() => setRsvpFilter(val)}
-                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors duration-150 ${
-                  rsvpFilter === val
-                    ? 'bg-cinematic-gold/10 text-cinematic-gold border-cinematic-gold/30'
-                    : 'text-charcoal-ink/40 border-transparent hover:text-charcoal-ink/60 hover:border-charcoal-ink/10'
-                }`}
-              >
-                <Icon className="size-2.5" />
-                <span className="hidden sm:inline">{label}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Filter */}
-          <div className="px-3 py-2 border-b border-champagne-silk">
-            <Select value={guestFilter} onValueChange={setGuestFilter}>
-              <SelectTrigger className="h-7 text-xs border-charcoal-ink/10">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Guests</SelectItem>
-                <SelectItem value="unassigned">Unassigned</SelectItem>
-                {tables
-                  .sort((a, b) => a.tableNum - b.tableNum)
-                  .map((t) => (
-                    <SelectItem key={t.id} value={`table-${t.tableNum}`}>
-                      {t.name || `Table ${t.tableNum}`}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Guest list */}
-          <ScrollArea className="flex-1">
-            <div className="px-2 py-1 space-y-1">
-              {filteredGuests.length === 0 && (
-                <p className="text-xs text-charcoal-ink/30 text-center py-4 italic">
-                  No guests found
-                </p>
-              )}
-              {filteredGuests.map((guest) => {
-                const dietary = getEffectiveDietary(guest);
-                const isSelected = reassigningGuestId === guest.id;
-                return (
-                  <div
-                    key={guest.id}
-                    draggable
-                    onDragStart={(e) => handleGuestDragStart(e, guest.id)}
-                    onClick={(e) => {
-                      if (e.detail === 1) {
-                        // Single click: tap-to-assign mode (for mobile)
-                        handleCanvasGuestClick(guest.id);
-                      }
-                    }}
-                    onDoubleClick={() => setDetailGuestId(guest.id)}
-                    className={`group flex items-center gap-2 rounded-md border px-2 py-1.5 cursor-grab active:cursor-grabbing transition-all duration-150 ${
-                      isSelected
-                        ? 'border-cinematic-gold bg-cinematic-gold/10 ring-1 ring-cinematic-gold/30'
-                        : 'border-charcoal-ink/5 bg-white hover:border-champagne-silk hover:shadow-sm'
-                    }`}
-                  >
-                    <div className="flex-1 min-w-0" onClick={() => setDetailGuestId(guest.id)}>
-                      <p className="text-xs font-medium text-charcoal-ink truncate">{guest.name}</p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        {guest.tableNumber != null && (
-                          <span className="text-[10px] font-medium text-cinematic-gold">
-                            T{guest.tableNumber}
-                          </span>
-                        )}
-                        {dietary && (
-                          <span
-                            className={`inline-flex items-center justify-center size-3.5 rounded text-[8px] font-bold ${dietaryBadgeColor(dietary)}`}
-                            title={dietary}
-                          >
-                            {dietary.charAt(0).toUpperCase()}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setEditingGuest(guest); setGuestFormOpen(true); }}
-                        className="h-5 w-5 flex items-center justify-center rounded text-charcoal-ink/30 hover:text-cinematic-gold hover:bg-cinematic-gold/10 transition-colors"
-                      >
-                        <Pencil className="size-2.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); handleDeleteGuest(guest.id); }}
-                        disabled={deletingGuestId === guest.id}
-                        className="h-5 w-5 flex items-center justify-center rounded text-charcoal-ink/30 hover:text-red-500 hover:bg-red-50 transition-colors"
-                      >
-                        {deletingGuestId === guest.id ? <Loader2 className="size-2.5 animate-spin" /> : <Trash2 className="size-2.5" />}
-                      </button>
-                    </div>
-                    {guest.plusOne && (
-                      <UserPlus className="size-3 text-pink-400 shrink-0" />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </ScrollArea>
-        </div>
-
-        {/* ======== CENTER CANVAS AREA ======== */}
-        <div className="flex-1 flex flex-col gap-3 min-w-0 order-1 lg:order-2">
+      <div
+        ref={outerRef}
+        data-seating-canvas
+        className="-mt-[28px] sm:-mt-[40px] md:-mt-[56px] -mx-[28px] sm:-mx-[40px] md:-mx-[56px] -mb-[96px] sm:-mb-[104px] md:-mb-[56px] flex flex-col overflow-y-auto rounded-lg"
+      >
+        {/* ======== SECTION 1: CANVAS AREA (top) ======== */}
+        <div className="flex flex-col gap-2 min-w-0"> 
           {/* Toolbar */}
-          <div className="flex items-center gap-2 px-1 flex-wrap">
-            {/* Feature 1: Undo/Redo */}
+          <div className="flex items-center gap-1.5 px-1.5 py-1.5 flex-wrap">
+            {/* ── History & View ── */}
+            <div className="flex items-center gap-0.5 rounded-lg bg-charcoal-ink/[0.03] p-0.5">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleUndo}
-                  disabled={historyIndex <= 0}
-                  className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5 disabled:opacity-30 cursor-not-allowed"
+                  disabled={!canUndo}
+                  className="h-7 px-2 text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06] active:scale-95 disabled:opacity-30 transition-all"
                 >
                   <Undo2 className="size-3.5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Undo</TooltipContent>
+              <TooltipContent>{canUndo ? `Undo (${undoCount}) — unsaved local changes` : 'Undo (Ctrl+Z)'}</TooltipContent>
             </Tooltip>
+
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleRedo}
-                  disabled={historyIndex >= historyStack.length - 1}
-                  className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5 disabled:opacity-30 cursor-not-allowed"
+                  disabled={!canRedo}
+                  className="h-7 px-2 text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06] active:scale-95 disabled:opacity-30 transition-all"
                 >
                   <Redo2 className="size-3.5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Redo</TooltipContent>
+              <TooltipContent>{canRedo ? `Redo (${redoCount})` : 'Redo (Ctrl+Y)'}</TooltipContent>
             </Tooltip>
 
             <Tooltip>
@@ -1122,42 +1344,49 @@ export default function CoupleSeatingCanvas() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setCanvasScale(100)}
-                  className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5"
+                  onClick={autoFitScale}
+                  className="h-7 px-2 text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06] active:scale-95 transition-all"
                 >
                   <Maximize className="size-3.5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Fit View (100%)</TooltipContent>
+              <TooltipContent>Fit View</TooltipContent>
             </Tooltip>
 
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRenumber}
+                  disabled={tables.length === 0}
+                  className="h-7 px-2 text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06] active:scale-95 disabled:opacity-30 transition-all"
+                >
+                  <ArrowDownUp className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Renumber tables by position</TooltipContent>
+            </Tooltip>
+            </div>
+
+            {/* ── Canvas Options ── */}
+            <div className="flex items-center gap-0.5 rounded-lg bg-charcoal-ink/[0.03] p-0.5">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setCanvasLocked(!canvasLocked)}
-                  className={`h-8 px-2 ${canvasLocked ? 'text-cinematic-gold bg-cinematic-gold/5' : 'text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5'}`}
+                  className={`h-7 px-2 transition-all active:scale-95 ${
+                    canvasLocked
+                      ? 'text-cinematic-gold bg-cinematic-gold/10 hover:bg-cinematic-gold/15'
+                      : 'text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06]'
+                  }`}
                 >
                   {canvasLocked ? <Lock className="size-3.5" /> : <Unlock className="size-3.5" />}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>{canvasLocked ? 'Unlock tables' : 'Lock tables'}</TooltipContent>
-            </Tooltip>
-
-            {/* Feature 2: Guest Labels Toggle */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowGuestLabels(!showGuestLabels)}
-                  className={`h-8 px-2 ${showGuestLabels ? 'text-cinematic-gold bg-cinematic-gold/5' : 'text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5'}`}
-                >
-                  <Tags className="size-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{showGuestLabels ? 'Hide guest labels' : 'Show guest labels'}</TooltipContent>
             </Tooltip>
 
             <Tooltip>
@@ -1166,7 +1395,11 @@ export default function CoupleSeatingCanvas() {
                   variant="ghost"
                   size="sm"
                   onClick={() => setGridSnap(!gridSnap)}
-                  className={`h-8 px-2 ${gridSnap ? 'text-cinematic-gold bg-cinematic-gold/5' : 'text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5'}`}
+                  className={`h-7 px-2 transition-all active:scale-95 ${
+                    gridSnap
+                      ? 'text-cinematic-gold bg-cinematic-gold/10 hover:bg-cinematic-gold/15'
+                      : 'text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06]'
+                  }`}
                 >
                   <Grid3x3 className="size-3.5" />
                 </Button>
@@ -1174,42 +1407,32 @@ export default function CoupleSeatingCanvas() {
               <TooltipContent>{gridSnap ? 'Disable grid snap' : 'Enable grid snap (20px)'}</TooltipContent>
             </Tooltip>
 
-            {/* Feature 4: Pan Mode */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setIsPanMode(!isPanMode)}
-                  className={`h-8 px-2 ${isPanMode ? 'text-cinematic-gold bg-cinematic-gold/5' : 'text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5'}`}
+                  onClick={() => setIsPanning(!isPanning)}
+                  className={`h-7 px-2 transition-all active:scale-95 ${
+                    isPanning
+                      ? 'text-cinematic-gold bg-cinematic-gold/10 hover:bg-cinematic-gold/15'
+                      : 'text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06]'
+                  }`}
                 >
-                  <Hand className="size-3.5" />
+                  <Move className="size-3.5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Pan Mode (drag to pan canvas)</TooltipContent>
+              <TooltipContent>{isPanning ? 'Exit grab mode' : 'Grab & move canvas'}</TooltipContent>
             </Tooltip>
-
-            {/* Feature 3: Table Size Slider */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-charcoal-ink/40 font-medium">Size</span>
-              <Slider
-                value={[tableSize]}
-                onValueChange={(v) => setTableSize(v[0])}
-                min={50}
-                max={150}
-                step={5}
-                className="w-20"
-              />
-              <span className="text-[10px] text-charcoal-ink/50 font-medium w-8">{tableSize}%</span>
             </div>
 
-            <div className="w-px h-5 bg-champagne-silk mx-1" />
-
+            {/* ── Floor Plan ── */}
+            <div className="flex items-center gap-0.5 rounded-lg bg-charcoal-ink/[0.03] p-0.5">
             <label
-              className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium cursor-pointer transition-colors duration-150 ${
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium cursor-pointer transition-all duration-150 active:scale-[0.97] ${
                 floorPlanUrl
-                  ? 'text-cinematic-gold bg-cinematic-gold/5'
-                  : 'text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5'
+                  ? 'text-cinematic-gold bg-cinematic-gold/10 hover:bg-cinematic-gold/15'
+                  : 'text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06]'
               }`}
             >
               <ImagePlus className="size-3.5" />
@@ -1230,7 +1453,7 @@ export default function CoupleSeatingCanvas() {
                     variant="ghost"
                     size="sm"
                     onClick={handleFloorPlanRemove}
-                    className="h-8 px-2 text-red-400 hover:text-red-600 hover:bg-red-50"
+                    className="h-7 px-2 text-red-400/70 hover:text-red-500 hover:bg-red-50 active:scale-95 transition-all"
                   >
                     <ImageOff className="size-3.5" />
                   </Button>
@@ -1238,17 +1461,17 @@ export default function CoupleSeatingCanvas() {
                 <TooltipContent>Remove floor plan</TooltipContent>
               </Tooltip>
             )}
+            </div>
 
-            <div className="w-px h-5 bg-champagne-silk mx-1" />
-
-            {/* Feature 7: Canvas Search */}
+            {/* ── Canvas Search ── */}
             <div className="relative">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-charcoal-ink/30" />
-              <Input
+              <input
+                type="text"
+                placeholder="Search tables..."
                 value={canvasSearch}
                 onChange={(e) => setCanvasSearch(e.target.value)}
-                placeholder="Search tables..."
-                className="h-8 w-36 text-xs pl-7 pr-7 border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+                className="h-7 w-32 sm:w-36 pl-7 pr-7 text-xs bg-transparent border border-charcoal-ink/10 rounded-md focus:outline-none focus:border-cinematic-gold/50 placeholder:text-charcoal-ink/25"
               />
               {canvasSearch && (
                 <button
@@ -1261,21 +1484,148 @@ export default function CoupleSeatingCanvas() {
               )}
             </div>
 
-            <ZoomOut className="size-3.5 text-charcoal-ink/40 shrink-0" />
+            {/* ── Zoom ── */}
+            <div className="flex items-center gap-1 rounded-lg bg-charcoal-ink/[0.03] px-1 py-0.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => setCanvasScale((s) => Math.max(30, s - 10))}
+                  className="p-1 rounded-md hover:bg-charcoal-ink/[0.06] text-charcoal-ink/35 hover:text-charcoal-ink active:scale-90 transition-all cursor-pointer"
+                >
+                  <ZoomOut className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Zoom out</TooltipContent>
+            </Tooltip>
             <Slider
               value={[canvasScale]}
               onValueChange={(v) => setCanvasScale(v[0])}
               min={30}
               max={200}
-              step={10}
-              className="w-24 sm:w-32"
+              step={5}
+              className="w-20 sm:w-28"
             />
-            <ZoomIn className="size-3.5 text-charcoal-ink/40 shrink-0" />
-            <span className="text-[10px] text-charcoal-ink/50 font-medium w-8 text-right">{canvasScale}%</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => setCanvasScale((s) => Math.min(200, s + 10))}
+                  className="p-1 rounded-md hover:bg-charcoal-ink/[0.06] text-charcoal-ink/35 hover:text-charcoal-ink active:scale-90 transition-all cursor-pointer"
+                >
+                  <ZoomIn className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Zoom in</TooltipContent>
+            </Tooltip>
+            <div className="flex items-center">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={canvasScale}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (!isNaN(v)) setCanvasScale(Math.max(30, Math.min(200, v)));
+              }}
+              onBlur={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (isNaN(v) || v < 30) setCanvasScale(30);
+                else if (v > 200) setCanvasScale(200);
+                else setCanvasScale(v);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+              }}
+              className="w-9 text-[10px] text-charcoal-ink/50 font-medium text-right bg-transparent border border-transparent focus:border-champagne-silk/60 focus:bg-white focus:ring-1 focus:ring-champagne-silk/20 rounded-md px-1 py-0.5 outline-none tabular-nums transition-all"
+            />
+            <span className="text-[10px] text-charcoal-ink/25 ml-0.5">%</span>
+            </div>
+            </div>
 
-            <div className="w-px h-5 bg-champagne-silk mx-1" />
+            {/* ── Table Size ── */}
+            <div className="flex items-center gap-1 rounded-lg bg-charcoal-ink/[0.03] px-1 py-0.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="p-1 rounded-md hover:bg-charcoal-ink/[0.06] text-charcoal-ink/35 hover:text-charcoal-ink active:scale-90 transition-all cursor-pointer"
+                >
+                  <Ruler className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Table size (visual only)</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = Math.max(20, Math.round(tableSizeScale * 100) - 10);
+                    setTableSizeScale(next / 100);
+                  }}
+                  className="p-1 rounded-md hover:bg-charcoal-ink/[0.06] text-charcoal-ink/35 hover:text-charcoal-ink active:scale-90 transition-all cursor-pointer"
+                >
+                  <ZoomOut className="size-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Smaller tables</TooltipContent>
+            </Tooltip>
+            <Slider
+              value={[Math.round(tableSizeScale * 100)]}
+              onValueChange={(v) => setTableSizeScale(v[0] / 100)}
+              onValueCommit={() => {
+                requestAnimationFrame(() => autoFitScale());
+              }}
+              min={20}
+              max={200}
+              step={5}
+              className="w-16 sm:w-24"
+            />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = Math.min(200, Math.round(tableSizeScale * 100) + 10);
+                    setTableSizeScale(next / 100);
+                    requestAnimationFrame(() => autoFitScale());
+                  }}
+                  className="p-1 rounded-md hover:bg-charcoal-ink/[0.06] text-charcoal-ink/35 hover:text-charcoal-ink active:scale-90 transition-all cursor-pointer"
+                >
+                  <ZoomIn className="size-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Larger tables</TooltipContent>
+            </Tooltip>
+            <div className="flex items-center">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={Math.round(tableSizeScale * 100)}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (!isNaN(v)) setTableSizeScale(Math.max(20, Math.min(200, v)) / 100);
+              }}
+              onBlur={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (isNaN(v) || v < 20) setTableSizeScale(0.2);
+                else if (v > 200) setTableSizeScale(2);
+                else setTableSizeScale(v / 100);
+                requestAnimationFrame(() => autoFitScale());
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
+              className="w-9 text-[10px] text-charcoal-ink/50 font-medium text-right bg-transparent border border-transparent focus:border-champagne-silk/60 focus:bg-white focus:ring-1 focus:ring-champagne-silk/20 rounded-md px-1 py-0.5 outline-none tabular-nums transition-all"
+            />
+            <span className="text-[10px] text-charcoal-ink/25 ml-0.5">%</span>
+            </div>
+            </div>
 
-            {/* Add Table dropdown */}
+            {/* ── Add & Export ── */}
+            <div className="flex items-center gap-0.5 rounded-lg bg-charcoal-ink/[0.03] p-0.5">
             <DropdownMenu>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -1283,7 +1633,7 @@ export default function CoupleSeatingCanvas() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5"
+                      className="h-7 px-2 text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06] active:scale-95 transition-all"
                     >
                       <Plus className="size-3.5" />
                       <ChevronsUpDown className="size-2" />
@@ -1300,7 +1650,6 @@ export default function CoupleSeatingCanvas() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Export buttons */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -1308,7 +1657,7 @@ export default function CoupleSeatingCanvas() {
                   size="sm"
                   onClick={handleExportPng}
                   disabled={exporting}
-                  className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5"
+                  className="h-7 px-2 text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06] active:scale-95 disabled:opacity-30 transition-all"
                 >
                   {exporting ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
                 </Button>
@@ -1322,7 +1671,7 @@ export default function CoupleSeatingCanvas() {
                   variant="ghost"
                   size="sm"
                   onClick={() => setPrintDialogOpen(true)}
-                  className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5"
+                  className="h-7 px-2 text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06] active:scale-95 transition-all"
                 >
                   <Printer className="size-3.5" />
                 </Button>
@@ -1336,12 +1685,30 @@ export default function CoupleSeatingCanvas() {
                   variant="ghost"
                   size="sm"
                   onClick={handleExportCsv}
-                  className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5"
+                  className="h-7 px-2 text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/[0.06] active:scale-95 transition-all"
                 >
                   <FileDown className="size-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Export CSV</TooltipContent>
+            </Tooltip>
+            </div>
+
+            {/* ── Guest Actions ── */}
+            <div className="flex items-center gap-0.5 rounded-lg bg-cinematic-gold/[0.06] p-0.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setEditingGuest(null); setGuestFormOpen(true); }}
+                  className="h-7 px-2 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/10 active:scale-95 transition-all"
+                >
+                  <UserPlus className="size-3.5" />
+                  <span className="hidden xl:inline text-xs ml-1.5">Add Guest</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Add Guest</TooltipContent>
             </Tooltip>
 
             <Tooltip>
@@ -1350,7 +1717,7 @@ export default function CoupleSeatingCanvas() {
                   variant="ghost"
                   size="sm"
                   onClick={() => setGuestListOpen(true)}
-                  className="h-8 px-2 text-charcoal-ink/50 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
+                  className="h-7 px-2 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/10 active:scale-95 transition-all"
                 >
                   <List className="size-4" />
                   <span className="hidden xl:inline text-xs ml-1.5">Guest List</span>
@@ -1358,41 +1725,85 @@ export default function CoupleSeatingCanvas() {
               </TooltipTrigger>
               <TooltipContent>Full Guest List</TooltipContent>
             </Tooltip>
+            </div>
           </div>
 
           {/* Capacity Overview Bar */}
-          <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-champagne-silk bg-paper-cream/50 text-xs text-charcoal-ink/70 flex-wrap">
-            <span className="font-medium text-charcoal-ink/60"><UsersRound className="size-3 inline mr-1" />{totalSeats} seats</span>
-            <span className="text-charcoal-ink/30">|</span>
-            <span className="text-emerald-600"><CheckCircle2 className="size-3 inline mr-0.5" />{assignedCount} assigned</span>
-            <span className="text-charcoal-ink/30">|</span>
-            <span className="text-amber-600"><Clock className="size-3 inline mr-0.5" />{remainingSeats} remaining</span>
-            <span className="text-charcoal-ink/30">|</span>
-            <span className="text-charcoal-ink/50">{unassignedGuests.length} unassigned</span>
+          <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-champagne-silk/60 bg-paper-cream/40 text-xs text-charcoal-ink/60 flex-wrap">
+            <span className="font-medium text-charcoal-ink/50 flex items-center gap-1"><UsersRound className="size-3" />{totalSeats} seats</span>
+            <span className="text-charcoal-ink/15">·</span>
+            <span className="text-emerald-600/80 flex items-center gap-1"><CheckCircle2 className="size-3" />{assignedCount} assigned</span>
+            <span className="text-charcoal-ink/15">·</span>
+            <span className="text-amber-600/80 flex items-center gap-1"><Clock className="size-3" />{remainingSeats} remaining</span>
+            <span className="text-charcoal-ink/15">·</span>
+            <span className="text-charcoal-ink/40">{unassignedGuests.length} unassigned</span>
             <div className="flex-1 min-w-[80px]">
-              <div className="w-full h-1.5 rounded-full bg-charcoal-ink/5 overflow-hidden">
+              <div className="w-full h-1.5 rounded-full bg-charcoal-ink/[0.04] overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all duration-500 ${
+                  className={`h-full rounded-full transition-all duration-500 ease-out ${
                     fillPct > 90 ? 'bg-red-400' : fillPct > 70 ? 'bg-amber-400' : 'bg-emerald-400'
                   }`}
                   style={{ width: `${Math.min(fillPct, 100)}%` }}
                 />
               </div>
             </div>
-            <span className={`font-semibold text-[10px] ${
+            <span className={`font-semibold tabular-nums text-[10px] ${
               fillPct > 90 ? 'text-red-500' : fillPct > 70 ? 'text-amber-500' : 'text-emerald-500'
             }`}>{fillPct}%</span>
             <Button
               variant="ghost"
               size="sm"
-              onClick={handleAutoAssign}
+              onClick={() => setSmartAssignOpen(true)}
               disabled={autoAssigning}
-              className="h-7 px-2 text-[11px] font-medium text-cinematic-gold hover:bg-cinematic-gold/10 ml-auto"
+              className="h-7 px-2.5 text-[11px] font-medium text-cinematic-gold hover:bg-cinematic-gold/10 active:scale-95 transition-all ml-auto rounded-md"
             >
               {autoAssigning ? <Loader2 className="size-3 animate-spin mr-1" /> : <Wand2 className="size-3 mr-1" />}
-              Auto-Assign
+              Smart Assign
             </Button>
           </div>
+
+          {/* Multi-select info bar */}
+          {multiSelectedIds.size > 0 && (
+            <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-cinematic-gold/30 bg-cinematic-gold/5 text-xs text-charcoal-ink/70 flex-wrap">
+              <span className="font-medium text-cinematic-gold"><Move className="size-3 inline mr-1" />{multiSelectedIds.size} tables selected</span>
+              <span className="text-charcoal-ink/30">|</span>
+              <span className="text-charcoal-ink/50">Shift+click to add/remove</span>
+              <div className="flex items-center gap-1.5 ml-auto">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setBatchZone('__none__'); setBatchZoneDialogOpen(true); }}
+                  className="h-7 px-2 text-[11px] font-medium text-charcoal-ink/60 hover:bg-charcoal-ink/5"
+                >
+                  Set Zone
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setBatchShape('circle'); setBatchShapeDialogOpen(true); }}
+                  className="h-7 px-2 text-[11px] font-medium text-charcoal-ink/60 hover:bg-charcoal-ink/5"
+                >
+                  Set Shape
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleBatchDelete}
+                  className="h-7 px-2 text-[11px] font-medium text-red-500 hover:bg-red-50"
+                >
+                  <Trash2 className="size-3 mr-1" />Delete
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setMultiSelectedIds(new Set())}
+                  className="h-7 px-2 text-[11px] font-medium text-charcoal-ink/60 hover:bg-charcoal-ink/5"
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* Reassigning indicator */}
           {reassigningGuestId && (
@@ -1416,37 +1827,20 @@ export default function CoupleSeatingCanvas() {
           {/* Canvas */}
           <div
             ref={canvasRef}
-            className={`relative border border-champagne-silk rounded-lg bg-white overflow-hidden ${isPanMode ? 'cursor-grab' : ''} ${isPanning ? 'cursor-grabbing' : ''}`}
-            style={{ height: '520px' }}
+            className={`relative h-[58vh] min-h-[400px] border border-champagne-silk rounded-lg bg-[radial-gradient(circle,_#d4d4d4_1px,_transparent_1px)] [background-size:20px_20px] overflow-hidden ${isPanning ? 'cursor-grab' : ''}`}
+            onMouseDown={handleCanvasMouseDown}
+            onWheel={(e) => {
+              if (canvasLocked) return;
+              e.preventDefault();
+              const delta = e.deltaY > 0 ? -5 : 5;
+              setCanvasScale((s) => Math.max(30, Math.min(200, s + delta)));
+            }}
             onClick={(e) => {
+              if (isPanning) return;
               if (e.target === e.currentTarget) {
                 if (reassigningGuestId) setReassigningGuestId(null);
                 setSelectedTableId(null);
-                setSelectedTableIds(new Set());
-              }
-            }}
-            onMouseDown={(e) => {
-              // Feature 4: Pan mode
-              if (isPanMode && e.target === e.currentTarget) {
-                e.preventDefault();
-                setIsPanning(true);
-                panStartRef.current = { x: e.clientX, y: e.clientY, panX: panOffset.x, panY: panOffset.y };
-
-                const handleMove = (ev: MouseEvent) => {
-                  const dx = ev.clientX - panStartRef.current.x;
-                  const dy = ev.clientY - panStartRef.current.y;
-                  setPanOffset({
-                    x: panStartRef.current.panX + dx / (canvasScale / 100),
-                    y: panStartRef.current.panY + dy / (canvasScale / 100),
-                  });
-                };
-                const handleUp = () => {
-                  setIsPanning(false);
-                  document.removeEventListener('mousemove', handleMove);
-                  document.removeEventListener('mouseup', handleUp);
-                };
-                document.addEventListener('mousemove', handleMove);
-                document.addEventListener('mouseup', handleUp);
+                setMultiSelectedIds(new Set());
               }
             }}
           >
@@ -1461,77 +1855,44 @@ export default function CoupleSeatingCanvas() {
                 <p className="text-xs text-charcoal-ink/30">Click &quot;Add Table&quot; to start arranging seating.</p>
               </div>
             ) : (
-              <div
-                style={{
-                  transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${canvasScale / 100})`,
-                  transformOrigin: 'top left',
-                  width: `${2000 * (100 / canvasScale)}px`,
-                  height: `${2000 * (100 / canvasScale)}px`,
-                }}
-                className="relative"
-              >
-                {/* Floor plan background */}
-                {floorPlanUrl && (
-                  <img
-                    src={floorPlanUrl}
-                    alt="Floor plan"
-                    className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-                    style={{ opacity: 0.15 }}
-                  />
-                )}
+              <div className="w-full h-full relative">
+                <div
+                  style={{
+                    transform: 'translate(' + panX + 'px, ' + panY + 'px) scale(' + (canvasScale / 100) + ')',
+                    transformOrigin: '0 0',
+                    width: contentBounds.w + 'px',
+                    height: contentBounds.h + 'px',
+                  }}
+                  className="relative shrink-0"
+                >
+                  {/* Floor plan background */}
+                  {floorPlanUrl && (
+                    <img
+                      src={floorPlanUrl}
+                      alt="Floor plan"
+                      className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                      style={{ opacity: 0.15 }}
+                    />
+                  )}
 
-                {/* Feature 5: Venue Elements */}
-                {venueElements.map((el) => (
+                  {/* Venue Elements: STAGE & COUPLE */}
                   <div
-                    key={el.id}
-                    className={`absolute ${el.type === 'STAGE' ? 'bg-gray-100 border border-gray-300' : 'border-dashed border-gray-300 bg-transparent'}`}
-                    style={{
-                      left: el.x,
-                      top: el.y,
-                      width: el.width,
-                      height: el.height,
-                    }}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      venueDragRef.current = {
-                        id: el.id,
-                        startX: e.clientX,
-                        startY: e.clientY,
-                        origX: el.x,
-                        origY: el.y,
-                      };
-                      const handleMove = (ev: MouseEvent) => {
-                        if (!venueDragRef.current) return;
-                        const dx = (ev.clientX - venueDragRef.current.startX) / (canvasScale / 100);
-                        const dy = (ev.clientY - venueDragRef.current.startY) / (canvasScale / 100);
-                        const newX = venueDragRef.current.origX + dx;
-                        const newY = venueDragRef.current.origY + dy;
-                        setVenueElements((prev) =>
-                          prev.map((v) => (v.id === el.id ? { ...v, x: newX, y: newY } : v))
-                        );
-                      };
-                      const handleUp = () => {
-                        venueDragRef.current = null;
-                        document.removeEventListener('mousemove', handleMove);
-                        document.removeEventListener('mouseup', handleUp);
-                      };
-                      document.addEventListener('mousemove', handleMove);
-                      document.addEventListener('mouseup', handleUp);
-                    }}
+                    className="absolute bg-gray-100 border border-gray-300 flex items-center justify-center select-none"
+                    style={{ left: 50, top: 100, width: 120, height: 200 }}
                   >
-                    <span
-                      className={`absolute inset-0 flex items-center justify-center text-[10px] font-semibold uppercase tracking-wider text-gray-400 ${el.type === 'STAGE' ? 'rotate-90' : ''}`}
-                    >
-                      {el.type}
-                    </span>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] [writing-mode:vertical-lr] rotate-180">Stage</span>
                   </div>
-                ))}
+                  <div
+                    className="absolute border-2 border-dashed border-gray-300 flex items-center justify-center select-none rounded-sm"
+                    style={{ left: 150, top: 600, width: 120, height: 120 }}
+                  >
+                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-[0.1em]">Couple</span>
+                  </div>
 
                 {tables.map((tbl) => {
-                  const dims = TABLE_DIMS[tbl.shape] || TABLE_DIMS.circle;
-                  const scaledW = dims.w * (tableSize / 100);
-                  const scaledH = dims.h * (tableSize / 100);
+                  const baseDims = TABLE_DIMS[tbl.shape] || TABLE_DIMS.circle;
+                  const scaledW = baseDims.w * tableSizeScale;
+                  const scaledH = baseDims.h * tableSizeScale;
                   const count = getGuestCountForTable(tbl.tableNum);
                   const isOverCapacity = count > tbl.capacity;
                   const isEmpty = count === 0;
@@ -1540,20 +1901,17 @@ export default function CoupleSeatingCanvas() {
                   const tableGuests = guestsAtTable(tbl.tableNum);
                   const displayName = tbl.name || `T${tbl.tableNum}`;
 
-                  // Feature 7: Search highlight
-                  const searchQ = canvasSearch.toLowerCase();
-                  const isSearchMatch = searchQ && (
-                    (tbl.name || '').toLowerCase().includes(searchQ) ||
-                    `t${tbl.tableNum}`.includes(searchQ) ||
-                    tableGuests.some((g) => g.name.toLowerCase().includes(searchQ))
-                  );
-
-                  // Feature 8: Multi-select
-                  const isMultiSelected = selectedTableIds.has(tbl.id) && !isSelected;
-
                   // Border color logic
                   let borderCls = 'border-gray-300';
-                  if (isDragOver) {
+                  const searchMatch = canvasSearch
+                    ? (displayName.toLowerCase().includes(canvasSearch.toLowerCase()) ||
+                       tableGuests.some(g => g.name.toLowerCase().includes(canvasSearch.toLowerCase())))
+                    : false;
+                  if (multiSelectedIds.has(tbl.id)) {
+                    borderCls = 'border-dashed border-cinematic-gold';
+                  } else if (searchMatch) {
+                    borderCls = 'ring-2 ring-cinematic-gold/50 animate-pulse border-cinematic-gold';
+                  } else if (isDragOver) {
                     borderCls = 'border-cinematic-gold animate-pulse';
                   } else if (isSelected) {
                     borderCls = 'border-cinematic-gold';
@@ -1564,9 +1922,20 @@ export default function CoupleSeatingCanvas() {
                   }
 
                   // Shape
-                  let shapeCls = 'rounded-full';
-                  if (tbl.shape === 'rectangle') shapeCls = 'rounded-md';
-                  if (tbl.shape === 'oval') shapeCls = 'rounded-[50%]';
+                  let shapeCls = '';
+                  let shapeStyle: React.CSSProperties = {};
+                  let circleDepthCls = '';
+                  if (tbl.shape === 'circle') {
+                    shapeStyle.borderRadius = '50%';
+                    circleDepthCls = 'shadow-[inset_0_1px_2px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.08)]';
+                  } else if (tbl.shape === 'rectangle') {
+                    shapeCls = 'rounded-md';
+                  } else if (tbl.shape === 'oval') {
+                    shapeStyle.borderRadius = '50%';
+                    shapeCls = 'rounded-lg';
+                  }
+
+                  const isDragging = dragRef.current?.tableId === tbl.id;
 
                   return (
                     <div
@@ -1584,28 +1953,30 @@ export default function CoupleSeatingCanvas() {
                         onMouseDown={(e) => handleDragStart(e, tbl.id)}
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleCanvasTableClick(tbl.id, e.shiftKey);
+                          handleCanvasTableClick(tbl.id);
                         }}
                         onDragOver={(e) => handleTableDragOver(e, tbl.id)}
                         onDragLeave={handleTableDragLeave}
                         onDrop={(e) => handleTableDrop(e, tbl.id)}
-                        className={`absolute inset-0 border-2 ${borderCls} ${shapeCls} bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center cursor-grab active:cursor-grabbing transition-all duration-200 ${
+                        className={`absolute inset-0 border-2 ${borderCls} ${shapeCls} ${circleDepthCls} bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center cursor-grab active:cursor-grabbing will-change-transform ${isDragging ? 'z-50' : ''} ${
                           isSelected
                             ? 'shadow-[0_0_0_3px_rgba(212,175,55,0.3)] ring-2 ring-cinematic-gold/30'
                             : 'hover:shadow-md'
                         } ${reassigningGuestId && !isSelected ? 'hover:border-cinematic-gold hover:bg-cinematic-gold/5' : ''} ${
                           canvasLocked ? 'cursor-default' : ''
-                        } ${isMultiSelected ? 'ring-2 ring-cinematic-gold/40' : ''} ${isSearchMatch ? 'ring-2 ring-cinematic-gold/50 animate-pulse' : ''}`}
+                        }`}
+                        style={shapeStyle}
                       >
-                        <span className="text-xs font-bold text-charcoal-ink leading-none">
+                        <span className={`font-bold text-charcoal-ink leading-none`} style={{ fontSize: Math.max(6, 12 * textScale) }}>
                           {displayName.length > 8 ? truncate(displayName, 8) : displayName}
                         </span>
-                        <span className={`text-[10px] font-medium ${isOverCapacity ? 'text-red-500' : 'text-charcoal-ink/50'}`}>
+                        <span className={`font-medium ${isOverCapacity ? 'text-red-500' : 'text-charcoal-ink/50'}`} style={{ fontSize: Math.max(5, 10 * textScale) }}>
                           {count}/{tbl.capacity}
                         </span>
                         {tbl.zone && (
                           <span
-                            className={`text-[8px] px-1 rounded mt-0.5 ${ZONE_COLORS[tbl.zone] || 'bg-gray-100 text-gray-600'}`}
+                            className={`px-1 rounded mt-0.5 ${ZONE_COLORS[tbl.zone] || 'bg-gray-100 text-gray-600'}`}
+                            style={{ fontSize: Math.max(5, 8 * textScale) }}
                           >
                             {tbl.zone.replace('_', ' ')}
                           </span>
@@ -1621,37 +1992,43 @@ export default function CoupleSeatingCanvas() {
                         </div>
                       </div>
 
-                      {/* Feature 2: Radial guest labels (when showGuestLabels is true) */}
+                      {/* Guest labels around table — shape-aware distribution (hidden below 40% size) */}
                       {showGuestLabels && tableGuests.map((guest, gi) => {
                         const dietary = getEffectiveDietary(guest);
-                        const tableRadius = scaledW / 2;
-                        const angle = (gi / Math.max(tableGuests.length, 1)) * 2 * Math.PI - Math.PI / 2;
-                        const labelRadius = tableRadius + 18;
-                        const cx = scaledW / 2 + Math.cos(angle) * labelRadius;
-                        const cy = scaledH / 2 + Math.sin(angle) * labelRadius;
+                        const total = tableGuests.length;
 
-                        return (
-                          <div
-                            key={`label-${guest.id}`}
-                            className="absolute text-[10px] text-charcoal-ink/70 whitespace-nowrap truncate max-w-[70px]"
-                            style={{
-                              left: cx,
-                              top: cy,
-                              transform: 'translate(-50%, -50%)',
-                            }}
-                          >
-                            {guest.name.split(' ')[0]}{dietary ? <span className="text-red-500">*</span> : ''}
-                          </div>
-                        );
-                      })}
+                        // Shape-aware position calculation
+                        let gx: number, gy: number;
+                        const padding = 38 * Math.pow(tableSizeScale, 0.8);
 
-                      {/* Guest labels around table */}
-                      {tableGuests.map((guest, gi) => {
-                        const dietary = getEffectiveDietary(guest);
-                        const angle = (gi / Math.max(tableGuests.length, 1)) * 2 * Math.PI - Math.PI / 2;
-                        const radius = (scaledW / 2) + 40;
-                        const gx = scaledW / 2 + Math.cos(angle) * radius - 50;
-                        const gy = scaledH / 2 + Math.sin(angle) * radius - 10;
+                        if (tbl.shape === 'oval') {
+                          const angle = (gi / Math.max(total, 1)) * 2 * Math.PI - Math.PI / 2;
+                          const rx = scaledW / 2 + padding;
+                          const ry = scaledH / 2 + padding;
+                          gx = scaledW / 2 + Math.cos(angle) * rx;
+                          gy = scaledH / 2 + Math.sin(angle) * ry;
+                        } else if (tbl.shape === 'rectangle') {
+                          const perimeter = 2 * (scaledW + scaledH);
+                          const step = perimeter / Math.max(total, 1);
+                          let dist = step * gi;
+                          if (dist < scaledW) {
+                            gx = dist; gy = -padding;
+                          } else if (dist < scaledW + scaledH) {
+                            gx = scaledW + padding; gy = dist - scaledW;
+                          } else if (dist < 2 * scaledW + scaledH) {
+                            gx = scaledW - (dist - scaledW - scaledH); gy = scaledH + padding;
+                          } else {
+                            gx = -padding; gy = scaledH - (dist - 2 * scaledW - scaledH);
+                          }
+                        } else {
+                          const angle = (gi / Math.max(total, 1)) * 2 * Math.PI - Math.PI / 2;
+                          const radius = scaledW / 2 + padding;
+                          gx = scaledW / 2 + Math.cos(angle) * radius;
+                          gy = scaledH / 2 + Math.sin(angle) * radius;
+                        }
+
+                        gx = Math.max(-20, Math.min(scaledW + 20, gx));
+                        gy = Math.max(-10, Math.min(scaledH + 20, gy));
 
                         return (
                           <Tooltip key={guest.id}>
@@ -1665,14 +2042,16 @@ export default function CoupleSeatingCanvas() {
                                   e.stopPropagation();
                                   setDetailGuestId(guest.id);
                                 }}
-                                className={`absolute flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium whitespace-nowrap cursor-pointer transition-colors duration-150 ${
+                                className={`absolute flex items-center gap-0.5 px-1.5 py-0.5 rounded font-medium whitespace-nowrap cursor-pointer transition-colors duration-150 ${
                                   reassigningGuestId === guest.id
                                     ? 'bg-cinematic-gold text-charcoal-ink ring-2 ring-cinematic-gold/50'
                                     : 'bg-white border border-charcoal-ink/10 text-charcoal-ink/70 hover:border-cinematic-gold hover:text-charcoal-ink'
                                 }`}
                                 style={{
-                                  left: Math.max(0, gx),
-                                  top: Math.max(0, gy),
+                                  left: gx,
+                                  top: gy,
+                                  transform: 'translate(-50%, -50%)',
+                                  fontSize: Math.max(7, 9 * textScale),
                                 }}
                               >
                                 {guest.name.split(' ')[0]}
@@ -1694,171 +2073,162 @@ export default function CoupleSeatingCanvas() {
                   );
                 })}
               </div>
-            )}
-            {/* Feature 8: Multi-select floating action bar */}
-            {selectedTableIds.size > 0 && (
-              <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-lg bg-charcoal-ink/90 text-white px-3 py-1.5 shadow-lg">
-                <span className="text-xs font-medium">{selectedTableIds.size} table{selectedTableIds.size !== 1 ? 's' : ''} selected</span>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px] text-white hover:bg-white/10">
-                      Assign Zone
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    {ZONE_OPTIONS.filter((z) => z.value).map((z) => (
-                      <DropdownMenuItem
-                        key={z.value}
-                        onClick={async () => {
-                          for (const id of selectedTableIds) {
-                            const tbl = tables.find((t) => t.id === id);
-                            if (!tbl) continue;
-                            await fetch(TABLES_API, {
-                              method: 'PUT',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ id, zone: z.value }),
-                            });
-                          }
-                          await fetchTables();
-                          setSelectedTableIds(new Set());
-                          toast({ title: 'Success', description: `Zone assigned to ${selectedTableIds.size} tables` });
-                        }}
-                      >
-                        {z.label}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-[11px] text-red-300 hover:text-red-200 hover:bg-red-500/20"
-                  onClick={async () => {
-                    if (!confirm(`Delete ${selectedTableIds.size} selected tables?`)) return;
-                    pushHistory();
-                    for (const id of selectedTableIds) {
-                      await fetch(`${TABLES_API}&id=${id}`, { method: 'DELETE' });
-                    }
-                    await fetchTables();
-                    await fetchAllGuests();
-                    setSelectedTableIds(new Set());
-                    toast({ title: 'Success', description: `${selectedTableIds.size} tables deleted` });
-                  }}
-                >
-                  Delete All
-                </Button>
-              </div>
-            )}
-          </div>
-
-          {/* Feature 6: Zone/Dietary Overview Panel */}
-          <div className="rounded-lg border border-champagne-silk bg-paper-cream/30 p-4">
-            <button
-              type="button"
-              onClick={() => setZonePanelOpen(!zonePanelOpen)}
-              className="w-full flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-[10px] font-semibold tracking-wider text-charcoal-ink/60">ZONES</span>
-                <span className="text-[10px] font-semibold tracking-wider text-charcoal-ink/60">DIETARY OVERVIEW</span>
-              </div>
-              {zonePanelOpen ? <ChevronDown className="size-3.5 text-charcoal-ink/40" /> : <ChevronUp className="size-3.5 text-charcoal-ink/40" />}
-            </button>
-            {zonePanelOpen && (
-              <div className="flex gap-6 mt-3">
-                {/* Left: Zone Summary */}
-                <div className="flex-1 space-y-2">
-                  {Object.keys(zoneSummary).length === 0 || (Object.keys(zoneSummary).length === 1 && zoneSummary['_none']) ? (
-                    <p className="text-xs text-charcoal-ink/30 italic">No zones defined</p>
-                  ) : (
-                    Object.entries(zoneSummary).filter(([k]) => k !== '_none').map(([zone, data]) => (
-                      <div key={zone} className="flex items-center gap-2">
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${ZONE_COLORS[zone] || 'bg-gray-100 text-gray-600'}`}>
-                          {zone.replace('_', ' ')}
-                        </span>
-                        <span className="text-[10px] text-charcoal-ink/50">{data.tables} tables</span>
-                        <div className="flex-1 h-1 rounded-full bg-charcoal-ink/5 overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-cinematic-gold/60"
-                            style={{ width: `${data.capacity > 0 ? (data.assigned / data.capacity) * 100 : 0}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                {/* Right: Dietary Overview */}
-                <div className="flex-1 flex flex-wrap gap-1.5">
-                  {Object.keys(dietarySummary.counts).length === 0 && dietarySummary.otherCount === 0 ? (
-                    <p className="text-xs text-charcoal-ink/30 italic">No dietary requirements</p>
-                  ) : (
-                    <>
-                      {dietarySummary.counts['vegetarian'] != null && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium">
-                          Vegetarian {dietarySummary.counts['vegetarian']}
-                        </span>
-                      )}
-                      {dietarySummary.counts['vegan'] != null && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-medium">
-                          Vegan {dietarySummary.counts['vegan']}
-                        </span>
-                      )}
-                      {dietarySummary.counts['gluten-free'] != null && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">
-                          Gluten-Free {dietarySummary.counts['gluten-free']}
-                        </span>
-                      )}
-                      {dietarySummary.counts['halal'] != null && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 font-medium">
-                          Halal {dietarySummary.counts['halal']}
-                        </span>
-                      )}
-                      {dietarySummary.counts['kosher'] != null && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 font-medium">
-                          Kosher {dietarySummary.counts['kosher']}
-                        </span>
-                      )}
-                      {dietarySummary.counts['nut-free'] != null && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-medium">
-                          Nut-Free {dietarySummary.counts['nut-free']}
-                        </span>
-                      )}
-                      {dietarySummary.counts['dairy-free'] != null && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 font-medium">
-                          Dairy-Free {dietarySummary.counts['dairy-free']}
-                        </span>
-                      )}
-                      {dietarySummary.otherCount > 0 && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium">
-                          Other {dietarySummary.otherCount}
-                        </span>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
+            </div>
+          )}
           </div>
         </div>
 
-        {/* ======== RIGHT TABLE DETAIL PANEL ======== */}
+        {/* ======== INLINE GUEST PANEL ======== */}
         {selectedTable && (
-          <div className="w-full lg:w-72 shrink-0 border-l border-champagne-silk bg-paper-cream order-3 lg:max-h-[580px] overflow-y-auto custom-scrollbar max-h-[300px] lg:max-h-none">
-            <div className="p-4 space-y-4">
-              {/* Header */}
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-[0.08em]">
-                  {selectedTable.name || `Table ${selectedTable.tableNum}`}
-                </h3>
-                <div className="flex items-center gap-1">
+          <div className="border border-champagne-silk border-t-0 rounded-b-lg bg-white p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-bold text-charcoal-ink">
+                    {selectedTable.name || `Table ${selectedTable.tableNum}`}
+                  </span>
+                  {selectedTable.zone && (
+                    <Badge variant="outline" className={`text-[10px] shrink-0 ${ZONE_COLORS[selectedTable.zone] || ''}`}>
+                      {selectedTable.zone.replace('_', ' ')}
+                    </Badge>
+                  )}
+                </div>
+                <span className="text-[11px] text-charcoal-ink/50 flex items-center gap-1">
+                  {SHAPE_ICONS[selectedTable.shape]}
+                  {selectedTable.capacity} seats
+                </span>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setEditSheetOpen(true)}
+                      className="h-7 w-7 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
+                    >
+                      <Pencil className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Edit Table</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedTableId(null)}
+                      className="h-7 w-7 p-0 text-charcoal-ink/40 hover:text-charcoal-ink hover:bg-charcoal-ink/5"
+                    >
+                      <X className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Close</TooltipContent>
+                </Tooltip>
+              </div>
+            </div>
+
+            <div className="max-h-[35vh] overflow-y-auto">
+              <div className="space-y-1.5">
+                {guestsAtTable(selectedTable.tableNum).map((g, idx) => {
+                  const dietary = getEffectiveDietary(g);
+                  return (
+                    <div key={g.id} className="flex items-center justify-between gap-2 rounded-md border border-charcoal-ink/5 px-2.5 py-1.5 hover:border-champagne-silk transition-colors">
+                      <div className="min-w-0 flex items-center gap-2">
+                        <span className="text-[10px] font-medium text-charcoal-ink/30 w-4 text-right shrink-0">{idx + 1}.</span>
+                        <span className="text-xs font-semibold text-charcoal-ink truncate">{g.name}</span>
+                        {dietary && (
+                          <span className="flex items-center gap-0.5 text-[10px] text-red-500/70 shrink-0">
+                            <UtensilsCrossed className="size-2.5" />
+                            <span className="hidden sm:inline">{truncate(dietary, 16)}</span>
+                          </span>
+                        )}
+                        {g.plusOne && (
+                          <span className="flex items-center gap-0.5 text-[10px] text-pink-400/70 shrink-0" title={g.plusOneName || 'Plus one'}>
+                            <UserPlus className="size-2.5" />
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => { setEditingGuest(g); setGuestFormOpen(true); }}
+                          className="text-charcoal-ink/30 hover:text-cinematic-gold transition-colors"
+                          title="Edit guest"
+                        >
+                          <Pencil className="size-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleReassignGuest(g.id, null)}
+                          className="text-[10px] text-red-400 hover:text-red-600 underline"
+                          title="Unassign"
+                        >Remove</button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {getGuestCountForTable(selectedTable.tableNum) === 0 && (
+                  <p className="text-xs text-charcoal-ink/30 italic py-2 text-center">No guests assigned</p>
+                )}
+              </div>
+
+              {unassignedGuests.length > 0 && (
+                <>
+                  <Separator className="bg-champagne-silk my-3" />
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-charcoal-ink/50">
+                        Add Guest
+                      </h4>
+                      <span className="text-[10px] text-charcoal-ink/30">{getGuestCountForTable(selectedTable.tableNum)}/{selectedTable.capacity} seats</span>
+                    </div>
+                    {(() => {
+                      const tableFull = getGuestCountForTable(selectedTable.tableNum) >= selectedTable.capacity;
+                      return (
+                        <Select disabled={tableFull}
+                          onValueChange={(v) => handleReassignGuest(v, selectedTable.tableNum)}
+                        >
+                          <SelectTrigger className="h-8 text-xs border-charcoal-ink/10 focus:border-cinematic-gold">
+                            <SelectValue placeholder={tableFull ? `Full (${selectedTable.capacity} seats)` : 'Select a guest to add...'} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {unassignedGuests.map((g) => (
+                              <SelectItem key={g.id} value={g.id}>
+                                {g.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      );
+                    })()}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ======== EDIT TABLE SHEET (simplified, edit-only) ======== */}
+      <Sheet open={editSheetOpen} onOpenChange={(open) => { if (!open) setEditSheetOpen(false); }}>
+        <SheetContent side="right" className="w-[360px] p-0 overflow-y-auto">
+          {selectedTable && (
+            <>
+              <SheetHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <SheetTitle className="text-charcoal-ink text-sm font-semibold truncate">
+                    Edit Table
+                  </SheetTitle>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={handleDuplicateTable}
-                        className="h-8 w-8 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
+                        className="h-7 w-7 p-0 text-charcoal-ink/40 hover:text-cinematic-gold hover:bg-cinematic-gold/5"
                       >
                         <Copy className="size-3.5" />
                       </Button>
@@ -1869,61 +2239,44 @@ export default function CoupleSeatingCanvas() {
                     variant="ghost"
                     size="sm"
                     onClick={handleDeleteTable}
-                    className="h-8 w-8 p-0 text-charcoal-ink/40 hover:text-red-500 hover:bg-red-50"
+                    className="h-7 w-7 p-0 text-charcoal-ink/40 hover:text-red-500 hover:bg-red-50"
                   >
                     <Trash2 className="size-3.5" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedTableId(null)}
-                    className="h-8 w-8 p-0 text-charcoal-ink/40 hover:text-charcoal-ink lg:hidden"
-                  >
-                    <X className="size-3.5" />
-                  </Button>
                 </div>
-              </div>
+              </SheetHeader>
 
               <Separator className="bg-champagne-silk" />
 
-              {/* Edit fields */}
-              <div className="space-y-3">
-                {/* Table Name */}
+              <div className="p-4 space-y-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-charcoal-ink/70">Table Name</Label>
                   <Input
                     value={editingTableName}
-                    onChange={(e) => {
-                      setEditingTableName(e.target.value);
-                      debouncedSaveTable();
-                    }}
+                    onChange={(e) => { setEditingTableName(e.target.value); debouncedSaveTable(); }}
                     placeholder="e.g. VIP Table"
                     className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
                   />
                 </div>
 
-                {/* Table Number */}
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-charcoal-ink/70">Table Number</Label>
                   <Input
                     value={editingTableNum}
-                    onChange={(e) => {
-                      setEditingTableNum(e.target.value);
-                      debouncedSaveTable();
-                    }}
+                    onChange={(e) => { setEditingTableNum(e.target.value); debouncedSaveTable(); }}
                     type="number"
                     className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
                   />
                 </div>
 
-                {/* Shape selector */}
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-charcoal-ink/70">Shape</Label>
                   <Select
                     value={editingShape}
                     onValueChange={(v) => {
                       setEditingShape(v);
-                      debouncedSaveTable();
+                      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+                      handleSaveTableEditsWith({ ...editFieldsRef.current, shape: v });
                     }}
                   >
                     <SelectTrigger className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20">
@@ -1931,72 +2284,52 @@ export default function CoupleSeatingCanvas() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="circle">
-                        <span className="flex items-center gap-2">{SHAPE_ICONS.circle} Circle</span>
+                        <span className="flex items-center gap-2">{SHAPE_ICONS.circle} Round</span>
                       </SelectItem>
                       <SelectItem value="rectangle">
-                        <span className="flex items-center gap-2">{SHAPE_ICONS.rectangle} Rectangle</span>
+                        <span className="flex items-center gap-2">{SHAPE_ICONS.rectangle} Square</span>
                       </SelectItem>
                       <SelectItem value="oval">
-                        <span className="flex items-center gap-2">{SHAPE_ICONS.oval} Oval</span>
+                        <span className="flex items-center gap-2">{SHAPE_ICONS.oval} Long Rectangle</span>
                       </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                {/* Capacity */}
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-charcoal-ink/70">Capacity</Label>
                   <Input
                     value={editingCapacity}
-                    onChange={(e) => {
-                      setEditingCapacity(parseInt(e.target.value, 10) || 1);
-                      debouncedSaveTable();
-                    }}
-                    type="number"
-                    min={1}
-                    max={50}
+                    onChange={(e) => { setEditingCapacity(parseInt(e.target.value, 10) || 1); debouncedSaveTable(); }}
+                    type="number" min={1} max={50}
                     className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
                   />
                 </div>
 
-                {/* Zone selector */}
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-charcoal-ink/70">Zone</Label>
-                  <Select
-                    value={editingZone}
-                    onValueChange={(v) => {
-                      setEditingZone(v);
-                      debouncedSaveTable();
-                    }}
-                  >
+                  <Select value={editingZone} onValueChange={(v) => { setEditingZone(v); debouncedSaveTable(); }}>
                     <SelectTrigger className="h-8 text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20">
                       <SelectValue placeholder="None" />
                     </SelectTrigger>
                     <SelectContent>
                       {ZONE_OPTIONS.map((z) => (
-                        <SelectItem key={z.value} value={z.value}>
-                          {z.label}
-                        </SelectItem>
+                        <SelectItem key={z.value} value={z.value}>{z.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
-                {/* Notes */}
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-charcoal-ink/70">Notes</Label>
                   <Textarea
                     value={editingNotes}
-                    onChange={(e) => {
-                      setEditingNotes(e.target.value);
-                      debouncedSaveTable();
-                    }}
+                    onChange={(e) => { setEditingNotes(e.target.value); debouncedSaveTable(); }}
                     placeholder="e.g. Near bar, VIP"
                     className="text-sm border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20 min-h-[60px]"
                   />
                 </div>
 
-                {/* Save button (explicit) */}
                 <Button
                   onClick={handleSaveTableEdits}
                   disabled={savingTable}
@@ -2006,101 +2339,10 @@ export default function CoupleSeatingCanvas() {
                   Save Changes
                 </Button>
               </div>
-
-              <Separator className="bg-champagne-silk" />
-
-              {/* Guests at this table */}
-              <div className="space-y-2">
-                <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-charcoal-ink/50">
-                  Guests at Table ({getGuestCountForTable(selectedTable.tableNum)}/{selectedTable.capacity})
-                </h4>
-                <div className="space-y-1.5">
-                  {guestsAtTable(selectedTable.tableNum).map((g, idx) => {
-                    const dietary = getEffectiveDietary(g);
-                    return (
-                      <div
-                        key={g.id}
-                        className="flex items-center justify-between gap-2 rounded-md border border-charcoal-ink/5 px-2.5 py-1.5 hover:border-champagne-silk transition-colors"
-                      >
-                        <div className="min-w-0 flex items-center gap-2">
-                          <span className="text-[10px] font-medium text-charcoal-ink/30 w-4 text-right shrink-0">{idx + 1}.</span>
-                          <div
-                            className="min-w-0 cursor-pointer"
-                            onClick={() => setDetailGuestId(g.id)}
-                          >
-                            <span className="text-xs font-semibold text-charcoal-ink truncate">{g.name}</span>
-                            {dietary && (
-                              <span className="flex items-center gap-0.5 text-[10px] text-red-500/70 shrink-0">
-                                <UtensilsCrossed className="size-2.5" />
-                                <span className="hidden sm:inline">{truncate(dietary, 16)}</span>
-                              </span>
-                            )}
-                            {g.plusOne && (
-                              <span className="flex items-center gap-0.5 text-[10px] text-pink-400/70 shrink-0" title={g.plusOneName || 'Plus one'}>
-                                <UserPlus className="size-2.5" />
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => { setEditingGuest(g); setGuestFormOpen(true); }}
-                            className="text-charcoal-ink/30 hover:text-cinematic-gold transition-colors"
-                            title="Edit guest"
-                          >
-                            <Pencil className="size-3" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleReassignGuest(g.id, null)}
-                            className="text-[10px] text-red-400 hover:text-red-600 underline"
-                            title="Unassign"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {getGuestCountForTable(selectedTable.tableNum) === 0 && (
-                    <p className="text-xs text-charcoal-ink/30 italic">No guests assigned</p>
-                  )}
-                </div>
-              </div>
-
-              <Separator className="bg-champagne-silk" />
-
-              {/* Unassigned guests */}
-              {unassignedGuests.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-charcoal-ink/50">
-                    Unassigned ({unassignedGuests.length})
-                  </h4>
-                  <div className="space-y-1.5 max-h-32 overflow-y-auto custom-scrollbar">
-                    {unassignedGuests.map((g) => (
-                      <div
-                        key={g.id}
-                        className="flex items-center justify-between gap-2 rounded-md border border-charcoal-ink/5 px-2.5 py-1.5"
-                      >
-                        <p className="text-xs font-medium text-charcoal-ink truncate min-w-0">{g.name}</p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleReassignGuest(g.id, selectedTable.tableNum)}
-                          className="h-6 px-2 text-[10px] text-cinematic-gold hover:bg-cinematic-gold/10 shrink-0"
-                        >
-                          <Plus className="size-3" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
 
       {/* ======== SWAP DIALOG ======== */}
       <Dialog open={swapDialogOpen} onOpenChange={setSwapDialogOpen}>
@@ -2262,30 +2504,69 @@ export default function CoupleSeatingCanvas() {
         </SheetContent>
       </Sheet>
 
-      {/* ======== PRINT DIALOG ======== */}
+      {/* ======== PRINT DIALOG (Enhanced) ======== */}
       <Dialog open={printDialogOpen} onOpenChange={setPrintDialogOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-charcoal-ink">Print-Ready Seating Chart</DialogTitle>
             <DialogDescription className="text-charcoal-ink/50">
-              Clean layout for printing. Use the Print button below.
+              Comprehensive view with stats, dietary info, and RSVP breakdown.
             </DialogDescription>
           </DialogHeader>
+
+          {/* Stats header */}
+          <div className="grid grid-cols-4 gap-3 p-3 rounded-lg bg-paper-cream/50 border border-champagne-silk text-center">
+            <div>
+              <p className="text-lg font-bold text-charcoal-ink">{tables.length}</p>
+              <p className="text-[10px] text-charcoal-ink/50 uppercase tracking-wider">Tables</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-emerald-600">{assignedCount}</p>
+              <p className="text-[10px] text-charcoal-ink/50 uppercase tracking-wider">Assigned</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-amber-600">{unassignedGuests.length}</p>
+              <p className="text-[10px] text-charcoal-ink/50 uppercase tracking-wider">Unassigned</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-charcoal-ink">{fillPct}%</p>
+              <p className="text-[10px] text-charcoal-ink/50 uppercase tracking-wider">Fill Rate</p>
+            </div>
+          </div>
+
           <div className="print-area space-y-6 p-4">
-            {tables.sort((a, b) => a.tableNum - b.tableNum).map((tbl) => {
+            {[...tables].sort((a, b) => a.tableNum - b.tableNum).map((tbl) => {
               const tblGuests = guestsAtTable(tbl.tableNum);
+              const rsvp = seatingStats.rsvpByTable[tbl.tableNum] || { attending: 0, pending: 0, declined: 0 };
+              const tblDietary: Record<string, number> = {};
+              for (const g of tblGuests) {
+                const dietary = getEffectiveDietary(g);
+                if (dietary) {
+                  const items = dietary.split(';').map(function(s) { return s.trim(); }).filter(Boolean);
+                  for (const item of items) {
+                    tblDietary[item] = (tblDietary[item] || 0) + 1;
+                  }
+                }
+              }
+              const dietarySummary = Object.entries(tblDietary).map(function(entry) { return entry[0] + ' (' + entry[1] + ')'; }).join(', ');
               return (
                 <div key={tbl.id} className="border border-charcoal-ink/10 rounded-lg p-4 print:break-inside-avoid">
                   <div className="flex items-center gap-2 mb-2">
                     <h3 className="text-sm font-bold text-charcoal-ink">
-                      {tbl.name || `Table ${tbl.tableNum}`}
+                      {tbl.name || 'Table ' + tbl.tableNum}
                     </h3>
-                    <span className="text-xs text-charcoal-ink/50">({tblGuests.length}/{tbl.capacity})</span>
+                    <span className="text-xs text-charcoal-ink/50">({'capacity: ' + tbl.capacity})</span>
                     {tbl.zone && (
-                      <Badge variant="outline" className={`text-[10px] ${ZONE_COLORS[tbl.zone] || ''}`}>
+                      <Badge variant="outline" className={'text-[10px] ' + (ZONE_COLORS[tbl.zone] || '')}>
                         {tbl.zone.replace('_', ' ')}
                       </Badge>
                     )}
+                  </div>
+                  {/* RSVP breakdown */}
+                  <div className="flex gap-3 text-[10px] text-charcoal-ink/50 mb-2">
+                    <span className="text-emerald-600">Attending: {rsvp.attending}</span>
+                    <span className="text-amber-600">Pending: {rsvp.pending}</span>
+                    <span className="text-red-500">Declined: {rsvp.declined}</span>
                   </div>
                   {tblGuests.length > 0 ? (
                     <ul className="space-y-1">
@@ -2293,13 +2574,18 @@ export default function CoupleSeatingCanvas() {
                         const dietary = getEffectiveDietary(g);
                         return (
                           <li key={g.id} className="text-xs text-charcoal-ink/80">
-                            {g.name}{dietary ? ` (${dietary})` : ''}
+                            {g.name}{dietary ? ' (' + dietary + ')' : ''}
                           </li>
                         );
                       })}
                     </ul>
                   ) : (
                     <p className="text-xs text-charcoal-ink/30 italic">No guests assigned</p>
+                  )}
+                  {dietarySummary && (
+                    <p className="text-[10px] text-red-500/70 mt-2 pt-2 border-t border-charcoal-ink/5">
+                      Dietary: {dietarySummary}
+                    </p>
                   )}
                 </div>
               );
@@ -2314,7 +2600,7 @@ export default function CoupleSeatingCanvas() {
                     const dietary = getEffectiveDietary(g);
                     return (
                       <li key={g.id} className="text-xs text-charcoal-ink/70">
-                        {g.name}{dietary ? ` (${dietary})` : ''}
+                        {g.name}{dietary ? ' (' + dietary + ')' : ''}
                       </li>
                     );
                   })}
@@ -2369,9 +2655,9 @@ export default function CoupleSeatingCanvas() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="circle">Circle</SelectItem>
-                  <SelectItem value="rectangle">Rectangle</SelectItem>
-                  <SelectItem value="oval">Oval</SelectItem>
+                  <SelectItem value="circle">Round</SelectItem>
+                  <SelectItem value="rectangle">Square</SelectItem>
+                  <SelectItem value="oval">Long Rectangle</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -2394,6 +2680,7 @@ export default function CoupleSeatingCanvas() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
       {/* Guest Form Dialog (sidebar add/edit) */}
       <GuestFormDialog
         open={guestFormOpen}
@@ -2408,6 +2695,266 @@ export default function CoupleSeatingCanvas() {
         onOpenChange={setGuestListOpen}
         onGuestsChanged={fetchAllGuests}
       />
+
+      {/* ======== SEATING STATISTICS CARDS (Phase 6) ======== */}
+      <div className="flex flex-col gap-2 mt-3">
+        {/* Zone fill cards */}
+        {Object.keys(seatingStats.zoneStats).length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {Object.entries(seatingStats.zoneStats).map(function(entry) {
+              const zone = entry[0];
+              const stats = entry[1];
+              const zoneFillPct = stats.seats > 0 ? Math.round((stats.assigned / stats.seats) * 100) : 0;
+              const zoneColor = ZONE_COLORS[zone] || 'bg-gray-100 text-gray-600';
+              return (
+                <div key={zone} className="rounded-lg border border-champagne-silk p-3 bg-white">
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge variant="outline" className={'text-[10px] ' + zoneColor}>
+                      {zone === 'Unzoned' ? 'No Zone' : zone.replace('_', ' ')}
+                    </Badge>
+                    <span className="text-[10px] text-charcoal-ink/40">{stats.tables} tables</span>
+                  </div>
+                  <div className="flex items-baseline gap-1 mb-1.5">
+                    <span className="text-sm font-semibold text-charcoal-ink">{stats.assigned}</span>
+                    <span className="text-[10px] text-charcoal-ink/40">/ {stats.seats} seats</span>
+                  </div>
+                  <Progress value={zoneFillPct} className="h-1.5" />
+                  <span className="text-[10px] text-charcoal-ink/40 mt-1">{zoneFillPct}%</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Dietary overview card */}
+        {Object.keys(seatingStats.dietaryCounts).length > 0 && (
+          <div className="rounded-lg border border-champagne-silk p-3 bg-white">
+            <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-charcoal-ink/50 mb-2">Dietary Overview</h4>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {Object.entries(seatingStats.dietaryCounts).map(function(entry) {
+                const name = entry[0];
+                const count = entry[1];
+                return (
+                  <div key={name} className="flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-1.5 text-charcoal-ink/70">
+                      <UtensilsCrossed className="size-3 text-red-400" />
+                      {name}
+                    </span>
+                    <span className="font-medium text-charcoal-ink">{count}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ======== SMART ASSIGN DIALOG ======== */}
+      <Dialog open={smartAssignOpen} onOpenChange={(open) => { if (open) setDryRunResult(null); setSmartAssignOpen(open); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-charcoal-ink">Smart Assign</DialogTitle>
+            <DialogDescription className="text-charcoal-ink/50">
+              Choose strategies for automatic guest placement.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="groupTogether"
+                checked={smartStrategies.groupTogether}
+                onCheckedChange={(checked) => setSmartStrategies((prev) => ({ ...prev, groupTogether: !!checked }))}
+                className="mt-0.5"
+              />
+              <div>
+                <Label htmlFor="groupTogether" className="text-sm font-medium text-charcoal-ink cursor-pointer">Group Together</Label>
+                <p className="text-[11px] text-charcoal-ink/50">Keep guests from the same group at the same table</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="pairPlusOnes"
+                checked={smartStrategies.pairPlusOnes}
+                onCheckedChange={(checked) => setSmartStrategies((prev) => ({ ...prev, pairPlusOnes: !!checked }))}
+                className="mt-0.5"
+              />
+              <div>
+                <Label htmlFor="pairPlusOnes" className="text-sm font-medium text-charcoal-ink cursor-pointer">Pair Plus Ones</Label>
+                <p className="text-[11px] text-charcoal-ink/50">Seat plus-one partners at the same table</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="matchZones"
+                checked={smartStrategies.matchZones}
+                onCheckedChange={(checked) => setSmartStrategies((prev) => ({ ...prev, matchZones: !!checked }))}
+                className="mt-0.5"
+              />
+              <div>
+                <Label htmlFor="matchZones" className="text-sm font-medium text-charcoal-ink cursor-pointer">Match Zones</Label>
+                <p className="text-[11px] text-charcoal-ink/50">Assign guests to tables in matching zones</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="balanceFill"
+                checked={smartStrategies.balanceFill}
+                onCheckedChange={(checked) => setSmartStrategies((prev) => ({ ...prev, balanceFill: !!checked }))}
+                className="mt-0.5"
+              />
+              <div>
+                <Label htmlFor="balanceFill" className="text-sm font-medium text-charcoal-ink cursor-pointer">Balance Fill</Label>
+                <p className="text-[11px] text-charcoal-ink/50">Distribute guests evenly across tables</p>
+              </div>
+            </div>
+            <Separator className="bg-champagne-silk" />
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="clearExisting"
+                checked={smartClearExisting}
+                onCheckedChange={(checked) => setSmartClearExisting(!!checked)}
+                className="mt-0.5"
+              />
+              <div>
+                <Label htmlFor="clearExisting" className="text-sm font-medium text-red-600 cursor-pointer">Clear Existing Assignments</Label>
+                <p className="text-[11px] text-charcoal-ink/50">Unassign all guests before running smart assign</p>
+              </div>
+            </div>
+            {/* Dry-run preview results */}
+            {dryRunResult && (
+              <div className="rounded-lg border border-cinematic-gold/30 bg-cinematic-gold/5 p-3 space-y-2">
+                <p className="text-xs font-medium text-charcoal-ink">Preview Results:</p>
+                <div className="flex gap-4 text-xs text-charcoal-ink/70">
+                  <span className="text-emerald-600 font-medium">{dryRunResult.assigned} would be assigned</span>
+                  <span className="text-amber-600 font-medium">{dryRunResult.unassigned} would remain unassigned</span>
+                  <span>{dryRunResult.tablesUsed} tables used</span>
+                </div>
+                {dryRunResult.unassigned > 0 && (
+                  <p className="text-[10px] text-amber-600/70">Some guests cannot be placed — consider adding more tables or increasing capacity.</p>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setSmartAssignOpen(false)}
+              className="border-charcoal-ink/15 text-charcoal-ink"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleDryRun}
+              disabled={autoAssigning}
+              className="border-charcoal-ink/15 text-charcoal-ink"
+            >
+              <Eye className="size-4 mr-1.5" />
+              Preview
+            </Button>
+            <Button
+              onClick={handleSmartAssign}
+              disabled={autoAssigning}
+              className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90"
+            >
+              {autoAssigning ? <Loader2 className="size-4 animate-spin mr-1.5" /> : <Wand2 className="size-4 mr-1.5" />}
+              Run Smart Assign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ======== BATCH ZONE DIALOG ======== */}
+      <Dialog open={batchZoneDialogOpen} onOpenChange={setBatchZoneDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-charcoal-ink">Set Zone for Selected Tables</DialogTitle>
+            <DialogDescription className="text-charcoal-ink/50">
+              Apply the same zone to {multiSelectedIds.size} selected tables.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-charcoal-ink/70">Zone</Label>
+              <Select value={batchZone} onValueChange={setBatchZone}>
+                <SelectTrigger className="h-8 text-sm border-charcoal-ink/10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ZONE_OPTIONS.map((z) => (
+                    <SelectItem key={z.value} value={z.value}>{z.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBatchZoneDialogOpen(false)}
+              className="border-charcoal-ink/15 text-charcoal-ink"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleBatchZone}
+              disabled={batchZone === '__none__'}
+              className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90"
+            >
+              Apply Zone
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ======== BATCH SHAPE DIALOG ======== */}
+      <Dialog open={batchShapeDialogOpen} onOpenChange={setBatchShapeDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-charcoal-ink">Set Shape for Selected Tables</DialogTitle>
+            <DialogDescription className="text-charcoal-ink/50">
+              Apply the same shape to {multiSelectedIds.size} selected tables.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-charcoal-ink/70">Shape</Label>
+              <Select value={batchShape} onValueChange={setBatchShape}>
+                <SelectTrigger className="h-8 text-sm border-charcoal-ink/10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="circle">
+                    <span className="flex items-center gap-2">{SHAPE_ICONS.circle} Round</span>
+                  </SelectItem>
+                  <SelectItem value="rectangle">
+                    <span className="flex items-center gap-2">{SHAPE_ICONS.rectangle} Square</span>
+                  </SelectItem>
+                  <SelectItem value="oval">
+                    <span className="flex items-center gap-2">{SHAPE_ICONS.oval} Long Rectangle</span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBatchShapeDialogOpen(false)}
+              className="border-charcoal-ink/15 text-charcoal-ink"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleBatchShape}
+              className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90"
+            >
+              Apply Shape
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {ConfirmDialog}
     </TooltipProvider>
   );
 }
