@@ -292,22 +292,41 @@ model Guest {
   weddingId      String
   wedding        WeddingAccount  @relation(fields: [weddingId], references: [id], onDelete: Cascade)
   name           String
+  chineseName    String?         // Chinese name (华文名)
   email          String?
   phone          String?
   groupName      String?         // family/grouping
+  side           String?         // GROOM | BRIDE — which side of the wedding
+  relationship   String?         // PARENT | SIBLING | RELATIVE | FRIEND | COLLEAGUE | BUSINESS | OTHER
+  invitedBy      String?         // free-text: who invited this guest
+  category       String?         // RELATIVES | FRIENDS | COLLEAGUES | BUSINESS | PARENTS_GUESTS | OTHER
   tableNumber    Int?
   invitationCode String          @unique
   rsvpStatus     String?         // PENDING | ATTENDING | DECLINED | PARTIAL
   plusOne        Boolean         @default(false)
   plusOneName    String?
+  seatCount      Int             @default(1) // total seats needed (1 = guest alone, 2 = guest + plus-one, etc.)
   dietaryNotes   String?
+  isVip          Boolean         @default(false)
+  isElderly      Boolean         @default(false) // needs elderly assistance / accessible seating
+  needsBabyChair Boolean         @default(false)
+  specialNotes   String?         // wedding-day notes beyond dietary
   sentVia        String?         // EMAIL | SMS | WHATSAPP | QR | MANUAL
   sentAt         DateTime?
   openedAt       DateTime?
+  checkInStatus  String?         // NOT_ARRIVED | CHECKED_IN | NO_SHOW
+  checkInTime    DateTime?       // when guest checked in on wedding day
+  actualPartySize Int?           // actual number who showed up
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
   rsvps RSVPSubmission[]
+
+  @@index([weddingId, side])
+  @@index([weddingId, category])
+  @@index([weddingId, rsvpStatus])
+  @@index([weddingId, tableNumber])
+  @@index([weddingId, checkInStatus])
 }
 
 // ============================================================
