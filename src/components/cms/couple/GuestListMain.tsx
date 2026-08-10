@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Loader2, Pencil, Trash2, Search, Crown, UtensilsCrossed,
   Download, Upload, Baby, PersonStanding, Users, UserCheck,
-  AlertTriangle, FileSpreadsheet,
+  AlertTriangle, FileSpreadsheet, CheckSquare, Square, X,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -90,6 +90,9 @@ export default function GuestListMain() {
   const [impResult, setImpResult] = useState<ImportResult | null>(null);
   const [impDrag, setImpDrag] = useState(false);
   const [checkinOpen, setCheckinOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDelOpen, setBulkDelOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const dbRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => { dbRef.current = setTimeout(() => setDebounced(search), 300); return () => clearTimeout(dbRef.current); }, [search]);
@@ -134,6 +137,39 @@ export default function GuestListMain() {
       fetchGuests(); fetchStats();
     } catch { toast({ title: 'Error', description: 'Failed to delete', variant: 'destructive' }); }
     finally { setDelId(null); }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = () => {
+    if (selectedIds.size === guests.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(guests.map((g) => g.id)));
+    }
+  };
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBulkDelete = async () => {
+    try {
+      setBulkDeleting(true);
+      const ids = Array.from(selectedIds);
+      await Promise.all(ids.map((id) => fetch(`${API_BASE}&id=${encodeURIComponent(id)}`, { method: 'DELETE' })));
+      invalidateWeddingCache();
+      toast({ title: 'Success', description: `${ids.length} guest${ids.length > 1 ? 's' : ''} deleted` });
+      clearSelection();
+      fetchGuests(); fetchStats();
+    } catch {
+      toast({ title: 'Error', description: 'Failed to delete some guests', variant: 'destructive' });
+    } finally {
+      setBulkDeleting(false);
+      setBulkDelOpen(false);
+    }
   };
 
   const onSaved = () => { fetchGuests(); fetchStats(); setSelId(null); };
@@ -247,6 +283,13 @@ export default function GuestListMain() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-paper-cream/60 hover:bg-paper-cream/60 border-b border-champagne-silk/40">
+                  <TableHead className="w-9 text-center p-0">
+                    <button onClick={toggleSelectAll} className="p-1.5 rounded cursor-pointer hover:bg-cinematic-gold/10 transition-colors" title={selectedIds.size === guests.length && guests.length > 0 ? 'Deselect all' : 'Select all'}>
+                      {selectedIds.size === guests.length && guests.length > 0
+                        ? <CheckSquare className="size-3.5 text-cinematic-gold" />
+                        : <Square className="size-3.5 text-charcoal-ink/30" />}
+                    </button>
+                  </TableHead>
                   <TableHead className="w-10 text-[11px] font-semibold text-charcoal-ink/50">No.</TableHead>
                   <TableHead className="text-[11px] font-semibold text-charcoal-ink/50">Name</TableHead>
                   <TableHead className="w-16 text-[11px] font-semibold text-charcoal-ink/50">Side</TableHead>
@@ -266,7 +309,14 @@ export default function GuestListMain() {
                   return (
                     <TableRow key={g.id} onClick={() => setSelId(sel ? null : g.id)}
                       className={`cursor-pointer transition-colors duration-100 border-b border-champagne-silk/20 ${
-                        sel ? 'bg-cinematic-gold/[0.08]' : idx % 2 === 0 ? 'bg-white hover:bg-paper-cream/40' : 'bg-paper-cream/30 hover:bg-paper-cream/60'}`}>
+                        selectedIds.has(g.id) ? 'bg-cinematic-gold/[0.06]' : sel ? 'bg-cinematic-gold/[0.08]' : idx % 2 === 0 ? 'bg-white hover:bg-paper-cream/40' : 'bg-paper-cream/30 hover:bg-paper-cream/60'}`}>
+                      <TableCell className="p-0 w-9 text-center" onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => toggleSelect(g.id)} className="p-1 rounded cursor-pointer hover:bg-cinematic-gold/10 transition-colors" title={selectedIds.has(g.id) ? 'Deselect' : 'Select'}>
+                          {selectedIds.has(g.id)
+                            ? <CheckSquare className="size-3.5 text-cinematic-gold" />
+                            : <Square className="size-3.5 text-charcoal-ink/25" />}
+                        </button>
+                      </TableCell>
                       <TableCell className="text-xs text-charcoal-ink/40 font-mono">{idx + 1}</TableCell>
                       <TableCell>
                         <div className="text-sm font-medium text-charcoal-ink">{g.name}</div>
@@ -325,6 +375,44 @@ export default function GuestListMain() {
           <Button size="sm" onClick={() => setCheckinOpen(true)} className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90 h-8 text-xs"><UserCheck className="size-3.5 mr-1" />Check-In</Button>
         </div>
       </div>
+
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="px-4 py-2.5 border-t border-cinematic-gold/30 bg-cinematic-gold/[0.06] shrink-0 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <CheckSquare className="size-4 text-cinematic-gold shrink-0" />
+            <span className="text-sm font-medium text-charcoal-ink truncate"><strong className="text-cinematic-gold">{selectedIds.size}</strong> guest{selectedIds.size > 1 ? 's' : ''} selected</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button variant="ghost" size="sm" onClick={clearSelection} className="h-7 text-xs text-charcoal-ink/50 hover:text-charcoal-ink px-2">
+              <X className="size-3.5 mr-1" />Clear
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setBulkDelOpen(true)}
+              className="h-7 text-xs border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300 px-3">
+              <Trash2 className="size-3.5 mr-1" />Delete Selected
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation */}
+      <Dialog open={bulkDelOpen} onOpenChange={setBulkDelOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-charcoal-ink">Delete {selectedIds.size} Guest{selectedIds.size > 1 ? 's' : ''}?</DialogTitle>
+            <DialogDescription className="text-charcoal-ink/50">
+              This will permanently remove {selectedIds.size} guest{selectedIds.size > 1 ? 's' : ''} from your list. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setBulkDelOpen(false)} className="border-charcoal-ink/15 text-charcoal-ink hover:border-cinematic-gold hover:text-cinematic-gold">Cancel</Button>
+            <Button onClick={handleBulkDelete} disabled={bulkDeleting}
+              className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+              {bulkDeleting ? <><Loader2 className="size-4 animate-spin mr-2" />Deleting…</> : `Delete ${selectedIds.size} Guest${selectedIds.size > 1 ? 's' : ''}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <GuestFormDialog open={editOpen} onOpenChange={setEditOpen} editGuest={editGuest} onSaved={onSaved} />
 
