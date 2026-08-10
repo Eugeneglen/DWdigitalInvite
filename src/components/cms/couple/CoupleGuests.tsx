@@ -56,10 +56,14 @@ export default function CoupleGuests() {
         </button>
       </div>
 
-      {/* Tab Content */}
+      {/* Tab Content — both panels stay mounted to preserve state across tab switches */}
       <div className="flex-1 min-h-0">
-        {activeTab === 'guests' && <GuestListMain />}
-        {activeTab === 'seating' && <CoupleSeatingCanvas />}
+        <div style={{ display: activeTab === 'guests' ? 'block' : 'none' }}>
+          <GuestListMain />
+        </div>
+        <div style={{ display: activeTab === 'seating' ? 'block' : 'none' }}>
+          <CoupleSeatingCanvas />
+        </div>
       </div>
     </div>
   );

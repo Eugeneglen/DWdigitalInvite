@@ -248,7 +248,7 @@ export default function CoupleSeatingCanvas() {
   const fetchTables = useCallback(async () => {
     try {
       setTablesLoading(true);
-      const res = await fetch(TABLES_API);
+      const res = await fetch(TABLES_API, { cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to load tables');
       const data = await res.json();
       setTables(data.tables ?? []);
@@ -969,13 +969,18 @@ export default function CoupleSeatingCanvas() {
       document.body.style.userSelect = '';
       if (!dragRef.current || !latestDragPos.current) return;
       try {
-        await fetch(TABLES_API, {
+        const res = await fetch(TABLES_API, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: tableId, posX: latestDragPos.current.posX, posY: latestDragPos.current.posY }),
         });
-      } catch {
-        // silent persist
+        if (!res.ok) {
+          console.error('[SeatingCanvas] Failed to save table position:', res.status, await res.text().catch(() => ''));
+          toast({ title: 'Position not saved', description: 'Could not persist table position. Try dragging again.', variant: 'destructive' });
+        }
+      } catch (err) {
+        console.error('[SeatingCanvas] Network error saving table position:', err);
+        toast({ title: 'Connection error', description: 'Could not save table position.', variant: 'destructive' });
       }
       dragRef.current = null;
       latestDragPos.current = null;
