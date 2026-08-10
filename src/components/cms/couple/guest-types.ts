@@ -207,14 +207,34 @@ export function parseCSV(text: string): { headers: string[]; rows: ParsedRow[] }
   const cleanText = text.replace(/^\ufeff/, '');
   const lines = cleanText.trim().split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) return { headers: [], rows: [] };
-  const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
+
+  // RFC 4180 compliant: handles quoted fields containing commas
+  function parseLine(line: string): string[] {
+    const fields: string[] = [];
+    let cur = '';
+    let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQ) {
+        if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+        else if (ch === '"') { inQ = false; }
+        else { cur += ch; }
+      } else {
+        if (ch === '"') { inQ = true; }
+        else if (ch === ',') { fields.push(cur.trim()); cur = ''; }
+        else { cur += ch; }
+      }
+    }
+    fields.push(cur.trim());
+    return fields;
+  }
+
+  const headers = parseLine(lines[0]).map((h) => h.replace(/^"|"$/g, ''));
   const rows: ParsedRow[] = [];
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',').map((v) => v.trim().replace(/^"|"$/g, ''));
+    const values = parseLine(lines[i]).map((v) => v.replace(/^"|"$/g, ''));
     const row: ParsedRow = {} as ParsedRow;
-    headers.forEach((h, idx) => {
-      row[h] = values[idx] ?? '';
-    });
+    headers.forEach((h, idx) => { row[h] = values[idx] ?? ''; });
     rows.push(row);
   }
   return { headers, rows };
@@ -266,6 +286,10 @@ export function rowToPayload(row: ParsedRow) {
     seatCount,
     dietaryNotes: (n.dietarynotes || n.dietary || '').trim() || undefined,
     rsvpStatus,
+    isVip: ['yes', 'true', '1', 'y'].includes((n.isvip || '').toLowerCase()),
+    isElderly: ['yes', 'true', '1', 'y'].includes((n.iselderly || '').toLowerCase()),
+    needsBabyChair: ['yes', 'true', '1', 'y'].includes((n.needsbabychair || '').toLowerCase()),
+    specialNotes: (n.specialnotes || '').trim() || undefined,
   };
 }
 

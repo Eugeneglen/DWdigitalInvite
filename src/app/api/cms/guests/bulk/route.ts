@@ -12,26 +12,9 @@ function normalize(str: string | null | undefined): string {
   return str.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
-// Relationship normaliser — maps common variants to canonical values
-const RELATIONSHIP_ALIASES: Record<string, string> = {
-  grandparent: 'RELATIVE', grandparents: 'RELATIVE', grandma: 'RELATIVE', grandfather: 'RELATIVE',
-  uncle: 'RELATIVE', aunt: 'RELATIVE', cousin: 'RELATIVE',
-  university_friend: 'FRIEND', uni_friend: 'FRIEND', school_friend: 'FRIEND',
-  family_friend: 'FRIEND', familyfriend: 'FRIEND', parents_friend: 'OTHER',
-  acquaintance: 'OTHER', neighbor: 'OTHER', neighbour: 'OTHER',
-  manager: 'COLLEAGUE', boss: 'COLLEAGUE', supervisor: 'COLLEAGUE',
-  partner: 'OTHER', guest_of: 'OTHER',
-};
-function normalizeRelationship(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const upper = raw.trim().toUpperCase().replace(/\s+/g, '_');
-  // If it already matches a standard value, return as-is
-  const standard = ['PARENT', 'SIBLING', 'RELATIVE', 'FRIEND', 'COLLEAGUE', 'BUSINESS', 'OTHER'];
-  if (standard.includes(upper)) return upper;
-  // Try alias lookup
-  const alias = RELATIONSHIP_ALIASES[raw.trim().toLowerCase().replace(/\s+/g, '_')];
-  return alias || raw.trim().toUpperCase().replace(/\s+/g, '_');
-}
+const VALID_SIDES = new Set(['GROOM', 'BRIDE']);
+const VALID_CATEGORIES = new Set(['RELATIVES', 'FRIENDS', 'COLLEAGUES', 'BUSINESS', 'PARENTS_GUESTS', 'OTHER']);
+const VALID_RELATIONSHIPS = new Set(['PARENT', 'SIBLING', 'RELATIVE', 'FRIEND', 'COLLEAGUE', 'BUSINESS', 'OTHER']);
 
 // ---------------------------------------------------------------------------
 // POST /api/cms/guests/bulk — bulk import guests from CSV data
@@ -53,7 +36,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { guests: guestRows } = body as { guests: Array<Record<string, string>> };
+    const { guests: guestRows } = body as { guests: Array<Record<string, unknown>> };
 
     if (!Array.isArray(guestRows) || guestRows.length === 0) {
       return NextResponse.json({ error: 'No guest data provided' }, { status: 400 });
@@ -70,13 +53,9 @@ export async function POST(req: NextRequest) {
       where: { weddingId: wedding.id },
     });
 
-    // email (lowercased) → guest  (only for guests that have an email)
     const byEmail = new Map<string, (typeof existingGuests)[number]>();
-    // phone (digits only) → guest  (only for guests that have a phone)
     const byPhone = new Map<string, (typeof existingGuests)[number]>();
-    // normalized name → guest
     const byName = new Map<string, (typeof existingGuests)[number]>();
-    // Set of guest IDs already matched (to avoid double-matching)
     const matchedIds = new Set<string>();
 
     for (const g of existingGuests) {
@@ -85,14 +64,13 @@ export async function POST(req: NextRequest) {
         if (key) byEmail.set(key, g);
       }
       if (g.phone) {
-        const key = g.phone.replace(/\D/g, ''); // digits only
+        const key = g.phone.replace(/\D/g, '');
         if (key) byPhone.set(key, g);
       }
       const nkey = normalize(g.name);
       if (nkey) byName.set(nkey, g);
     }
 
-    // Existing invitation codes to avoid collisions
     const existingCodeSet = new Set(existingGuests.map((g) => g.invitationCode));
 
     function generateCode(): string {
@@ -105,7 +83,31 @@ export async function POST(req: NextRequest) {
     }
 
     // -----------------------------------------------------------------------
-    // 2. Match-merge logic
+    // 2. Extract & validate a field from the raw row
+    // -----------------------------------------------------------------------
+    function str(v: unknown): string {
+      return typeof v === 'string' ? v.trim() : '';
+    }
+    function strOrNull(v: unknown): string | null {
+      const s = str(v);
+      return s || null;
+    }
+    function intOrNull(v: unknown): number | null {
+      if (v === null || v === undefined) return null;
+      const n = parseInt(String(v), 10);
+      return isNaN(n) ? null : n;
+    }
+    function bool(v: unknown): boolean {
+      if (typeof v === 'boolean') return v;
+      return ['yes', 'true', '1', 'y'].includes(str(v).toLowerCase());
+    }
+    function enumOrUndefined(v: unknown, validSet: Set<string>): string | undefined {
+      const upper = str(v).toUpperCase().trim();
+      return validSet.has(upper) ? upper : undefined;
+    }
+
+    // -----------------------------------------------------------------------
+    // 3. Match-merge logic
     // -----------------------------------------------------------------------
     const results = {
       created: 0,
@@ -115,7 +117,6 @@ export async function POST(req: NextRequest) {
     };
 
     function findExisting(email: string | null, phone: string | null, name: string): (typeof existingGuests)[number] | null {
-      // Priority 1: Email match
       if (email) {
         const norm = normalize(email);
         if (norm) {
@@ -123,7 +124,6 @@ export async function POST(req: NextRequest) {
           if (match && !matchedIds.has(match.id)) return match;
         }
       }
-      // Priority 2: Phone match
       if (phone) {
         const digits = phone.replace(/\D/g, '');
         if (digits) {
@@ -131,7 +131,6 @@ export async function POST(req: NextRequest) {
           if (match && !matchedIds.has(match.id)) return match;
         }
       }
-      // Priority 3: Exact normalized name match
       const normName = normalize(name);
       if (normName) {
         const match = byName.get(normName);
@@ -140,16 +139,16 @@ export async function POST(req: NextRequest) {
       return null;
     }
 
-    /**
-     * Merge strategy:
-     *  - tableNumber, groupName: always update (reassignment is common)
-     *  - email, phone, plusOne, plusOneName, dietaryNotes: fill gaps only
-     *    (existing data is more authoritative — may be from manual edit or RSVP)
-     *  - rsvpStatus, sentVia, sentAt, openedAt, invitationCode: NEVER touch
-     */
     function buildMergeData(
       existing: (typeof existingGuests)[number],
-      incoming: { email: string | null; phone: string | null; groupName: string | null; tableNumber: number | null; plusOne: boolean; plusOneName: string | null; dietaryNotes: string | null; chineseName: string | null; side: string | null; relationship: string | null; invitedBy: string | null; category: string | null; seatCount: number | null },
+      incoming: {
+        email: string | null; phone: string | null; groupName: string | null;
+        tableNumber: number | null; plusOne: boolean; plusOneName: string | null;
+        dietaryNotes: string | null; chineseName: string | null; side: string | null;
+        relationship: string | null; invitedBy: string | null; category: string | null;
+        seatCount: number; isVip: boolean; isElderly: boolean; needsBabyChair: boolean;
+        specialNotes: string | null;
+      },
     ) {
       const data: Record<string, unknown> = {};
 
@@ -157,77 +156,81 @@ export async function POST(req: NextRequest) {
       data.tableNumber = incoming.tableNumber;
       data.groupName = incoming.groupName;
 
-      // Always update org fields (re-categorisation is expected on re-import)
+      // Always update these enriched fields if provided
+      if (incoming.chineseName) data.chineseName = incoming.chineseName;
       if (incoming.side) data.side = incoming.side;
       if (incoming.relationship) data.relationship = incoming.relationship;
-      if (incoming.category) data.category = incoming.category;
       if (incoming.invitedBy) data.invitedBy = incoming.invitedBy;
-      if (incoming.seatCount && incoming.seatCount > 0) data.seatCount = incoming.seatCount;
+      if (incoming.category) data.category = incoming.category;
+      if (incoming.seatCount > 0) data.seatCount = incoming.seatCount;
+      if (incoming.isVip) data.isVip = true;
+      if (incoming.isElderly) data.isElderly = true;
+      if (incoming.needsBabyChair) data.needsBabyChair = true;
+      if (incoming.specialNotes) data.specialNotes = incoming.specialNotes;
 
-      // Fill gaps only — don't overwrite existing values
+      // Fill gaps only for contact/dietary fields
       if (!existing.email && incoming.email) data.email = incoming.email;
       if (!existing.phone && incoming.phone) data.phone = incoming.phone;
-      if (!existing.chineseName && incoming.chineseName) data.chineseName = incoming.chineseName;
       if (!existing.plusOneName && incoming.plusOneName) data.plusOneName = incoming.plusOneName;
       if (!existing.dietaryNotes && incoming.dietaryNotes) data.dietaryNotes = incoming.dietaryNotes;
-      // plusOne: update to true if incoming says yes (never downgrade to false)
+      if (!existing.chineseName && incoming.chineseName) data.chineseName = incoming.chineseName;
       if (incoming.plusOne && !existing.plusOne) data.plusOne = true;
 
       return data;
     }
 
     // -----------------------------------------------------------------------
-    // 3. Process each row
+    // 4. Process each row
     // -----------------------------------------------------------------------
     for (let i = 0; i < guestRows.length; i++) {
       const row = guestRows[i];
-      const name = (row.name || row.Name || '').trim();
+      const name = str(row.name || row.Name);
       if (!name) {
         results.errors.push({ row: i + 1, name: 'Unknown', error: 'Name is required' });
         results.skipped++;
         continue;
       }
 
-      const email = (row.email || row.Email || '').trim() || null;
-      const phone = (row.phone || row.Phone || '').trim() || null;
-      const groupName = (row.group || row.Group || row.groupName || row.GroupName || '').trim() || null;
-      const chineseName = (row.chineseName || row.ChineseName || row.chinese_name || '').trim() || null;
-      const sideRaw = (row.side || row.Side || '').trim().toUpperCase();
-      const side = ['GROOM', 'BRIDE'].includes(sideRaw) ? sideRaw : null;
-      const relationship = normalizeRelationship(row.relationship || row.Relationship);
-      const invitedBy = (row.invitedBy || row.InvitedBy || row.invited_by || '').trim() || null;
-      const categoryRaw = (row.category || row.Category || '').trim().toUpperCase().replace(/\s+/g, '_');
-      const category = ['RELATIVES', 'FRIENDS', 'COLLEAGUES', 'BUSINESS', 'PARENTS_GUESTS', 'OTHER'].includes(categoryRaw) ? categoryRaw : null;
-      const seatCount = parseInt(String(row.seatCount || row.SeatCount || '1'), 10) || 1;
-      const tableNumber = row.tableNumber || row.TableNumber
-        ? parseInt(String(row.tableNumber || row.TableNumber), 10) || null
-        : null;
-      const plusOne = row.plusOne === 'true' || row.PlusOne === 'true' || row.plus_one === 'yes' || row.plus_one === '1' || row.plusOne === true;
-      const plusOneName = (row.plusOneName || row.PlusOneName || row.plus_one_name || '').trim() || null;
-      const dietaryNotes = (row.dietaryNotes || row.DietaryNotes || row.dietary || row.Dietary || '').trim() || null;
+      const email = strOrNull(row.email || row.Email);
+      const phone = strOrNull(row.phone || row.Phone);
+      const groupName = strOrNull(row.group || row.Group || row.groupName || row.GroupName);
+      const chineseName = strOrNull(row.chineseName || row.ChineseName);
+      const side = enumOrUndefined(row.side || row.Side, VALID_SIDES);
+      const relationship = enumOrUndefined(row.relationship || row.Relationship, VALID_RELATIONSHIPS);
+      const invitedBy = strOrNull(row.invitedBy || row.InvitedBy);
+      const category = enumOrUndefined(row.category || row.Category, VALID_CATEGORIES);
+      const tableNumber = intOrNull(row.tableNumber || row.TableNumber);
+      const plusOne = bool(row.plusOne || row.PlusOne);
+      const plusOneName = strOrNull(row.plusOneName || row.PlusOneName);
+      const seatCount = intOrNull(row.seatCount || row.SeatCount) || 1;
+      const dietaryNotes = strOrNull(row.dietaryNotes || row.DietaryNotes || row.dietary || row.Dietary);
+      const rsvpStatus = enumOrUndefined(row.rsvpStatus || row.RsvpStatus,
+        new Set(['PENDING', 'ATTENDING', 'DECLINED', 'PARTIAL']));
+      const isVip = bool(row.isVip || row.IsVip);
+      const isElderly = bool(row.isElderly || row.IsElderly);
+      const needsBabyChair = bool(row.needsBabyChair || row.NeedsBabyChair);
+      const specialNotes = strOrNull(row.specialNotes || row.SpecialNotes);
 
       try {
         const existing = findExisting(email, phone, name);
 
         if (existing) {
-          // --- MATCH FOUND: merge ---
-          const mergeData = buildMergeData(existing, { email, phone, groupName, tableNumber, plusOne, plusOneName, dietaryNotes, chineseName, side, relationship, invitedBy, category, seatCount });
+          const mergeData = buildMergeData(existing, {
+            email, phone, groupName, tableNumber, plusOne, plusOneName,
+            dietaryNotes, chineseName, side, relationship, invitedBy,
+            category, seatCount, isVip, isElderly, needsBabyChair, specialNotes,
+          });
 
-          // Skip if nothing would change (avoid unnecessary updatedAt churn)
           const hasChanges = Object.keys(mergeData).some(
             (key) => JSON.stringify(mergeData[key]) !== JSON.stringify((existing as Record<string, unknown>)[key]),
           );
 
           if (hasChanges) {
             await db.guest.update({ where: { id: existing.id }, data: mergeData });
-            results.updated++;
-          } else {
-            // Identical — count as matched but no DB write needed
-            results.updated++;
           }
+          results.updated++;
           matchedIds.add(existing.id);
         } else {
-          // --- NO MATCH: create new guest ---
           await db.guest.create({
             data: {
               weddingId: wedding.id,
@@ -241,11 +244,15 @@ export async function POST(req: NextRequest) {
               invitedBy,
               category,
               tableNumber,
-              seatCount,
               plusOne,
               plusOneName,
+              seatCount,
               dietaryNotes,
-              rsvpStatus: (row.rsvpStatus as string) || null,
+              rsvpStatus: rsvpStatus ?? 'PENDING',
+              isVip,
+              isElderly,
+              needsBabyChair,
+              specialNotes,
               invitationCode: generateCode(),
             },
           });
@@ -259,7 +266,7 @@ export async function POST(req: NextRequest) {
     }
 
     // -----------------------------------------------------------------------
-    // 4. Audit log
+    // 5. Audit log
     // -----------------------------------------------------------------------
     await db.auditLog.create({
       data: {
@@ -280,6 +287,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, ...results });
   } catch (error) {
     console.error('Bulk guest import error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const msg = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

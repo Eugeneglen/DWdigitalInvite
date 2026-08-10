@@ -88,6 +88,7 @@ export default function GuestListMain() {
   const [impHeaders, setImpHeaders] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
   const [impResult, setImpResult] = useState<ImportResult | null>(null);
+  const [impError, setImpError] = useState<string | null>(null);
   const [impDrag, setImpDrag] = useState(false);
   const [checkinOpen, setCheckinOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -187,7 +188,7 @@ export default function GuestListMain() {
     finally { setExporting(false); }
   };
 
-  const resetImp = () => { setImpStep('upload'); setImpRows([]); setImpHeaders([]); setImporting(false); setImpResult(null); setImpDrag(false); };
+  const resetImp = () => { setImpStep('upload'); setImpRows([]); setImpHeaders([]); setImporting(false); setImpResult(null); setImpError(null); setImpDrag(false); };
   const procFile = (f: File) => {
     if (!f.name.endsWith('.csv')) { toast({ title: 'Error', description: 'Please select a .csv file', variant: 'destructive' }); return; }
     const reader = new FileReader();
@@ -203,15 +204,22 @@ export default function GuestListMain() {
   const handleImp = async () => {
     try {
       setImporting(true);
+      setImpError(null);
       const r = await fetch('/api/cms/guests/bulk?XTransformPort=3000', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ guests: impRows.map(rowToPayload) }),
       });
-      if (!r.ok) throw new Error();
-      setImpResult(await r.json()); setImpStep('result');
+      const data = await r.json();
+      if (!r.ok) {
+        setImpError(data.error || `Server error (${r.status})`);
+        return;
+      }
+      setImpResult(data); setImpStep('result');
       invalidateWeddingCache(); fetchGuests(); fetchStats();
-    } catch { toast({ title: 'Error', description: 'Import failed', variant: 'destructive' }); }
-    finally { setImporting(false); }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Network error — check your connection';
+      setImpError(msg);
+    } finally { setImporting(false); }
   };
 
   const gC = stats?.groomSide ?? 0; const bC = stats?.brideSide ?? 0;
@@ -424,8 +432,9 @@ export default function GuestListMain() {
 
       {/* Import Dialog */}
       <Dialog open={impOpen} onOpenChange={(v) => { if (!v) resetImp(); setImpOpen(v); }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col overflow-hidden p-0">
+          {/* Pinned Header */}
+          <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
             <DialogTitle className="text-charcoal-ink">Import Guests from CSV</DialogTitle>
             <DialogDescription className="text-charcoal-ink/50">
               {impStep === 'upload' && 'Upload a CSV file with guest data.'}
@@ -433,53 +442,121 @@ export default function GuestListMain() {
               {impStep === 'result' && 'Import complete!'}
             </DialogDescription>
           </DialogHeader>
-          {impStep === 'upload' && (
-            <div onDragOver={(e) => { e.preventDefault(); setImpDrag(true); }} onDragLeave={() => setImpDrag(false)} onDrop={handleImpDrop}
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${impDrag ? 'border-cinematic-gold bg-cinematic-gold/5' : 'border-charcoal-ink/15 hover:border-charcoal-ink/30'}`}>
-              <Upload className="size-8 mx-auto mb-2 text-charcoal-ink/30" />
-              <p className="text-sm text-charcoal-ink/50 mb-3">Drag & drop a CSV file here, or</p>
-              <label className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-cinematic-gold/10 text-cinematic-gold text-sm font-medium cursor-pointer hover:bg-cinematic-gold/20 transition-colors">
-                <FileSpreadsheet className="size-4" /> Browse Files
-                <input type="file" accept=".csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) procFile(f); }} />
-              </label>
-            </div>
-          )}
-          {impStep === 'preview' && (
-            <div className="space-y-3">
-              <div className="max-h-48 overflow-y-auto rounded border border-charcoal-ink/10 text-xs">
-                <table className="w-full"><thead><tr className="bg-paper-cream/60 border-b border-champagne-silk/40">
-                  {impHeaders.map((h) => <th key={h} className="px-2 py-1.5 text-left text-charcoal-ink/50 font-medium">{h}</th>)}
-                </tr></thead><tbody>
-                  {impRows.slice(0, 10).map((row, i) => <tr key={i} className="border-b border-charcoal-ink/5">
-                    {impHeaders.map((h) => <td key={h} className="px-2 py-1 text-charcoal-ink/60">{row[h] || ''}</td>)}
-                  </tr>)}
-                </tbody></table>
-                {impRows.length > 10 && <p className="px-2 py-1.5 text-charcoal-ink/40 text-center">...and {impRows.length - 10} more rows</p>}
+
+          {/* Scrollable Body */}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            {/* UPLOAD STEP */}
+            {impStep === 'upload' && (
+              <div className="px-6 py-4">
+                <div onDragOver={(e) => { e.preventDefault(); setImpDrag(true); }} onDragLeave={() => setImpDrag(false)} onDrop={handleImpDrop}
+                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${impDrag ? 'border-cinematic-gold bg-cinematic-gold/5' : 'border-charcoal-ink/15 hover:border-charcoal-ink/30'}`}>
+                  <Upload className="size-8 mx-auto mb-2 text-charcoal-ink/30" />
+                  <p className="text-sm text-charcoal-ink/50 mb-3">Drag & drop a CSV file here, or</p>
+                  <label className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-cinematic-gold/10 text-cinematic-gold text-sm font-medium cursor-pointer hover:bg-cinematic-gold/20 transition-colors">
+                    <FileSpreadsheet className="size-4" /> Browse Files
+                    <input type="file" accept=".csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) procFile(f); }} />
+                  </label>
+                </div>
               </div>
-              <DialogFooter className="gap-2">
-                <Button variant="outline" onClick={resetImp} className="border-charcoal-ink/15 text-charcoal-ink hover:border-cinematic-gold hover:text-cinematic-gold">Cancel</Button>
-                <Button onClick={handleImp} disabled={importing} className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90">
-                  {importing ? <><Loader2 className="size-4 animate-spin mr-2" />Importing…</> : `Import ${impRows.length} Guests`}
-                </Button>
-              </DialogFooter>
-            </div>
+            )}
+
+            {/* PREVIEW STEP */}
+            {impStep === 'preview' && (
+              <div className="h-full flex flex-col">
+                <div className="flex-1 min-h-0 overflow-auto px-6 py-3">
+                  <div className="overflow-x-auto rounded border border-charcoal-ink/10">
+                    <table className="w-full text-xs">
+                      <thead className="sticky top-0 z-10">
+                        <tr className="bg-paper-cream/80 border-b border-champagne-silk/40">
+                          <th className="px-2 py-1.5 text-left text-charcoal-ink/40 font-medium w-8">#</th>
+                          {impHeaders.map((h) => (
+                            <th key={h} className="px-2.5 py-1.5 text-left text-charcoal-ink/50 font-medium whitespace-nowrap">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {impRows.slice(0, 50).map((row, i) => {
+                          const rowName = (row.name || '').trim();
+                          const rowMissing = !rowName;
+                          return (
+                            <tr key={i} className={`border-b border-charcoal-ink/5 ${rowMissing ? 'bg-red-50/60' : 'hover:bg-paper-cream/30'}`}>
+                              <td className="px-2 py-1 text-charcoal-ink/30 font-mono text-center">{i + 1}</td>
+                              {impHeaders.map((h) => (
+                                <td key={h} className="px-2.5 py-1 text-charcoal-ink/60 max-w-[180px] truncate whitespace-nowrap" title={row[h] || ''}>
+                                  {row[h] || ''}
+                                </td>
+                              ))}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {impRows.length > 50 && (
+                    <p className="text-[11px] text-charcoal-ink/40 text-center mt-2">Showing 50 of {impRows.length} rows</p>
+                  )}
+                </div>
+                {/* Import error banner */}
+                {impError && (
+                  <div className="mx-6 mb-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 flex items-start gap-2">
+                    <AlertTriangle className="size-3.5 shrink-0 mt-0.5" />
+                    <span>{impError}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* RESULT STEP */}
+            {impStep === 'result' && impResult && (
+              <div className="px-6 py-4 space-y-3 overflow-y-auto">
+                <div className="rounded-lg border border-champagne-silk/40 p-4 grid grid-cols-3 gap-3 text-center">
+                  <div>
+                    <span className="block text-lg font-bold text-emerald-600">{impResult.created}</span>
+                    <span className="text-[11px] text-charcoal-ink/50">Created</span>
+                  </div>
+                  <div>
+                    <span className="block text-lg font-bold text-cinematic-gold">{impResult.updated}</span>
+                    <span className="text-[11px] text-charcoal-ink/50">Updated</span>
+                  </div>
+                  <div>
+                    <span className="block text-lg font-bold text-charcoal-ink/40">{impResult.skipped}</span>
+                    <span className="text-[11px] text-charcoal-ink/50">Skipped</span>
+                  </div>
+                </div>
+                {impResult.errors.length > 0 && (
+                  <div className="rounded-md border border-red-200 bg-red-50 overflow-hidden">
+                    <div className="px-3 py-2 border-b border-red-200 bg-red-100/50">
+                      <span className="text-xs font-medium text-red-700">{impResult.errors.length} row(s) had errors:</span>
+                    </div>
+                    <div className="max-h-36 overflow-y-auto px-3 py-2 space-y-1">
+                      {impResult.errors.map((e, i) => (
+                        <p key={i} className="text-xs text-red-600">
+                          <span className="font-mono font-medium">Row {e.row}</span>: {e.name} — {e.error}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {impResult.errors.length === 0 && (
+                  <p className="text-sm text-emerald-600 text-center">All rows imported successfully!</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Pinned Footer */}
+          {impStep === 'preview' && (
+            <DialogFooter className="gap-2 px-6 pb-5 pt-3 shrink-0 border-t border-charcoal-ink/5">
+              <Button variant="outline" onClick={resetImp} className="border-charcoal-ink/15 text-charcoal-ink hover:border-cinematic-gold hover:text-cinematic-gold">Cancel</Button>
+              <Button onClick={handleImp} disabled={importing} className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90">
+                {importing ? <><Loader2 className="size-4 animate-spin mr-2" />Importing…</> : `Import ${impRows.length} Guests`}
+              </Button>
+            </DialogFooter>
           )}
           {impStep === 'result' && impResult && (
-            <div className="space-y-3">
-              <div className="rounded-lg border border-champagne-silk/40 p-4 space-y-2">
-                <p className="text-sm text-emerald-600 font-medium">✅ {impResult.created} guests created</p>
-                <p className="text-sm text-cinematic-gold font-medium">🔄 {impResult.updated} guests updated</p>
-                {impResult.skipped > 0 && <p className="text-sm text-charcoal-ink/50">⏭️ {impResult.skipped} skipped</p>}
-              </div>
-              {impResult.errors.length > 0 && (
-                <div className="max-h-32 overflow-y-auto text-xs text-red-500">
-                  {impResult.errors.map((e, i) => <p key={i}>Row {e.row}: {e.name} — {e.error}</p>)}
-                </div>
-              )}
-              <DialogFooter>
-                <Button onClick={() => { resetImp(); setImpOpen(false); }} className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90">Done</Button>
-              </DialogFooter>
-            </div>
+            <DialogFooter className="px-6 pb-5 pt-3 shrink-0 border-t border-charcoal-ink/5">
+              <Button onClick={() => { resetImp(); setImpOpen(false); }} className="bg-cinematic-gold text-charcoal-ink hover:bg-cinematic-gold/90">Done</Button>
+            </DialogFooter>
           )}
         </DialogContent>
       </Dialog>
