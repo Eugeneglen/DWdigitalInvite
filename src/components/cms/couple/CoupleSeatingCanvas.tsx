@@ -6,7 +6,7 @@ import {
   ZoomIn, ZoomOut, Circle, Square, RectangleHorizontal,
   AlertCircle, UtensilsCrossed, Lock, Unlock,
   ImagePlus, ImageOff, Maximize, ChevronRight, Mail, Phone,
-  UserPlus, ArrowRightLeft, Ban, X, Pencil,
+  UserPlus, ArrowRightLeft, Ban, X, Pencil, Search,
   Wand2, Grid3x3, Download, Printer, Copy, FileDown,
   UsersRound, CheckCircle2, Clock, ChevronsUpDown,
   List, Undo2, Redo2, ArrowDownUp, Move, Ruler, Eye,
@@ -170,6 +170,9 @@ export default function CoupleSeatingCanvas() {
   const [batchZone, setBatchZone] = useState('__none__');
   const [batchShapeDialogOpen, setBatchShapeDialogOpen] = useState(false);
   const [batchShape, setBatchShape] = useState('circle');
+
+  // Canvas search
+  const [canvasSearch, setCanvasSearch] = useState('');
 
   // Drag state (table drag)
   const dragRef = useRef<{
@@ -1460,6 +1463,27 @@ export default function CoupleSeatingCanvas() {
             )}
             </div>
 
+            {/* ── Canvas Search ── */}
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-charcoal-ink/30" />
+              <input
+                type="text"
+                placeholder="Search tables..."
+                value={canvasSearch}
+                onChange={(e) => setCanvasSearch(e.target.value)}
+                className="h-7 w-32 sm:w-36 pl-7 pr-7 text-xs bg-transparent border border-charcoal-ink/10 rounded-md focus:outline-none focus:border-cinematic-gold/50 placeholder:text-charcoal-ink/25"
+              />
+              {canvasSearch && (
+                <button
+                  type="button"
+                  onClick={() => setCanvasSearch('')}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-charcoal-ink/30 hover:text-charcoal-ink"
+                >
+                  <X className="size-3" />
+                </button>
+              )}
+            </div>
+
             {/* ── Zoom ── */}
             <div className="flex items-center gap-1 rounded-lg bg-charcoal-ink/[0.03] px-1 py-0.5">
             <Tooltip>
@@ -1851,6 +1875,20 @@ export default function CoupleSeatingCanvas() {
                     />
                   )}
 
+                  {/* Venue Elements: STAGE & COUPLE */}
+                  <div
+                    className="absolute bg-gray-100 border border-gray-300 flex items-center justify-center select-none"
+                    style={{ left: 50, top: 100, width: 120, height: 200 }}
+                  >
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] [writing-mode:vertical-lr] rotate-180">Stage</span>
+                  </div>
+                  <div
+                    className="absolute border-2 border-dashed border-gray-300 flex items-center justify-center select-none rounded-sm"
+                    style={{ left: 150, top: 600, width: 120, height: 120 }}
+                  >
+                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-[0.1em]">Couple</span>
+                  </div>
+
                 {tables.map((tbl) => {
                   const baseDims = TABLE_DIMS[tbl.shape] || TABLE_DIMS.circle;
                   const scaledW = baseDims.w * tableSizeScale;
@@ -1865,8 +1903,14 @@ export default function CoupleSeatingCanvas() {
 
                   // Border color logic
                   let borderCls = 'border-gray-300';
+                  const searchMatch = canvasSearch
+                    ? (displayName.toLowerCase().includes(canvasSearch.toLowerCase()) ||
+                       tableGuests.some(g => g.name.toLowerCase().includes(canvasSearch.toLowerCase())))
+                    : false;
                   if (multiSelectedIds.has(tbl.id)) {
                     borderCls = 'border-dashed border-cinematic-gold';
+                  } else if (searchMatch) {
+                    borderCls = 'ring-2 ring-cinematic-gold/50 animate-pulse border-cinematic-gold';
                   } else if (isDragOver) {
                     borderCls = 'border-cinematic-gold animate-pulse';
                   } else if (isSelected) {
@@ -2086,11 +2130,12 @@ export default function CoupleSeatingCanvas() {
 
             <div className="max-h-[35vh] overflow-y-auto">
               <div className="space-y-1.5">
-                {guestsAtTable(selectedTable.tableNum).map((g) => {
+                {guestsAtTable(selectedTable.tableNum).map((g, idx) => {
                   const dietary = getEffectiveDietary(g);
                   return (
                     <div key={g.id} className="flex items-center justify-between gap-2 rounded-md border border-charcoal-ink/5 px-2.5 py-1.5 hover:border-champagne-silk transition-colors">
                       <div className="min-w-0 flex items-center gap-2">
+                        <span className="text-[10px] font-medium text-charcoal-ink/30 w-4 text-right shrink-0">{idx + 1}.</span>
                         <span className="text-xs font-semibold text-charcoal-ink truncate">{g.name}</span>
                         {dietary && (
                           <span className="flex items-center gap-0.5 text-[10px] text-red-500/70 shrink-0">

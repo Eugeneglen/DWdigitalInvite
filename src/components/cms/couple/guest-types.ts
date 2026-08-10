@@ -1,6 +1,8 @@
 // ---- Shared constants ----
 export const API_BASE = '/api/cms/guests?XTransformPort=3000';
 export const TABLES_API = '/api/cms/tables?XTransformPort=3000';
+export const GUEST_STATS_API = '/api/cms/guests/stats?XTransformPort=3000';
+export const CHECKIN_API = '/api/cms/guests/checkin?XTransformPort=3000';
 
 export const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   PENDING: { label: 'Pending', color: 'bg-amber-50 text-amber-700 border-amber-200' },
@@ -9,13 +11,41 @@ export const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   PARTIAL: { label: 'Partial', color: 'bg-sky-50 text-sky-700 border-sky-200' },
 };
 
-export const TABLE_DIMS: Record<string, { w: number; h: number }> = {
-  circle:    { w: 90, h: 90 },
-  rectangle: { w: 120, h: 80 },
-  oval:      { w: 150, h: 70 },
+export const CHECKIN_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  NOT_ARRIVED: { label: 'Not Arrived', color: 'bg-gray-50 text-gray-500 border-gray-200' },
+  CHECKED_IN: { label: 'Checked In', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  NO_SHOW: { label: 'No Show', color: 'bg-red-50 text-red-600 border-red-200' },
 };
 
-// SHAPE_ICONS needs to be defined in .tsx files that use JSX rendering
+export const SIDE_OPTIONS = [
+  { value: 'GROOM', label: 'Groom\'s Side', emoji: '🤵' },
+  { value: 'BRIDE', label: 'Bride\'s Side', emoji: '👰' },
+] as const;
+
+export const CATEGORY_OPTIONS = [
+  { value: 'RELATIVES', label: 'Relatives' },
+  { value: 'FRIENDS', label: 'Friends' },
+  { value: 'COLLEAGUES', label: 'Colleagues' },
+  { value: 'BUSINESS', label: 'Business' },
+  { value: 'PARENTS_GUESTS', label: 'Parents\' Guests' },
+  { value: 'OTHER', label: 'Other' },
+] as const;
+
+export const RELATIONSHIP_OPTIONS = [
+  { value: 'PARENT', label: 'Parent' },
+  { value: 'SIBLING', label: 'Sibling' },
+  { value: 'RELATIVE', label: 'Relative' },
+  { value: 'FRIEND', label: 'Friend' },
+  { value: 'COLLEAGUE', label: 'Colleague' },
+  { value: 'BUSINESS', label: 'Business Contact' },
+  { value: 'OTHER', label: 'Other' },
+] as const;
+
+export const TABLE_DIMS: Record<string, { w: number; h: number }> = {
+  circle:    { w: 76, h: 76 },
+  rectangle: { w: 120, h: 76 },
+  oval:      { w: 100, h: 80 },
+};
 
 // ---- Interfaces ----
 export interface RsvpGuestResponse {
@@ -33,17 +63,30 @@ export interface RsvpSubmissionBrief {
 export interface GuestItem {
   id: string;
   name: string;
+  chineseName: string | null;
   email: string | null;
   phone: string | null;
   groupName: string | null;
+  side: string | null;          // GROOM | BRIDE
+  relationship: string | null;  // PARENT | SIBLING | RELATIVE | FRIEND | COLLEAGUE | BUSINESS | OTHER
+  invitedBy: string | null;     // who invited this guest
+  category: string | null;      // RELATIVES | FRIENDS | COLLEAGUES | BUSINESS | PARENTS_GUESTS | OTHER
   tableNumber: number | null;
   invitationCode: string;
   rsvpStatus: string;
   plusOne: boolean;
   plusOneName: string | null;
+  seatCount: number;
   dietaryNotes: string | null;
+  isVip: boolean;
+  isElderly: boolean;
+  needsBabyChair: boolean;
+  specialNotes: string | null;
   sentVia: string | null;
   sentAt: string | null;
+  checkInStatus: string | null;
+  checkInTime: string | null;
+  actualPartySize: number | null;
   _count?: { rsvps: number; wishes: number };
   rsvps?: RsvpSubmissionBrief[];
 }
@@ -64,39 +107,86 @@ export interface SeatingTableItem {
 
 export interface GuestFormData {
   name: string;
+  chineseName: string;
   email: string;
   phone: string;
   groupName: string;
+  side: string;
+  relationship: string;
+  invitedBy: string;
+  category: string;
   tableNumber: string;
   plusOne: boolean;
   plusOneName: string;
+  seatCount: string;
   dietaryNotes: string;
+  isVip: boolean;
+  isElderly: boolean;
+  needsBabyChair: boolean;
+  specialNotes: string;
 }
 
 export const emptyGuestForm: GuestFormData = {
   name: '',
+  chineseName: '',
   email: '',
   phone: '',
   groupName: '',
+  side: '',
+  relationship: '',
+  invitedBy: '',
+  category: '',
   tableNumber: '',
   plusOne: false,
   plusOneName: '',
+  seatCount: '1',
   dietaryNotes: '',
+  isVip: false,
+  isElderly: false,
+  needsBabyChair: false,
+  specialNotes: '',
 };
+
+export interface GuestStats {
+  total: number;
+  groomSide: number;
+  brideSide: number;
+  unassignedSide: number;
+  attending: number;
+  declined: number;
+  pending: number;
+  partial: number;
+  totalSeats: number;
+  checkedIn: number;
+  notArrived: number;
+  noShow: number;
+  vipCount: number;
+  elderlyCount: number;
+  babyChairCount: number;
+  unassignedTable: number;
+  byCategory: Record<string, number>;
+  byRelationship: Record<string, number>;
+}
 
 // ---- CSV Import types & helpers ----
 export type ImportStep = 'upload' | 'preview' | 'result';
 
 export interface ParsedRow {
   name: string;
+  chineseName: string;
   email: string;
   phone: string;
   group: string;
   groupName: string;
   GroupName: string;
+  side: string;
+  relationship: string;
+  invitedBy: string;
+  category: string;
   tableNumber: string;
   plusOne: string;
   plusOneName: string;
+  seatCount: string;
   dietaryNotes: string;
   rsvpStatus: string;
   [key: string]: string;
@@ -110,38 +200,17 @@ export interface ImportResult {
   errors: Array<{ row: number; name: string; error: string }>;
 }
 
-export const CSV_TEMPLATE_HEADERS = 'name,email,phone,group,tableNumber,plusOne,plusOneName,dietaryNotes';
-export const CSV_TEMPLATE_EXAMPLE = "John Smith,john@email.com,+65 9123 4567,Bride's Family,1,yes,Jane Smith,Vegetarian";
-
-/** RFC 4180 compliant CSV line parser — handles quoted fields with commas */
-function parseCSVLine(line: string): string[] {
-  const fields: string[] = [];
-  let current = '';
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (inQuotes) {
-      if (ch === '"' && line[i + 1] === '"') { current += '"'; i++; }
-      else if (ch === '"') { inQuotes = false; }
-      else { current += ch; }
-    } else {
-      if (ch === '"') { inQuotes = true; }
-      else if (ch === ',') { fields.push(current.trim()); current = ''; }
-      else { current += ch; }
-    }
-  }
-  fields.push(current.trim());
-  return fields;
-}
+export const CSV_TEMPLATE_HEADERS = 'name,chineseName,email,phone,group,side,relationship,category,tableNumber,plusOne,plusOneName,seatCount,dietaryNotes,rsvpStatus';
+export const CSV_TEMPLATE_EXAMPLE = 'John Smith,陈大明,john@email.com,+65 9123 4567,Bride\'s Family,BRIDE,RELATIVE,RELATIVES,1,yes,Jane Smith,2,Vegetarian,ATTENDING';
 
 export function parseCSV(text: string): { headers: string[]; rows: ParsedRow[] } {
   const cleanText = text.replace(/^\ufeff/, '');
   const lines = cleanText.trim().split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) return { headers: [], rows: [] };
-  const headers = parseCSVLine(lines[0]);
+  const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
   const rows: ParsedRow[] = [];
   for (let i = 1; i < lines.length; i++) {
-    const values = parseCSVLine(lines[i]);
+    const values = lines[i].split(',').map((v) => v.trim().replace(/^"|"$/g, ''));
     const row: ParsedRow = {} as ParsedRow;
     headers.forEach((h, idx) => {
       row[h] = values[idx] ?? '';
@@ -178,14 +247,23 @@ export function rowToPayload(row: ParsedRow) {
   else if (rsvpRaw === 'confirmed' || rsvpRaw === 'attending') rsvpStatus = 'ATTENDING';
   else if (rsvpRaw === 'declined') rsvpStatus = 'DECLINED';
   else if (rsvpRaw === 'partial') rsvpStatus = 'PARTIAL';
+  const sideRaw = (n.side || '').toUpperCase().trim();
+  const side = ['GROOM', 'BRIDE'].includes(sideRaw) ? sideRaw : undefined;
+  const seatCount = parseInt(n.seatcount || '1', 10) || 1;
   return {
     name: (n.name || '').trim(),
+    chineseName: (n.chinesename || '').trim() || undefined,
     email: (n.email || '').trim() || undefined,
     phone: (n.phone || '').trim() || undefined,
     group: (n.group || n.groupname || '').trim() || undefined,
+    side,
+    relationship: (n.relationship || '').trim() || undefined,
+    invitedBy: (n.invitedby || '').trim() || undefined,
+    category: (n.category || '').trim() || undefined,
     tableNumber,
     plusOne: ['yes', 'true', '1', 'y'].includes((n.plusone || '').toLowerCase()),
     plusOneName: (n.plusonename || '').trim() || undefined,
+    seatCount,
     dietaryNotes: (n.dietarynotes || n.dietary || '').trim() || undefined,
     rsvpStatus,
   };
@@ -229,4 +307,18 @@ export function dietaryBadgeColor(dietary: string): string {
 
 export function getStatusConfig(status: string) {
   return STATUS_CONFIG[status] ?? { label: status, color: 'bg-gray-50 text-gray-600 border-gray-200' };
+}
+
+export function getCheckInStatusConfig(status: string) {
+  return CHECKIN_STATUS_CONFIG[status] ?? { label: status, color: 'bg-gray-50 text-gray-600 border-gray-200' };
+}
+
+export function getGuestDisplayName(guest: GuestItem): string {
+  if (guest.chineseName && guest.name) return `${guest.name} (${guest.chineseName})`;
+  return guest.name;
+}
+
+export function getGuestSeatCount(guest: GuestItem): number {
+  if (guest.actualPartySize != null && guest.actualPartySize > 0) return guest.actualPartySize;
+  return guest.seatCount || 1;
 }

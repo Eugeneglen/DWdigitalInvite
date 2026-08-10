@@ -6,7 +6,6 @@ import {
   Download, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, UtensilsCrossed,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,16 +61,8 @@ export default function GuestListSheet({ open, onOpenChange, onGuestsChanged }: 
   // --- Guest list state ---
   const [guests, setGuests] = useState<GuestItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const { confirm, ConfirmDialog } = useConfirmDialog();
   const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-
-  // Debounce search to avoid API call on every keystroke
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(t);
-  }, [search]);
   const [deleting, setDeleting] = useState<string | null>(null);
 
   // --- CSV Export state ---
@@ -97,7 +88,7 @@ export default function GuestListSheet({ open, onOpenChange, onGuestsChanged }: 
       setLoading(true);
       let url = API_BASE;
       const params: string[] = [];
-      if (debouncedSearch) params.push(`search=${encodeURIComponent(debouncedSearch)}`);
+      if (search) params.push(`search=${encodeURIComponent(search)}`);
       if (statusFilter !== 'all') params.push(`status=${statusFilter}`);
       if (params.length > 0) url += '&' + params.join('&');
       const res = await fetch(url);
@@ -109,7 +100,7 @@ export default function GuestListSheet({ open, onOpenChange, onGuestsChanged }: 
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, statusFilter]);
+  }, [search, statusFilter]);
 
   useEffect(() => {
     if (open) fetchGuests();
@@ -117,8 +108,7 @@ export default function GuestListSheet({ open, onOpenChange, onGuestsChanged }: 
 
   // ======== Guest CRUD ========
   const handleDelete = async (id: string) => {
-    const ok = await confirm('Delete Guest', 'This action cannot be undone. The guest will be permanently removed.');
-    if (!ok) return;
+    if (!confirm('Delete this guest? This action cannot be undone.')) return;
     try {
       setDeleting(id);
       const res = await fetch(`${API_BASE}&id=${encodeURIComponent(id)}`, { method: 'DELETE' });
@@ -335,7 +325,6 @@ export default function GuestListSheet({ open, onOpenChange, onGuestsChanged }: 
                   <Table>
                     <TableHeader className="sticky top-0 bg-paper-cream z-10">
                       <TableRow className="border-charcoal-ink/5 hover:bg-transparent">
-                        <TableHead className="text-[11px] font-semibold uppercase tracking-[0.08em] text-charcoal-ink/50 w-10 text-center">No.</TableHead>
                         <TableHead className="text-[11px] font-semibold uppercase tracking-[0.08em] text-charcoal-ink/50">Name</TableHead>
                         <TableHead className="text-[11px] font-semibold uppercase tracking-[0.08em] text-charcoal-ink/50">Email</TableHead>
                         <TableHead className="text-[11px] font-semibold uppercase tracking-[0.08em] text-charcoal-ink/50">Phone</TableHead>
@@ -346,12 +335,11 @@ export default function GuestListSheet({ open, onOpenChange, onGuestsChanged }: 
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {guests.map((guest, idx) => {
+                      {guests.map((guest) => {
                         const sc = getStatusConfig(guest.rsvpStatus);
                         const dietary = getEffectiveDietary(guest);
                         return (
                           <TableRow key={guest.id} className="border-charcoal-ink/5">
-                            <TableCell className="py-2.5 text-center text-xs text-charcoal-ink/30 font-mono">{idx + 1}</TableCell>
                             <TableCell className="py-2.5">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="text-sm font-medium text-charcoal-ink">{guest.name}</span>
@@ -423,7 +411,7 @@ export default function GuestListSheet({ open, onOpenChange, onGuestsChanged }: 
 
                 {/* Mobile Card View */}
                 <div className="sm:hidden space-y-2">
-                  {guests.map((guest, idx) => {
+                  {guests.map((guest) => {
                     const sc = getStatusConfig(guest.rsvpStatus);
                     const dietary = getEffectiveDietary(guest);
                     return (
@@ -435,7 +423,6 @@ export default function GuestListSheet({ open, onOpenChange, onGuestsChanged }: 
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                                <span className="text-[10px] font-mono text-charcoal-ink/30 w-5 text-right shrink-0">{idx + 1}</span>
                                 <h3 className="text-sm font-semibold text-charcoal-ink">{guest.name}</h3>
                                 <Badge variant="outline" className={`text-[10px] font-medium ${sc.color}`}>
                                   {sc.label}
@@ -722,7 +709,6 @@ export default function GuestListSheet({ open, onOpenChange, onGuestsChanged }: 
           onGuestsChanged();
         }}
       />
-      {ConfirmDialog}
     </>
   );
 }
