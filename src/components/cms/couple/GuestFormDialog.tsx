@@ -56,9 +56,9 @@ export default function GuestFormDialog({ open, onOpenChange, editGuest, default
         invitedBy: editGuest.invitedBy ?? '',
         category: editGuest.category ?? '',
         tableNumber: editGuest.tableNumber != null ? String(editGuest.tableNumber) : (defaultTableNumber ?? ''),
-        plusOne: editGuest.plusOne,
-        plusOneName: editGuest.plusOneName ?? '',
-        seatCount: String(editGuest.seatCount || 1),
+        plusOne: false,
+        plusOneName: '',
+        seatCount: '1',
         dietaryNotes: editGuest.dietaryNotes ?? '',
         isVip: editGuest.isVip,
         isElderly: editGuest.isElderly,
@@ -74,14 +74,7 @@ export default function GuestFormDialog({ open, onOpenChange, editGuest, default
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handlePlusOneChange = (checked: boolean) => {
-    setForm((prev) => {
-      const next = { ...prev, plusOne: checked };
-      if (checked && prev.seatCount === '1') next.seatCount = '2';
-      if (!checked) next.plusOneName = '';
-      return next;
-    });
-  };
+  // One name = one seat policy: plusOne and seatCount removed from UI
 
   const handleSave = async () => {
     if (!form.name.trim()) {
@@ -100,9 +93,9 @@ export default function GuestFormDialog({ open, onOpenChange, editGuest, default
         invitedBy: form.invitedBy.trim() || undefined,
         category: form.category || undefined,
         tableNumber: form.tableNumber ? parseInt(form.tableNumber, 10) : undefined,
-        plusOne: form.plusOne,
-        plusOneName: form.plusOneName.trim() || undefined,
-        seatCount: parseInt(form.seatCount, 10) || 1,
+        plusOne: false,
+        plusOneName: undefined,
+        seatCount: 1,
         dietaryNotes: form.dietaryNotes.trim() || undefined,
         isVip: form.isVip,
         isElderly: form.isElderly,
@@ -272,43 +265,14 @@ export default function GuestFormDialog({ open, onOpenChange, editGuest, default
           {/* === Section 3: Table & Seating === */}
           <p className={sectionCls}>Table & Seating</p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="gf-table" className="text-sm font-medium text-charcoal-ink/70">Table Number</Label>
-              <Input
-                id="gf-table" type="number" value={form.tableNumber}
-                onChange={(e) => updateField('tableNumber', e.target.value)}
-                placeholder="e.g. 5" className={inputCls}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="gf-seats" className="text-sm font-medium text-charcoal-ink/70">Seats Needed</Label>
-              <Input
-                id="gf-seats" type="number" min={1} max={20} value={form.seatCount}
-                onChange={(e) => updateField('seatCount', e.target.value)}
-                placeholder="1" className={inputCls}
-              />
-            </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="gf-table" className="text-sm font-medium text-charcoal-ink/70">Table Number</Label>
+            <Input
+              id="gf-table" type="number" value={form.tableNumber}
+              onChange={(e) => updateField('tableNumber', e.target.value)}
+              placeholder="e.g. 5" className={inputCls}
+            />
           </div>
-
-          <div className="flex items-center justify-between rounded-lg border border-charcoal-ink/5 p-3">
-            <div className="space-y-0.5">
-              <Label className="text-sm font-medium text-charcoal-ink/70">Plus One</Label>
-              <p className="text-xs text-charcoal-ink/40">Guest can bring a plus one</p>
-            </div>
-            <Switch checked={form.plusOne} onCheckedChange={handlePlusOneChange} />
-          </div>
-
-          {form.plusOne && (
-            <div className="space-y-1.5">
-              <Label htmlFor="gf-plusone" className="text-sm font-medium text-charcoal-ink/70">Plus One Name</Label>
-              <Input
-                id="gf-plusone" value={form.plusOneName}
-                onChange={(e) => updateField('plusOneName', e.target.value)}
-                placeholder="e.g. John Lim" className={inputCls}
-              />
-            </div>
-          )}
 
           {/* === Section 4: Special Requirements === */}
           <p className={sectionCls}>Special Requirements</p>

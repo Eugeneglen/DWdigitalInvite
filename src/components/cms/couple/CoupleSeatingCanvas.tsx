@@ -95,7 +95,10 @@ interface HistoryEntry {
 }
 
 // ---- Main Component ----
-export default function CoupleSeatingCanvas() {
+interface CoupleSeatingCanvasProps {
+  activeTab?: string;
+}
+export default function CoupleSeatingCanvas({ activeTab }: CoupleSeatingCanvasProps) {
   // --- Guest state ---
   const [guests, setGuests] = useState<GuestItem[]>([]);
 
@@ -157,7 +160,6 @@ export default function CoupleSeatingCanvas() {
   const [smartAssignOpen, setSmartAssignOpen] = useState(false);
   const [smartStrategies, setSmartStrategies] = useState({
     groupTogether: true,
-    pairPlusOnes: true,
     matchZones: false,
     balanceFill: true,
   });
@@ -236,7 +238,7 @@ export default function CoupleSeatingCanvas() {
   // ======== Data Fetching ========
   const fetchAllGuests = useCallback(async () => {
     try {
-      const res = await fetch(API_BASE);
+      const res = await fetch(API_BASE, { cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to load guests');
       const data = await res.json();
       setGuests(data.guests ?? []);
@@ -277,6 +279,14 @@ export default function CoupleSeatingCanvas() {
     loadHistory();
   }, [fetchTables, fetchAllGuests, fetchFloorPlan, loadHistory]);
 
+  // Re-fetch guests & tables when user switches back to the seating tab
+  useEffect(() => {
+    if (activeTab === 'seating') {
+      fetchAllGuests();
+      fetchTables();
+    }
+  }, [activeTab, fetchAllGuests, fetchTables]);
+
   // ======== Derived Data ========
   const selectedTable = tables.find((t) => t.id === selectedTableId);
 
@@ -285,7 +295,7 @@ export default function CoupleSeatingCanvas() {
     const map = new Map<number, number>();
     for (const g of guests) {
       if (g.tableNumber != null) {
-        map.set(g.tableNumber, (map.get(g.tableNumber) ?? 0) + (g.seatCount || 1));
+        map.set(g.tableNumber, (map.get(g.tableNumber) ?? 0) + 1);
       }
     }
     return map;
@@ -765,14 +775,14 @@ export default function CoupleSeatingCanvas() {
     const guest = guests.find((g) => g.id === guestId);
     if (!guest) return;
 
-    // Frontend capacity guard — block if target table is full (seat-based)
+    // Frontend capacity guard — block if target table is full (one name = one seat)
     if (newTableNum != null) {
       const table = tables.find((t) => t.tableNum === newTableNum);
       if (table) {
         const isSameTable = guest.tableNumber === newTableNum;
-        const currentSeats = getGuestCountForTable(newTableNum) - (isSameTable ? (guest.seatCount || 1) : 0);
-        if (currentSeats + (guest.seatCount || 1) > table.capacity) {
-          toast({ title: 'Table Full', description: `Table ${newTableNum} has ${table.capacity - currentSeats} seat(s) remaining — guest needs ${guest.seatCount || 1}.`, variant: 'destructive' });
+        const currentGuests = getGuestCountForTable(newTableNum) - (isSameTable ? 1 : 0);
+        if (currentGuests + 1 > table.capacity) {
+          toast({ title: 'Table Full', description: `Table ${newTableNum} has ${table.capacity - currentGuests} seat(s) remaining.`, variant: 'destructive' });
           return;
         }
       }
@@ -1079,7 +1089,7 @@ export default function CoupleSeatingCanvas() {
 
   // ======== Export CSV ========
   const handleExportCsv = () => {
-    const header = 'Guest Name,Email,Phone,Table Number,Table Name,Zone,RSVP Status,Dietary Notes,Plus One,Group';
+    const header = 'Guest Name,Email,Phone,Table Number,Table Name,Zone,RSVP Status,Dietary Notes,Group';
     const rows = guests.map((g) => {
       const tbl = g.tableNumber != null ? tables.find((t) => t.tableNum === g.tableNumber) : null;
       const name = `"${(g.name || '').replace(/"/g, '""')}"`;
@@ -1089,9 +1099,8 @@ export default function CoupleSeatingCanvas() {
       const zone = tbl?.zone || '';
       const rsvp = g.rsvpStatus || 'PENDING';
       const dietary = `"${(getEffectiveDietary(g) || '').replace(/"/g, '""')}"`;
-      const plusOne = g.plusOne ? 'Yes' : 'No';
       const group = `"${(g.groupName || '').replace(/"/g, '""')}"`;
-      return [name, email, phone, g.tableNumber ?? '', tblName, zone, rsvp, dietary, plusOne, group].join(',');
+      return [name, email, phone, g.tableNumber ?? '', tblName, zone, rsvp, dietary, group].join(',');
     });
     const csv = [header, ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -2154,11 +2163,6 @@ export default function CoupleSeatingCanvas() {
                             <span className="hidden sm:inline">{truncate(dietary, 16)}</span>
                           </span>
                         )}
-                        {g.plusOne && (
-                          <span className="flex items-center gap-0.5 text-[10px] text-pink-400/70 shrink-0" title={g.plusOneName || 'Plus one'}>
-                            <UserPlus className="size-2.5" />
-                          </span>
-                        )}
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button
@@ -2444,16 +2448,6 @@ export default function CoupleSeatingCanvas() {
                   </div>
                 );
               })()}
-
-              {/* Plus One */}
-              {detailGuest.plusOne && (
-                <div className="flex items-center gap-2">
-                  <UserPlus className="size-3.5 text-pink-400" />
-                  <span className="text-sm text-charcoal-ink/70">
-                    Plus one{detailGuest.plusOneName ? `: ${detailGuest.plusOneName}` : ' allowed'}
-                  </span>
-                </div>
-              )}
 
               {/* RSVP */}
               <div className="flex items-center gap-2">
@@ -2780,18 +2774,6 @@ export default function CoupleSeatingCanvas() {
               <div>
                 <Label htmlFor="groupTogether" className="text-sm font-medium text-charcoal-ink cursor-pointer">Group Together</Label>
                 <p className="text-[11px] text-charcoal-ink/50">Keep guests from the same group at the same table</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <Checkbox
-                id="pairPlusOnes"
-                checked={smartStrategies.pairPlusOnes}
-                onCheckedChange={(checked) => setSmartStrategies((prev) => ({ ...prev, pairPlusOnes: !!checked }))}
-                className="mt-0.5"
-              />
-              <div>
-                <Label htmlFor="pairPlusOnes" className="text-sm font-medium text-charcoal-ink cursor-pointer">Pair Plus Ones</Label>
-                <p className="text-[11px] text-charcoal-ink/50">Seat plus-one partners at the same table</p>
               </div>
             </div>
             <div className="flex items-start gap-3">

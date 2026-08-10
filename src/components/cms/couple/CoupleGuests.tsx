@@ -62,7 +62,7 @@ export default function CoupleGuests() {
           <GuestListMain />
         </div>
         <div style={{ display: activeTab === 'seating' ? 'block' : 'none' }}>
-          <CoupleSeatingCanvas />
+          <CoupleSeatingCanvas activeTab={activeTab} />
         </div>
       </div>
     </div>

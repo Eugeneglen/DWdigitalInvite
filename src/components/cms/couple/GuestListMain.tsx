@@ -304,7 +304,6 @@ export default function GuestListMain() {
                   <TableHead className="w-20 text-[11px] font-semibold text-charcoal-ink/50 hidden md:table-cell">Category</TableHead>
                   <TableHead className="w-20 text-[11px] font-semibold text-charcoal-ink/50">RSVP</TableHead>
                   <TableHead className="w-14 text-[11px] font-semibold text-charcoal-ink/50 text-center">Table</TableHead>
-                  <TableHead className="w-12 text-[11px] font-semibold text-charcoal-ink/50 text-center">Seats</TableHead>
                   <TableHead className="w-28 text-[11px] font-semibold text-charcoal-ink/50 hidden sm:table-cell">Special</TableHead>
                   <TableHead className="w-20 text-[11px] font-semibold text-charcoal-ink/50 text-right">Actions</TableHead>
                 </TableRow>
@@ -341,7 +340,6 @@ export default function GuestListMain() {
                       <TableCell className="hidden md:table-cell text-xs text-charcoal-ink/50">{g.category || '—'}</TableCell>
                       <TableCell><Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${sc.color}`}>{sc.label}</Badge></TableCell>
                       <TableCell className="text-center text-sm font-medium text-charcoal-ink">{g.tableNumber ?? '—'}</TableCell>
-                      <TableCell className="text-center text-sm text-charcoal-ink/60">{g.seatCount || 1}</TableCell>
                       <TableCell className="hidden sm:table-cell">
                         <div className="flex items-center gap-1 flex-wrap">
                           {g.isVip && <span title="VIP" className="inline-flex items-center justify-center size-5 rounded-full bg-amber-100 text-amber-600"><Crown className="size-3" /></span>}

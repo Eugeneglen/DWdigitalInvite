@@ -30,7 +30,6 @@ export async function GET() {
         rsvpStatus: true,
         category: true,
         relationship: true,
-        seatCount: true,
         tableNumber: true,
         isVip: true,
         isElderly: true,
@@ -48,7 +47,7 @@ export async function GET() {
       declined: guests.filter(g => g.rsvpStatus === 'DECLINED').length,
       pending: guests.filter(g => g.rsvpStatus === 'PENDING' || !g.rsvpStatus).length,
       partial: guests.filter(g => g.rsvpStatus === 'PARTIAL').length,
-      totalSeats: guests.reduce((s, g) => s + (g.seatCount || 1), 0),
+      totalSeats: guests.length, // one name = one seat
       checkedIn: guests.filter(g => g.checkInStatus === 'CHECKED_IN').length,
       notArrived: guests.filter(g => !g.checkInStatus || g.checkInStatus === 'NOT_ARRIVED').length,
       noShow: guests.filter(g => g.checkInStatus === 'NO_SHOW').length,

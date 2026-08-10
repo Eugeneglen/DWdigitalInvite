@@ -21,14 +21,11 @@ interface CheckInResult {
   phone: string | null;
   side: string | null;
   tableNumber: number | null;
-  seatCount: number;
   dietaryNotes: string | null;
   isVip: boolean;
   isElderly: boolean;
   needsBabyChair: boolean;
   specialNotes: string | null;
-  plusOne: boolean;
-  plusOneName: string | null;
   rsvpStatus: string;
   checkInStatus: string | null;
   groupName: string | null;
@@ -267,10 +264,7 @@ export default function GuestListCheckIn({ onClose }: GuestListCheckInProps) {
                     <span className="text-[10px] text-charcoal-ink/40 uppercase tracking-wider">Table</span>
                   </div>
                   <div className="text-sm text-charcoal-ink/60">
-                    <p>{guest.seatCount || 1} {guest.seatCount > 1 ? 'seats' : 'seat'}</p>
-                    {guest.plusOne && guest.plusOneName && (
-                      <p className="text-charcoal-ink/40">+1: {guest.plusOneName}</p>
-                    )}
+                    <p>1 seat</p>
                   </div>
                 </div>
 

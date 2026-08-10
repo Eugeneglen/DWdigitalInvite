@@ -211,27 +211,22 @@ export async function POST(req: NextRequest) {
       ...parsed.data,
     };
 
-    // Auto-calculate seatCount from plusOne if not provided
-    if (!data.seatCount) {
-      data.seatCount = data.plusOne ? 2 : 1;
-    }
+    // One name = one seat policy: always set seatCount to 1
+    data.seatCount = 1;
 
-    // Server-side capacity enforcement on create
+    // Server-side capacity enforcement on create (count guests, not seats)
     const tableNum = data.tableNumber as number | undefined;
     if (tableNum != null) {
       const targetTable = await db.seatingTable.findFirst({
         where: { weddingId, tableNum },
       });
       if (targetTable) {
-        const currentSeats = await db.guest.aggregate({
+        const currentGuestCount = await db.guest.count({
           where: { weddingId, tableNumber: tableNum },
-          _sum: { seatCount: true },
         });
-        const usedSeats = currentSeats._sum.seatCount ?? 0;
-        const guestSeats = (data.seatCount as number) ?? 1;
-        if (usedSeats + guestSeats > targetTable.capacity) {
+        if (currentGuestCount + 1 > targetTable.capacity) {
           return NextResponse.json({
-            error: `Table ${tableNum} cannot fit ${guestSeats} seat(s) — ${usedSeats}/${targetTable.capacity} seats already in use.`,
+            error: `Table ${tableNum} is full — ${currentGuestCount}/${targetTable.capacity} guests already assigned. Remove a guest or increase capacity.`,
           }, { status: 409 });
         }
       }
@@ -283,22 +278,19 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    // Server-side capacity enforcement (compares seat sum, not guest count)
+    // Server-side capacity enforcement (count guests, not seats — one name = one seat)
     const newTableNumber = parsed.data.tableNumber;
     if (newTableNumber != null && newTableNumber !== existing.tableNumber) {
       const targetTable = await db.seatingTable.findFirst({
         where: { weddingId, tableNum: newTableNumber },
       });
       if (targetTable) {
-        const currentSeats = await db.guest.aggregate({
+        const currentGuestCount = await db.guest.count({
           where: { weddingId, tableNumber: newTableNumber },
-          _sum: { seatCount: true },
         });
-        const usedSeats = currentSeats._sum.seatCount ?? 0;
-        const guestSeats = parsed.data.seatCount ?? existing.seatCount ?? 1;
-        if (usedSeats + guestSeats > targetTable.capacity) {
+        if (currentGuestCount + 1 > targetTable.capacity) {
           return NextResponse.json({
-            error: `Table ${newTableNumber} cannot fit ${guestSeats} seat(s) — ${usedSeats}/${targetTable.capacity} seats already in use. Remove a guest or increase capacity.`,
+            error: `Table ${newTableNumber} is full — ${currentGuestCount}/${targetTable.capacity} guests already assigned.`,
           }, { status: 409 });
         }
       }
