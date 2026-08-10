@@ -9,7 +9,7 @@ import {
   UserPlus, ArrowRightLeft, Ban,
   Wand2, Grid3x3, Download, Printer, Copy, FileDown,
   UsersRound, CheckCircle2, XCircle, Clock, ChevronsUpDown,
-  List,
+  List, Undo2, Redo2, Hand, Tags, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import {
@@ -140,6 +140,46 @@ export default function CoupleSeatingCanvas() {
   const [editingGuest, setEditingGuest] = useState<GuestItem | null>(null);
   const [deletingGuestId, setDeletingGuestId] = useState<string | null>(null);
 
+  // Feature 1: Undo/Redo
+  const [historyStack, setHistoryStack] = useState<SeatingTableItem[][]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+
+  // Feature 2: Guest Labels
+  const [showGuestLabels, setShowGuestLabels] = useState(false);
+
+  // Feature 3: Table Size Slider
+  const [tableSize, setTableSize] = useState(100);
+
+  // Feature 4: Pan Mode
+  const [isPanMode, setIsPanMode] = useState(false);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+
+  // Feature 5: Venue Elements
+  const [venueElements, setVenueElements] = useState<
+    Array<{ id: string; type: 'STAGE' | 'COUPLE'; x: number; y: number; width: number; height: number }>
+  >([
+    { id: 'stage-1', type: 'STAGE', x: 50, y: 100, width: 120, height: 200 },
+    { id: 'couple-1', type: 'COUPLE', x: 150, y: 600, width: 120, height: 120 },
+  ]);
+  const venueDragRef = useRef<{
+    id: string;
+    startX: number;
+    startY: number;
+    origX: number;
+    origY: number;
+  } | null>(null);
+
+  // Feature 7: Canvas Search
+  const [canvasSearch, setCanvasSearch] = useState('');
+
+  // Feature 8: Multi-select
+  const [selectedTableIds, setSelectedTableIds] = useState<Set<string>>(new Set());
+
+  // Feature 6: Zone panel
+  const [zonePanelOpen, setZonePanelOpen] = useState(true);
+
   // Drag state (table drag)
   const dragRef = useRef<{
     tableId: string;
@@ -244,8 +284,69 @@ export default function CoupleSeatingCanvas() {
   const remainingSeats = Math.max(0, totalSeats - assignedCount);
   const fillPct = totalSeats > 0 ? Math.round((assignedCount / totalSeats) * 100) : 0;
 
+  // ======== Feature 1: History (Undo/Redo) ========
+  const pushHistory = useCallback(() => {
+    setHistoryStack((prev) => {
+      const snapshot = JSON.parse(JSON.stringify(tables)) as SeatingTableItem[];
+      const newStack = prev.slice(0, historyIndex + 1);
+      newStack.push(snapshot);
+      if (newStack.length > 50) newStack.shift();
+      return newStack;
+    });
+    setHistoryIndex((prev) => Math.min(prev + 1, 49));
+  }, [tables, historyIndex]);
+
+  const handleUndo = useCallback(() => {
+    if (historyIndex <= 0) return;
+    const newIndex = historyIndex - 1;
+    setHistoryIndex(newIndex);
+    setTables(JSON.parse(JSON.stringify(historyStack[newIndex])));
+  }, [historyIndex, historyStack]);
+
+  const handleRedo = useCallback(() => {
+    if (historyIndex >= historyStack.length - 1) return;
+    const newIndex = historyIndex + 1;
+    setHistoryIndex(newIndex);
+    setTables(JSON.parse(JSON.stringify(historyStack[newIndex])));
+  }, [historyIndex, historyStack]);
+
+  // ======== Feature 6: Zone & Dietary derived data ========
+  const zoneSummary = (() => {
+    const zones: Record<string, { tables: number; capacity: number; assigned: number }> = {};
+    for (const t of tables) {
+      const z = t.zone || '_none';
+      if (!zones[z]) zones[z] = { tables: 0, capacity: 0, assigned: 0 };
+      zones[z].tables++;
+      zones[z].capacity += t.capacity;
+      zones[z].assigned += getGuestCountForTable(t.tableNum);
+    }
+    return zones;
+  })();
+
+  const dietarySummary = (() => {
+    const counts: Record<string, number> = {};
+    const common = ['vegetarian', 'vegan', 'gluten-free', 'halal', 'kosher', 'nut-free', 'dairy-free'];
+    let otherCount = 0;
+    for (const g of guests) {
+      const d = getEffectiveDietary(g);
+      if (!d) continue;
+      const dl = d.toLowerCase();
+      let matched = false;
+      for (const c of common) {
+        if (dl.includes(c)) {
+          counts[c] = (counts[c] || 0) + 1;
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) otherCount++;
+    }
+    return { counts, otherCount };
+  })();
+
   // ======== Table CRUD ========
   const handleAddTable = async () => {
+    pushHistory();
     const maxNum = tables.length > 0 ? Math.max(...tables.map((t) => t.tableNum)) : 0;
     const newNum = maxNum + 1;
     const offset = (newNum - 1) * 180;
@@ -272,6 +373,7 @@ export default function CoupleSeatingCanvas() {
     const tbl = tables.find((t) => t.id === selectedTableId);
     if (!tbl) return;
     if (!confirm(`Delete Table ${tbl.tableNum}? All guests at this table will be unassigned.`)) return;
+    pushHistory();
     try {
       const res = await fetch(`${TABLES_API}&id=${tbl.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to delete table');
@@ -339,6 +441,20 @@ export default function CoupleSeatingCanvas() {
   const handleReassignGuest = async (guestId: string, newTableNum: number | null) => {
     const guest = guests.find((g) => g.id === guestId);
     if (!guest) return;
+
+    // Frontend capacity guard — block if target table is full
+    if (newTableNum != null) {
+      const table = tables.find((t) => t.tableNum === newTableNum);
+      if (table) {
+        const isSameTable = guest.tableNumber === newTableNum;
+        const currentCount = getGuestCountForTable(newTableNum) - (isSameTable ? 1 : 0);
+        if (currentCount >= table.capacity) {
+          toast({ title: 'Table Full', description: `Table ${newTableNum} has reached its capacity of ${table.capacity}.`, variant: 'destructive' });
+          return;
+        }
+      }
+    }
+
     try {
       const res = await fetch(API_BASE, {
         method: 'PUT',
@@ -385,7 +501,7 @@ export default function CoupleSeatingCanvas() {
   };
 
   // Canvas table click: if a guest is selected, reassign them
-  const handleCanvasTableClick = (tableId: string) => {
+  const handleCanvasTableClick = (tableId: string, shiftKey?: boolean) => {
     if (reassigningGuestId) {
       const tbl = tables.find((t) => t.id === tableId);
       if (tbl) {
@@ -402,7 +518,16 @@ export default function CoupleSeatingCanvas() {
         handleReassignGuest(reassigningGuestId, tbl.tableNum);
       }
       setReassigningGuestId(null);
+    } else if (shiftKey) {
+      // Feature 8: Multi-select with Shift
+      setSelectedTableIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(tableId)) next.delete(tableId);
+        else next.add(tableId);
+        return next;
+      });
     } else {
+      setSelectedTableIds(new Set());
       setSelectedTableId(tableId === selectedTableId ? null : tableId);
     }
   };
@@ -461,6 +586,7 @@ export default function CoupleSeatingCanvas() {
   const handleDragStart = (e: React.MouseEvent, tableId: string) => {
     if (canvasLocked) return;
     e.preventDefault();
+    pushHistory();
     const tbl = tables.find((t) => t.id === tableId);
     if (!tbl) return;
     dragRef.current = {
@@ -744,6 +870,18 @@ export default function CoupleSeatingCanvas() {
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
 
+      // Feature 1: Undo/Redo shortcuts
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
+
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedTableId) {
         e.preventDefault();
         handleDeleteTable();
@@ -752,11 +890,12 @@ export default function CoupleSeatingCanvas() {
         setSelectedTableId(null);
         setReassigningGuestId(null);
         setDetailGuestId(null);
+        setSelectedTableIds(new Set()); // Feature 8: clear multi-select
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [selectedTableId]);
+  }, [selectedTableId, handleUndo, handleRedo]);
 
   // ======== Detail Drawer Guest ========
   const detailGuest = guests.find((g) => g.id === detailGuestId);
@@ -948,6 +1087,36 @@ export default function CoupleSeatingCanvas() {
         <div className="flex-1 flex flex-col gap-3 min-w-0 order-1 lg:order-2">
           {/* Toolbar */}
           <div className="flex items-center gap-2 px-1 flex-wrap">
+            {/* Feature 1: Undo/Redo */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleUndo}
+                  disabled={historyIndex <= 0}
+                  className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5 disabled:opacity-30 cursor-not-allowed"
+                >
+                  <Undo2 className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Undo</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRedo}
+                  disabled={historyIndex >= historyStack.length - 1}
+                  className="h-8 px-2 text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5 disabled:opacity-30 cursor-not-allowed"
+                >
+                  <Redo2 className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Redo</TooltipContent>
+            </Tooltip>
+
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -976,6 +1145,21 @@ export default function CoupleSeatingCanvas() {
               <TooltipContent>{canvasLocked ? 'Unlock tables' : 'Lock tables'}</TooltipContent>
             </Tooltip>
 
+            {/* Feature 2: Guest Labels Toggle */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowGuestLabels(!showGuestLabels)}
+                  className={`h-8 px-2 ${showGuestLabels ? 'text-cinematic-gold bg-cinematic-gold/5' : 'text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5'}`}
+                >
+                  <Tags className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{showGuestLabels ? 'Hide guest labels' : 'Show guest labels'}</TooltipContent>
+            </Tooltip>
+
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -989,6 +1173,35 @@ export default function CoupleSeatingCanvas() {
               </TooltipTrigger>
               <TooltipContent>{gridSnap ? 'Disable grid snap' : 'Enable grid snap (20px)'}</TooltipContent>
             </Tooltip>
+
+            {/* Feature 4: Pan Mode */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsPanMode(!isPanMode)}
+                  className={`h-8 px-2 ${isPanMode ? 'text-cinematic-gold bg-cinematic-gold/5' : 'text-charcoal-ink/50 hover:text-charcoal-ink hover:bg-charcoal-ink/5'}`}
+                >
+                  <Hand className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Pan Mode (drag to pan canvas)</TooltipContent>
+            </Tooltip>
+
+            {/* Feature 3: Table Size Slider */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-charcoal-ink/40 font-medium">Size</span>
+              <Slider
+                value={[tableSize]}
+                onValueChange={(v) => setTableSize(v[0])}
+                min={50}
+                max={150}
+                step={5}
+                className="w-20"
+              />
+              <span className="text-[10px] text-charcoal-ink/50 font-medium w-8">{tableSize}%</span>
+            </div>
 
             <div className="w-px h-5 bg-champagne-silk mx-1" />
 
@@ -1027,6 +1240,26 @@ export default function CoupleSeatingCanvas() {
             )}
 
             <div className="w-px h-5 bg-champagne-silk mx-1" />
+
+            {/* Feature 7: Canvas Search */}
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-charcoal-ink/30" />
+              <Input
+                value={canvasSearch}
+                onChange={(e) => setCanvasSearch(e.target.value)}
+                placeholder="Search tables..."
+                className="h-8 w-36 text-xs pl-7 pr-7 border-charcoal-ink/10 focus:border-cinematic-gold focus:ring-cinematic-gold/20"
+              />
+              {canvasSearch && (
+                <button
+                  type="button"
+                  onClick={() => setCanvasSearch('')}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-charcoal-ink/30 hover:text-charcoal-ink"
+                >
+                  <X className="size-3" />
+                </button>
+              )}
+            </div>
 
             <ZoomOut className="size-3.5 text-charcoal-ink/40 shrink-0" />
             <Slider
@@ -1183,12 +1416,37 @@ export default function CoupleSeatingCanvas() {
           {/* Canvas */}
           <div
             ref={canvasRef}
-            className="relative border border-champagne-silk rounded-lg bg-white overflow-hidden"
+            className={`relative border border-champagne-silk rounded-lg bg-white overflow-hidden ${isPanMode ? 'cursor-grab' : ''} ${isPanning ? 'cursor-grabbing' : ''}`}
             style={{ height: '520px' }}
             onClick={(e) => {
               if (e.target === e.currentTarget) {
                 if (reassigningGuestId) setReassigningGuestId(null);
                 setSelectedTableId(null);
+                setSelectedTableIds(new Set());
+              }
+            }}
+            onMouseDown={(e) => {
+              // Feature 4: Pan mode
+              if (isPanMode && e.target === e.currentTarget) {
+                e.preventDefault();
+                setIsPanning(true);
+                panStartRef.current = { x: e.clientX, y: e.clientY, panX: panOffset.x, panY: panOffset.y };
+
+                const handleMove = (ev: MouseEvent) => {
+                  const dx = ev.clientX - panStartRef.current.x;
+                  const dy = ev.clientY - panStartRef.current.y;
+                  setPanOffset({
+                    x: panStartRef.current.panX + dx / (canvasScale / 100),
+                    y: panStartRef.current.panY + dy / (canvasScale / 100),
+                  });
+                };
+                const handleUp = () => {
+                  setIsPanning(false);
+                  document.removeEventListener('mousemove', handleMove);
+                  document.removeEventListener('mouseup', handleUp);
+                };
+                document.addEventListener('mousemove', handleMove);
+                document.addEventListener('mouseup', handleUp);
               }
             }}
           >
@@ -1205,7 +1463,7 @@ export default function CoupleSeatingCanvas() {
             ) : (
               <div
                 style={{
-                  transform: `scale(${canvasScale / 100})`,
+                  transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${canvasScale / 100})`,
                   transformOrigin: 'top left',
                   width: `${2000 * (100 / canvasScale)}px`,
                   height: `${2000 * (100 / canvasScale)}px`,
@@ -1222,8 +1480,58 @@ export default function CoupleSeatingCanvas() {
                   />
                 )}
 
+                {/* Feature 5: Venue Elements */}
+                {venueElements.map((el) => (
+                  <div
+                    key={el.id}
+                    className={`absolute ${el.type === 'STAGE' ? 'bg-gray-100 border border-gray-300' : 'border-dashed border-gray-300 bg-transparent'}`}
+                    style={{
+                      left: el.x,
+                      top: el.y,
+                      width: el.width,
+                      height: el.height,
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      venueDragRef.current = {
+                        id: el.id,
+                        startX: e.clientX,
+                        startY: e.clientY,
+                        origX: el.x,
+                        origY: el.y,
+                      };
+                      const handleMove = (ev: MouseEvent) => {
+                        if (!venueDragRef.current) return;
+                        const dx = (ev.clientX - venueDragRef.current.startX) / (canvasScale / 100);
+                        const dy = (ev.clientY - venueDragRef.current.startY) / (canvasScale / 100);
+                        const newX = venueDragRef.current.origX + dx;
+                        const newY = venueDragRef.current.origY + dy;
+                        setVenueElements((prev) =>
+                          prev.map((v) => (v.id === el.id ? { ...v, x: newX, y: newY } : v))
+                        );
+                      };
+                      const handleUp = () => {
+                        venueDragRef.current = null;
+                        document.removeEventListener('mousemove', handleMove);
+                        document.removeEventListener('mouseup', handleUp);
+                      };
+                      document.addEventListener('mousemove', handleMove);
+                      document.addEventListener('mouseup', handleUp);
+                    }}
+                  >
+                    <span
+                      className={`absolute inset-0 flex items-center justify-center text-[10px] font-semibold uppercase tracking-wider text-gray-400 ${el.type === 'STAGE' ? 'rotate-90' : ''}`}
+                    >
+                      {el.type}
+                    </span>
+                  </div>
+                ))}
+
                 {tables.map((tbl) => {
                   const dims = TABLE_DIMS[tbl.shape] || TABLE_DIMS.circle;
+                  const scaledW = dims.w * (tableSize / 100);
+                  const scaledH = dims.h * (tableSize / 100);
                   const count = getGuestCountForTable(tbl.tableNum);
                   const isOverCapacity = count > tbl.capacity;
                   const isEmpty = count === 0;
@@ -1231,6 +1539,17 @@ export default function CoupleSeatingCanvas() {
                   const isDragOver = tbl.id === dragOverTableId;
                   const tableGuests = guestsAtTable(tbl.tableNum);
                   const displayName = tbl.name || `T${tbl.tableNum}`;
+
+                  // Feature 7: Search highlight
+                  const searchQ = canvasSearch.toLowerCase();
+                  const isSearchMatch = searchQ && (
+                    (tbl.name || '').toLowerCase().includes(searchQ) ||
+                    `t${tbl.tableNum}`.includes(searchQ) ||
+                    tableGuests.some((g) => g.name.toLowerCase().includes(searchQ))
+                  );
+
+                  // Feature 8: Multi-select
+                  const isMultiSelected = selectedTableIds.has(tbl.id) && !isSelected;
 
                   // Border color logic
                   let borderCls = 'border-gray-300';
@@ -1256,8 +1575,8 @@ export default function CoupleSeatingCanvas() {
                       style={{
                         left: tbl.posX,
                         top: tbl.posY,
-                        width: dims.w,
-                        height: dims.h,
+                        width: scaledW,
+                        height: scaledH,
                       }}
                     >
                       {/* Table shape */}
@@ -1265,7 +1584,7 @@ export default function CoupleSeatingCanvas() {
                         onMouseDown={(e) => handleDragStart(e, tbl.id)}
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleCanvasTableClick(tbl.id);
+                          handleCanvasTableClick(tbl.id, e.shiftKey);
                         }}
                         onDragOver={(e) => handleTableDragOver(e, tbl.id)}
                         onDragLeave={handleTableDragLeave}
@@ -1276,7 +1595,7 @@ export default function CoupleSeatingCanvas() {
                             : 'hover:shadow-md'
                         } ${reassigningGuestId && !isSelected ? 'hover:border-cinematic-gold hover:bg-cinematic-gold/5' : ''} ${
                           canvasLocked ? 'cursor-default' : ''
-                        }`}
+                        } ${isMultiSelected ? 'ring-2 ring-cinematic-gold/40' : ''} ${isSearchMatch ? 'ring-2 ring-cinematic-gold/50 animate-pulse' : ''}`}
                       >
                         <span className="text-xs font-bold text-charcoal-ink leading-none">
                           {displayName.length > 8 ? truncate(displayName, 8) : displayName}
@@ -1302,13 +1621,37 @@ export default function CoupleSeatingCanvas() {
                         </div>
                       </div>
 
+                      {/* Feature 2: Radial guest labels (when showGuestLabels is true) */}
+                      {showGuestLabels && tableGuests.map((guest, gi) => {
+                        const dietary = getEffectiveDietary(guest);
+                        const tableRadius = scaledW / 2;
+                        const angle = (gi / Math.max(tableGuests.length, 1)) * 2 * Math.PI - Math.PI / 2;
+                        const labelRadius = tableRadius + 18;
+                        const cx = scaledW / 2 + Math.cos(angle) * labelRadius;
+                        const cy = scaledH / 2 + Math.sin(angle) * labelRadius;
+
+                        return (
+                          <div
+                            key={`label-${guest.id}`}
+                            className="absolute text-[10px] text-charcoal-ink/70 whitespace-nowrap truncate max-w-[70px]"
+                            style={{
+                              left: cx,
+                              top: cy,
+                              transform: 'translate(-50%, -50%)',
+                            }}
+                          >
+                            {guest.name.split(' ')[0]}{dietary ? <span className="text-red-500">*</span> : ''}
+                          </div>
+                        );
+                      })}
+
                       {/* Guest labels around table */}
                       {tableGuests.map((guest, gi) => {
                         const dietary = getEffectiveDietary(guest);
                         const angle = (gi / Math.max(tableGuests.length, 1)) * 2 * Math.PI - Math.PI / 2;
-                        const radius = (dims.w / 2) + 40;
-                        const gx = dims.w / 2 + Math.cos(angle) * radius - 50;
-                        const gy = dims.h / 2 + Math.sin(angle) * radius - 10;
+                        const radius = (scaledW / 2) + 40;
+                        const gx = scaledW / 2 + Math.cos(angle) * radius - 50;
+                        const gy = scaledH / 2 + Math.sin(angle) * radius - 10;
 
                         return (
                           <Tooltip key={guest.id}>
@@ -1350,6 +1693,150 @@ export default function CoupleSeatingCanvas() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+            {/* Feature 8: Multi-select floating action bar */}
+            {selectedTableIds.size > 0 && (
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-lg bg-charcoal-ink/90 text-white px-3 py-1.5 shadow-lg">
+                <span className="text-xs font-medium">{selectedTableIds.size} table{selectedTableIds.size !== 1 ? 's' : ''} selected</span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px] text-white hover:bg-white/10">
+                      Assign Zone
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    {ZONE_OPTIONS.filter((z) => z.value).map((z) => (
+                      <DropdownMenuItem
+                        key={z.value}
+                        onClick={async () => {
+                          for (const id of selectedTableIds) {
+                            const tbl = tables.find((t) => t.id === id);
+                            if (!tbl) continue;
+                            await fetch(TABLES_API, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ id, zone: z.value }),
+                            });
+                          }
+                          await fetchTables();
+                          setSelectedTableIds(new Set());
+                          toast({ title: 'Success', description: `Zone assigned to ${selectedTableIds.size} tables` });
+                        }}
+                      >
+                        {z.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-[11px] text-red-300 hover:text-red-200 hover:bg-red-500/20"
+                  onClick={async () => {
+                    if (!confirm(`Delete ${selectedTableIds.size} selected tables?`)) return;
+                    pushHistory();
+                    for (const id of selectedTableIds) {
+                      await fetch(`${TABLES_API}&id=${id}`, { method: 'DELETE' });
+                    }
+                    await fetchTables();
+                    await fetchAllGuests();
+                    setSelectedTableIds(new Set());
+                    toast({ title: 'Success', description: `${selectedTableIds.size} tables deleted` });
+                  }}
+                >
+                  Delete All
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Feature 6: Zone/Dietary Overview Panel */}
+          <div className="rounded-lg border border-champagne-silk bg-paper-cream/30 p-4">
+            <button
+              type="button"
+              onClick={() => setZonePanelOpen(!zonePanelOpen)}
+              className="w-full flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-semibold tracking-wider text-charcoal-ink/60">ZONES</span>
+                <span className="text-[10px] font-semibold tracking-wider text-charcoal-ink/60">DIETARY OVERVIEW</span>
+              </div>
+              {zonePanelOpen ? <ChevronDown className="size-3.5 text-charcoal-ink/40" /> : <ChevronUp className="size-3.5 text-charcoal-ink/40" />}
+            </button>
+            {zonePanelOpen && (
+              <div className="flex gap-6 mt-3">
+                {/* Left: Zone Summary */}
+                <div className="flex-1 space-y-2">
+                  {Object.keys(zoneSummary).length === 0 || (Object.keys(zoneSummary).length === 1 && zoneSummary['_none']) ? (
+                    <p className="text-xs text-charcoal-ink/30 italic">No zones defined</p>
+                  ) : (
+                    Object.entries(zoneSummary).filter(([k]) => k !== '_none').map(([zone, data]) => (
+                      <div key={zone} className="flex items-center gap-2">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${ZONE_COLORS[zone] || 'bg-gray-100 text-gray-600'}`}>
+                          {zone.replace('_', ' ')}
+                        </span>
+                        <span className="text-[10px] text-charcoal-ink/50">{data.tables} tables</span>
+                        <div className="flex-1 h-1 rounded-full bg-charcoal-ink/5 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-cinematic-gold/60"
+                            style={{ width: `${data.capacity > 0 ? (data.assigned / data.capacity) * 100 : 0}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Right: Dietary Overview */}
+                <div className="flex-1 flex flex-wrap gap-1.5">
+                  {Object.keys(dietarySummary.counts).length === 0 && dietarySummary.otherCount === 0 ? (
+                    <p className="text-xs text-charcoal-ink/30 italic">No dietary requirements</p>
+                  ) : (
+                    <>
+                      {dietarySummary.counts['vegetarian'] != null && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium">
+                          Vegetarian {dietarySummary.counts['vegetarian']}
+                        </span>
+                      )}
+                      {dietarySummary.counts['vegan'] != null && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-medium">
+                          Vegan {dietarySummary.counts['vegan']}
+                        </span>
+                      )}
+                      {dietarySummary.counts['gluten-free'] != null && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">
+                          Gluten-Free {dietarySummary.counts['gluten-free']}
+                        </span>
+                      )}
+                      {dietarySummary.counts['halal'] != null && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 font-medium">
+                          Halal {dietarySummary.counts['halal']}
+                        </span>
+                      )}
+                      {dietarySummary.counts['kosher'] != null && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 font-medium">
+                          Kosher {dietarySummary.counts['kosher']}
+                        </span>
+                      )}
+                      {dietarySummary.counts['nut-free'] != null && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-medium">
+                          Nut-Free {dietarySummary.counts['nut-free']}
+                        </span>
+                      )}
+                      {dietarySummary.counts['dairy-free'] != null && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 font-medium">
+                          Dairy-Free {dietarySummary.counts['dairy-free']}
+                        </span>
+                      )}
+                      {dietarySummary.otherCount > 0 && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium">
+                          Other {dietarySummary.otherCount}
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -1528,34 +2015,54 @@ export default function CoupleSeatingCanvas() {
                   Guests at Table ({getGuestCountForTable(selectedTable.tableNum)}/{selectedTable.capacity})
                 </h4>
                 <div className="space-y-1.5">
-                  {guestsAtTable(selectedTable.tableNum).map((g) => (
-                    <div
-                      key={g.id}
-                      className="flex items-center justify-between gap-2 rounded-md border border-charcoal-ink/5 px-2.5 py-1.5"
-                    >
+                  {guestsAtTable(selectedTable.tableNum).map((g, idx) => {
+                    const dietary = getEffectiveDietary(g);
+                    return (
                       <div
-                        className="min-w-0 cursor-pointer"
-                        onClick={() => setDetailGuestId(g.id)}
+                        key={g.id}
+                        className="flex items-center justify-between gap-2 rounded-md border border-charcoal-ink/5 px-2.5 py-1.5 hover:border-champagne-silk transition-colors"
                       >
-                        <p className="text-xs font-medium text-charcoal-ink truncate hover:text-cinematic-gold transition-colors">
-                          {g.name}
-                        </p>
-                        {g.dietaryNotes && (
-                          <p className="text-[10px] text-red-500/70 flex items-center gap-0.5">
-                            <UtensilsCrossed className="size-2.5" />{truncate(g.dietaryNotes, 20)}
-                          </p>
-                        )}
+                        <div className="min-w-0 flex items-center gap-2">
+                          <span className="text-[10px] font-medium text-charcoal-ink/30 w-4 text-right shrink-0">{idx + 1}.</span>
+                          <div
+                            className="min-w-0 cursor-pointer"
+                            onClick={() => setDetailGuestId(g.id)}
+                          >
+                            <span className="text-xs font-semibold text-charcoal-ink truncate">{g.name}</span>
+                            {dietary && (
+                              <span className="flex items-center gap-0.5 text-[10px] text-red-500/70 shrink-0">
+                                <UtensilsCrossed className="size-2.5" />
+                                <span className="hidden sm:inline">{truncate(dietary, 16)}</span>
+                              </span>
+                            )}
+                            {g.plusOne && (
+                              <span className="flex items-center gap-0.5 text-[10px] text-pink-400/70 shrink-0" title={g.plusOneName || 'Plus one'}>
+                                <UserPlus className="size-2.5" />
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => { setEditingGuest(g); setGuestFormOpen(true); }}
+                            className="text-charcoal-ink/30 hover:text-cinematic-gold transition-colors"
+                            title="Edit guest"
+                          >
+                            <Pencil className="size-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleReassignGuest(g.id, null)}
+                            className="text-[10px] text-red-400 hover:text-red-600 underline"
+                            title="Unassign"
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleReassignGuest(g.id, null)}
-                        className="text-[10px] text-red-400 hover:text-red-600 shrink-0 underline"
-                        title="Unassign"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {getGuestCountForTable(selectedTable.tableNum) === 0 && (
                     <p className="text-xs text-charcoal-ink/30 italic">No guests assigned</p>
                   )}
