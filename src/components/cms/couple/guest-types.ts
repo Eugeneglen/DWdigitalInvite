@@ -200,8 +200,8 @@ export interface ImportResult {
   errors: Array<{ row: number; name: string; error: string }>;
 }
 
-export const CSV_TEMPLATE_HEADERS = 'name,chineseName,email,phone,group,side,relationship,category,tableNumber,plusOne,plusOneName,seatCount,dietaryNotes,rsvpStatus';
-export const CSV_TEMPLATE_EXAMPLE = 'John Smith,陈大明,john@email.com,+65 9123 4567,Bride\'s Family,BRIDE,RELATIVE,RELATIVES,1,yes,Jane Smith,2,Vegetarian,ATTENDING';
+export const CSV_TEMPLATE_HEADERS = 'name,chineseName,email,phone,group,side,relationship,category,tableNumber,dietaryNotes,rsvpStatus';
+export const CSV_TEMPLATE_EXAMPLE = 'John Smith,陈大明,john@email.com,+65 9123 4567,Bride\'s Family,BRIDE,RELATIVE,RELATIVES,1,Vegetarian,ATTENDING';
 
 export function parseCSV(text: string): { headers: string[]; rows: ParsedRow[] } {
   const cleanText = text.replace(/^\ufeff/, '');
