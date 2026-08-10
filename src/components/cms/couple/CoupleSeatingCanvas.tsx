@@ -788,6 +788,12 @@ export default function CoupleSeatingCanvas() {
           tableNumber: newTableNum,
         }),
       });
+      if (res.status === 409) {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: 'Table Full', description: err.error || `Table ${newTableNum} is at capacity.`, variant: 'destructive' });
+        fetchAllGuests(); // refresh to get accurate counts
+        return;
+      }
       if (!res.ok) throw new Error('Failed to reassign guest');
       invalidateWeddingCache();
       // Optimistic update

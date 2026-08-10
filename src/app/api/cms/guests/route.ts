@@ -262,6 +262,24 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
+    // Server-side capacity enforcement
+    const newTableNumber = parsed.data.tableNumber;
+    if (newTableNumber != null && newTableNumber !== existing.tableNumber) {
+      const targetTable = await db.seatingTable.findFirst({
+        where: { weddingId, tableNum: newTableNumber },
+      });
+      if (targetTable) {
+        const currentCount = await db.guest.count({
+          where: { weddingId, tableNumber: newTableNumber },
+        });
+        if (currentCount >= targetTable.capacity) {
+          return NextResponse.json({
+            error: `Table ${newTableNumber} is full (${currentCount}/${targetTable.capacity} guests). Remove a guest first or increase table capacity.`,
+          }, { status: 409 });
+        }
+      }
+    }
+
     const data: Record<string, unknown> = { ...updates };
     if (sentVia) {
       data.sentVia = sentVia;
