@@ -163,6 +163,7 @@ model WeddingAccount {
   members       UserWeddingRole[]   // Tier 2 + Tier 3 per-wedding role assignments
   honeymoonVotes      HoneymoonVote[]
   honeymoonSuggestions HoneymoonSuggestion[]
+  seatingHistory      SeatingHistory?
 
   // Indexes for Admin CMS search + filter performance at scale
   @@index([coupleName])       // Search by couple name
@@ -353,6 +354,20 @@ model SeatingTable {
 }
 
 // ============================================================
+// ============================================================
+// SEATING HISTORY (undo/redo persistence for seating canvas)
+// ============================================================
+
+model SeatingHistory {
+  id        String          @id @default(cuid())
+  weddingId String          @unique
+  wedding   WeddingAccount  @relation(fields: [weddingId], references: [id], onDelete: Cascade)
+  undoStack String          // JSON array of HistoryEntry
+  redoStack String          // JSON array of HistoryEntry
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+}
+
 // GUEST-FACING SUBMISSIONS (existing, enhanced with weddingId)
 // ============================================================
 

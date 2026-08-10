@@ -216,6 +216,27 @@ export async function POST(req: NextRequest) {
       data.seatCount = data.plusOne ? 2 : 1;
     }
 
+    // Server-side capacity enforcement on create
+    const tableNum = data.tableNumber as number | undefined;
+    if (tableNum != null) {
+      const targetTable = await db.seatingTable.findFirst({
+        where: { weddingId, tableNum },
+      });
+      if (targetTable) {
+        const currentSeats = await db.guest.aggregate({
+          where: { weddingId, tableNumber: tableNum },
+          _sum: { seatCount: true },
+        });
+        const usedSeats = currentSeats._sum.seatCount ?? 0;
+        const guestSeats = (data.seatCount as number) ?? 1;
+        if (usedSeats + guestSeats > targetTable.capacity) {
+          return NextResponse.json({
+            error: `Table ${tableNum} cannot fit ${guestSeats} seat(s) — ${usedSeats}/${targetTable.capacity} seats already in use.`,
+          }, { status: 409 });
+        }
+      }
+    }
+
     const guest = await db.guest.create({ data });
 
     await createAuditLog(session.user.id, weddingId, 'CREATE', 'Guest', guest.id, {
@@ -262,19 +283,22 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    // Server-side capacity enforcement
+    // Server-side capacity enforcement (compares seat sum, not guest count)
     const newTableNumber = parsed.data.tableNumber;
     if (newTableNumber != null && newTableNumber !== existing.tableNumber) {
       const targetTable = await db.seatingTable.findFirst({
         where: { weddingId, tableNum: newTableNumber },
       });
       if (targetTable) {
-        const currentCount = await db.guest.count({
+        const currentSeats = await db.guest.aggregate({
           where: { weddingId, tableNumber: newTableNumber },
+          _sum: { seatCount: true },
         });
-        if (currentCount >= targetTable.capacity) {
+        const usedSeats = currentSeats._sum.seatCount ?? 0;
+        const guestSeats = parsed.data.seatCount ?? existing.seatCount ?? 1;
+        if (usedSeats + guestSeats > targetTable.capacity) {
           return NextResponse.json({
-            error: `Table ${newTableNumber} is full (${currentCount}/${targetTable.capacity} guests). Remove a guest first or increase table capacity.`,
+            error: `Table ${newTableNumber} cannot fit ${guestSeats} seat(s) — ${usedSeats}/${targetTable.capacity} seats already in use. Remove a guest or increase capacity.`,
           }, { status: 409 });
         }
       }

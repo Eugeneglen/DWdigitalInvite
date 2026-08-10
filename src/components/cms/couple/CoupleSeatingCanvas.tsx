@@ -285,7 +285,7 @@ export default function CoupleSeatingCanvas() {
     const map = new Map<number, number>();
     for (const g of guests) {
       if (g.tableNumber != null) {
-        map.set(g.tableNumber, (map.get(g.tableNumber) ?? 0) + 1);
+        map.set(g.tableNumber, (map.get(g.tableNumber) ?? 0) + (g.seatCount || 1));
       }
     }
     return map;
@@ -765,14 +765,14 @@ export default function CoupleSeatingCanvas() {
     const guest = guests.find((g) => g.id === guestId);
     if (!guest) return;
 
-    // Frontend capacity guard — block if target table is full
+    // Frontend capacity guard — block if target table is full (seat-based)
     if (newTableNum != null) {
       const table = tables.find((t) => t.tableNum === newTableNum);
       if (table) {
         const isSameTable = guest.tableNumber === newTableNum;
-        const currentCount = getGuestCountForTable(newTableNum) - (isSameTable ? 1 : 0);
-        if (currentCount >= table.capacity) {
-          toast({ title: 'Table Full', description: `Table ${newTableNum} has reached its capacity of ${table.capacity}.`, variant: 'destructive' });
+        const currentSeats = getGuestCountForTable(newTableNum) - (isSameTable ? (guest.seatCount || 1) : 0);
+        if (currentSeats + (guest.seatCount || 1) > table.capacity) {
+          toast({ title: 'Table Full', description: `Table ${newTableNum} has ${table.capacity - currentSeats} seat(s) remaining — guest needs ${guest.seatCount || 1}.`, variant: 'destructive' });
           return;
         }
       }
