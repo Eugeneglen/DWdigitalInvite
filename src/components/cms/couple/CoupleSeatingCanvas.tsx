@@ -2178,7 +2178,7 @@ export default function CoupleSeatingCanvas({ activeTab }: CoupleSeatingCanvasPr
                           onClick={() => handleReassignGuest(g.id, null)}
                           className="text-[10px] text-red-400 hover:text-red-600 underline"
                           title="Unassign"
-                        >Remove</button>
+                        >Reassign</button>
                       </div>
                     </div>
                   );
