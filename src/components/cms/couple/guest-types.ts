@@ -201,7 +201,18 @@ export interface ImportResult {
 }
 
 export const CSV_TEMPLATE_HEADERS = 'name,chineseName,email,phone,group,side,relationship,category,tableNumber,dietaryNotes,rsvpStatus';
-export const CSV_TEMPLATE_EXAMPLE = 'John Smith,陈大明,john@email.com,+65 9123 4567,Bride\'s Family,BRIDE,RELATIVE,RELATIVES,1,Vegetarian,ATTENDING';
+
+const REFERENCE_ROWS = [
+  'Reference ↓, , , , ,Valid Options ↓,Valid Options ↓,Valid Options ↓, ,Valid Options ↓,Valid Options ↓',
+  ', , , , ,GROOM or BRIDE,PARENT / SIBLING / RELATIVE / FRIEND / COLLEAGUE / BUSINESS / OTHER,RELATIVES / FRIENDS / COLLEAGUES / BUSINESS / PARENTS_GUESTS / OTHER, ,Free text e.g. Halal / Vegetarian / No Seafood / Vegan / No Nuts,PENDING / ATTENDING / DECLINED / PARTIAL',
+];
+
+const EXAMPLE_ROWS = [
+  'John Smith,陈大明,john@email.com,+65 9123 4567,Bride\'s Family,BRIDE,RELATIVE,RELATIVES,1,Vegetarian,ATTENDING',
+  'Mary Tan,陈美玲,mary@email.com,+65 8765 4321,Groom\'s Friends,GROOM,FRIEND,FRIENDS,2,Halal,ATTENDING',
+  'Ahmad Bin Ali,阿末,Ahmad@email.com,+65 9876 5432,Groom\'s Relatives,GROOM,PARENT,PARENTS_GUESTS,3,No Seafood,ATTENDING',
+  'Siti Binte Osman,斯蒂,siti@email.com,+65 8123 4567,Bride\'s Colleagues,BRIDE,COLLEAGUE,COLLEAGUES,,DECLINED',
+];
 
 export function parseCSV(text: string): { headers: string[]; rows: ParsedRow[] } {
   const cleanText = text.replace(/^\ufeff/, '');
@@ -294,7 +305,7 @@ export function rowToPayload(row: ParsedRow) {
 }
 
 export function downloadCSVTemplate() {
-  const csv = `${CSV_TEMPLATE_HEADERS}\n${CSV_TEMPLATE_EXAMPLE}`;
+  const csv = [CSV_TEMPLATE_HEADERS, ...EXAMPLE_ROWS, '', ...REFERENCE_ROWS].join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
