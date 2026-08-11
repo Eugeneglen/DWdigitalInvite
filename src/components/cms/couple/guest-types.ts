@@ -202,18 +202,6 @@ export interface ImportResult {
 
 export const CSV_TEMPLATE_HEADERS = 'name,chineseName,email,phone,group,side,relationship,category,tableNumber,dietaryNotes,rsvpStatus';
 
-const REFERENCE_ROWS = [
-  'Reference ↓, , , , ,Valid Options ↓,Valid Options ↓,Valid Options ↓, ,Valid Options ↓,Valid Options ↓',
-  ', , , , ,GROOM or BRIDE,PARENT / SIBLING / RELATIVE / FRIEND / COLLEAGUE / BUSINESS / OTHER,RELATIVES / FRIENDS / COLLEAGUES / BUSINESS / PARENTS_GUESTS / OTHER, ,Free text e.g. Halal / Vegetarian / No Seafood / Vegan / No Nuts,PENDING / ATTENDING / DECLINED / PARTIAL',
-];
-
-const EXAMPLE_ROWS = [
-  'John Smith,陈大明,john@email.com,+65 9123 4567,Bride\'s Family,BRIDE,RELATIVE,RELATIVES,1,Vegetarian,ATTENDING',
-  'Mary Tan,陈美玲,mary@email.com,+65 8765 4321,Groom\'s Friends,GROOM,FRIEND,FRIENDS,2,Halal,ATTENDING',
-  'Ahmad Bin Ali,阿末,Ahmad@email.com,+65 9876 5432,Groom\'s Relatives,GROOM,PARENT,PARENTS_GUESTS,3,No Seafood,ATTENDING',
-  'Siti Binte Osman,斯蒂,siti@email.com,+65 8123 4567,Bride\'s Colleagues,BRIDE,COLLEAGUE,COLLEAGUES,,DECLINED',
-];
-
 export function parseCSV(text: string): { headers: string[]; rows: ParsedRow[] } {
   const cleanText = text.replace(/^\ufeff/, '');
   const lines = cleanText.trim().split(/\r?\n/).filter((l) => l.trim());
@@ -304,13 +292,81 @@ export function rowToPayload(row: ParsedRow) {
   };
 }
 
-export function downloadCSVTemplate() {
-  const csv = [CSV_TEMPLATE_HEADERS, ...EXAMPLE_ROWS, '', ...REFERENCE_ROWS].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+export async function downloadCSVTemplate() {
+  const ExcelJS = await import('exceljs');
+  const workbook = new ExcelJS.Workbook();
+  const ws = workbook.addWorksheet('Guest Import Template');
+
+  const headers = ['name', 'chineseName', 'email', 'phone', 'group', 'side', 'relationship', 'category', 'tableNumber', 'dietaryNotes', 'rsvpStatus'];
+
+  // Header row styling
+  const headerRow = ws.addRow(headers);
+  headerRow.eachCell((cell) => {
+    cell.font = { bold: true, size: 11 };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
+    cell.border = {
+      bottom: { style: 'thin', color: { argb: 'FF9CA3AF' } },
+    };
+  });
+  ws.getRow(1).height = 24;
+
+  // Example data rows
+  const examples = [
+    ['John Smith', '陈大明', 'john@email.com', '+65 9123 4567', "Bride's Family", 'BRIDE', 'RELATIVE', 'RELATIVES', 1, 'Vegetarian', 'ATTENDING'],
+    ['Mary Tan', '陈美玲', 'mary@email.com', '+65 8765 4321', "Groom's Friends", 'GROOM', 'FRIEND', 'FRIENDS', 2, 'Halal', 'ATTENDING'],
+    ['Ahmad Bin Ali', '阿末', 'Ahmad@email.com', '+65 9876 5432', "Groom's Relatives", 'GROOM', 'PARENT', 'PARENTS_GUESTS', 3, 'No Seafood', 'ATTENDING'],
+    ['Siti Binte Osman', '斯蒂', 'siti@email.com', '+65 8123 4567', "Bride's Colleagues", 'BRIDE', 'COLLEAGUE', 'COLLEAGUES', null, null, 'DECLINED'],
+  ];
+  examples.forEach((row) => ws.addRow(row));
+
+  // Empty rows for user input (rows 6-25 = 20 blank rows)
+  for (let i = 0; i < 20; i++) ws.addRow([]);
+
+  // Column widths
+  ws.getColumn(1).width = 20;  // name
+  ws.getColumn(2).width = 14;  // chineseName
+  ws.getColumn(3).width = 26;  // email
+  ws.getColumn(4).width = 18;  // phone
+  ws.getColumn(5).width = 18;  // group
+  ws.getColumn(6).width = 10;  // side
+  ws.getColumn(7).width = 16;  // relationship
+  ws.getColumn(8).width = 18;  // category
+  ws.getColumn(9).width = 13;  // tableNumber
+  ws.getColumn(10).width = 20; // dietaryNotes
+  ws.getColumn(11).width = 14; // rsvpStatus
+
+  // Dropdown data validation (rows 2-25, i.e. data area)
+  const dv: ExcelJS.DataValidation = {
+    type: 'list',
+    allowBlank: true,
+    showErrorMessage: true,
+    errorStyle: 'warning',
+    errorTitle: 'Invalid value',
+  };
+
+  // Side: GROOM / BRIDE (col F = 6)
+  ws.getCell('F2').dataValidation = { ...dv, formulae: ['"GROOM,BRIDE"'], error: 'Please select GROOM or BRIDE' };
+  for (let r = 3; r <= 25; r++) ws.getCell(`F${r}`).dataValidation = { ...dv, formulae: ['"GROOM,BRIDE"'], error: 'Please select GROOM or BRIDE' };
+
+  // Relationship (col G = 7)
+  const relOpts = 'PARENT,SIBLING,RELATIVE,FRIEND,COLLEAGUE,BUSINESS,OTHER';
+  for (let r = 2; r <= 25; r++) ws.getCell(`G${r}`).dataValidation = { ...dv, formulae: [`"${relOpts}"`], error: `Please select: ${relOpts}` };
+
+  // Category (col H = 8)
+  const catOpts = 'RELATIVES,FRIENDS,COLLEAGUES,BUSINESS,PARENTS_GUESTS,OTHER';
+  for (let r = 2; r <= 25; r++) ws.getCell(`H${r}`).dataValidation = { ...dv, formulae: [`"${catOpts}"`], error: `Please select: ${catOpts}` };
+
+  // RSVP Status (col K = 11)
+  const rsvpOpts = 'PENDING,ATTENDING,DECLINED,PARTIAL';
+  for (let r = 2; r <= 25; r++) ws.getCell(`K${r}`).dataValidation = { ...dv, formulae: [`"${rsvpOpts}"`], error: `Please select: ${rsvpOpts}` };
+
+  // Generate and download
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'guest-import-template.csv';
+  a.download = 'guest-import-template.xlsx';
   a.click();
   URL.revokeObjectURL(url);
 }

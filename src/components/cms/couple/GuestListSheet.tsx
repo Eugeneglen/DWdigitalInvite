@@ -565,10 +565,10 @@ export default function GuestListSheet({ open, onOpenChange, onGuestsChanged }: 
               <div className="text-center">
                 <button
                   type="button"
-                  onClick={downloadCSVTemplate}
+                  onClick={() => { downloadCSVTemplate(); }}
                   className="text-xs text-cinematic-gold font-medium hover:underline transition-colors"
                 >
-                  ↓ Download CSV Template
+                  ↓ Download Excel Template
                 </button>
               </div>
             </div>
