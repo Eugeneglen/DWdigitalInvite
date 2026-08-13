@@ -429,9 +429,9 @@ export default function HeirloomPage() {
             <Image
               src="/dreamweavers-logo.png"
               alt="Dreamweavers"
-              width={32}
-              height={32}
-              className="h-8 w-auto mx-auto object-contain"
+              width={120}
+              height={14}
+              className="h-7 sm:h-8 w-auto mx-auto object-contain"
             />
             <span
               className={`${inter} block text-xs tracking-[0.3em] uppercase text-cinematic-gold/80 font-medium mt-6`}
