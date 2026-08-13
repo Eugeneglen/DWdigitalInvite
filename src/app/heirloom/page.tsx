@@ -431,7 +431,7 @@ export default function HeirloomPage() {
               alt="Dreamweavers"
               width={120}
               height={14}
-              className="h-[22px] sm:h-[25px] w-auto mx-auto object-contain"
+              className="h-[27px] sm:h-[30px] w-auto mx-auto object-contain"
             />
             <span
               className={`${inter} block text-xs tracking-[0.3em] uppercase text-cinematic-gold/80 font-medium mt-6`}
