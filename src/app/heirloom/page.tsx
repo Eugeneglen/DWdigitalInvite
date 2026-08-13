@@ -536,11 +536,13 @@ export default function HeirloomPage() {
             <form onSubmit={handleEnquirySubmit} className="px-8 sm:px-10 pt-8 pb-10">
               {/* Header */}
               <div className="mb-7">
-                <h3
-                  className={`${playfair} text-2xl sm:text-[28px] font-semibold text-charcoal-ink leading-tight`}
-                >
-                  Contact Concierge
-                </h3>
+              <Image
+                src="/dreamweavers-logo.png"
+                alt="Dreamweavers"
+                width={120}
+                height={14}
+                className="h-5 sm:h-6 w-auto object-contain"
+              />
                 <p className={`${inter} text-sm text-charcoal-ink/50 mt-2 leading-relaxed`}>
                   We'd love to hear from you. Share your details and we'll be in touch shortly.
                 </p>
