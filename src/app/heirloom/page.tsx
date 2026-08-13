@@ -306,7 +306,7 @@ export default function HeirloomPage() {
             </h2>
           </RevealSection>
 
-          <div className="mt-10 sm:mt-14 grid grid-cols-1 sm:grid-cols-3 gap-5 sm:gap-7">
+          <div className="mt-10 sm:mt-14 grid grid-cols-1 sm:grid-cols-3 gap-10 sm:gap-14 md:gap-16">
             {/* Step 1 */}
             <RevealSection delay={100}>
               <div className="border border-charcoal-ink/[0.06] rounded-sm p-7 sm:p-9 h-full flex flex-col">
