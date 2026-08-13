@@ -216,7 +216,7 @@ export default function HeirloomPage() {
       {/* ═══════════════════════════════════════════
           SECTION 2: THE PROBLEM → THE REVEAL
           ═══════════════════════════════════════════ */}
-      <section className="py-32 sm:py-44 md:py-56 bg-paper-cream">
+      <section className="py-40 sm:py-60 md:py-72 bg-paper-cream">
         <div className="max-w-5xl mx-auto px-6">
           <RevealSection>
             <h2
@@ -305,7 +305,7 @@ export default function HeirloomPage() {
           ═══════════════════════════════════════════ */}
       <section
         id="how-it-works"
-        className="py-32 sm:py-44 md:py-56 bg-champagne-silk/30"
+        className="py-40 sm:py-60 md:py-72 bg-champagne-silk/30"
       >
         <div className="max-w-5xl mx-auto px-6">
           <RevealSection>
@@ -401,7 +401,7 @@ export default function HeirloomPage() {
       {/* ═══════════════════════════════════════════
           SECTION 4: THE GUEST EXPERIENCE
           ═══════════════════════════════════════════ */}
-      <section className="py-32 sm:py-44 md:py-56 bg-paper-cream">
+      <section className="py-40 sm:py-60 md:py-72 bg-paper-cream">
         <div className="max-w-6xl mx-auto px-6">
           <RevealSection>
             <h2
@@ -445,7 +445,7 @@ export default function HeirloomPage() {
       {/* ═══════════════════════════════════════════
           SECTION 5: CLOSING / ENQUIRY
           ═══════════════════════════════════════════ */}
-      <section className="py-24 sm:py-32 md:py-40 bg-paper-cream">
+      <section className="py-32 sm:py-48 md:py-56 bg-paper-cream">
         <div className="max-w-2xl mx-auto px-6 text-center">
           <RevealSection>
             <span
