@@ -1,0 +1,544 @@
+'use client'
+
+import { useEffect, useRef, useState, useCallback } from 'react'
+import Image from 'next/image'
+
+/* ─────────────────────────────────────────────
+   Reveal Section Wrapper
+   ───────────────────────────────────────────── */
+function RevealSection({ children, className = '', delay = 0 }: {
+  children: React.ReactNode
+  className?: string
+  delay?: number
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setTimeout(() => {
+            el.style.opacity = '1'
+            el.style.transform = 'translateY(0)'
+          }, delay)
+          observer.unobserve(el)
+        }
+      },
+      { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
+    )
+
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [delay])
+
+  return (
+    <div
+      ref={ref}
+      className={className}
+      style={{
+        opacity: 0,
+        transform: 'translateY(30px)',
+        transition: 'opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1), transform 0.9s cubic-bezier(0.16, 1, 0.3, 1)',
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────
+   Phone Mockup Component
+   ───────────────────────────────────────────── */
+const PHONES = [
+  { src: '/heirloom/guest-hero.png', label: 'The First Impression', alt: 'Heirloom guest-facing hero screen showing couple names' },
+  { src: '/heirloom/guest-schedule.png', label: 'The Day, Beautifully Planned', alt: 'Schedule page with event timeline' },
+  { src: '/heirloom/guest-story.png', label: 'Your Love Story', alt: 'Love story introduction section' },
+  { src: '/heirloom/guest-wishes.png', label: 'Wishes From Loved Ones', alt: 'Guest wishes and blessings page' },
+  { src: '/heirloom/guest-moments.png', label: 'Treasured Moments', alt: 'Photo moments gallery' },
+] as const
+
+function PhoneMockup({ src, label, alt }: (typeof PHONES)[number]) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          el.style.opacity = '1'
+          el.style.transform = 'translateY(0)'
+          observer.unobserve(el)
+        }
+      },
+      { threshold: 0.1 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <div
+      ref={ref}
+      className="flex-shrink-0 w-56 sm:w-64"
+      style={{
+        opacity: 0,
+        transform: 'translateY(24px)',
+        transition: 'opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
+      }}
+    >
+      {/* Phone frame */}
+      <div className="relative rounded-[2rem] border-[6px] border-charcoal-ink/80 overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.15),0_4px_16px_rgba(0,0,0,0.1)] bg-charcoal-ink">
+        {/* Notch */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-5 bg-charcoal-ink rounded-b-xl z-10" />
+        <Image
+          src={src}
+          alt={alt}
+          width={256}
+          height={512}
+          className="w-full h-auto block"
+          sizes="(max-width: 640px) 224px, 256px"
+        />
+      </div>
+      {/* Label */}
+      <p className="mt-4 text-center text-xs sm:text-sm font-[family-name:var(--font-inter)] text-charcoal-ink/60 tracking-wide uppercase">
+        {label}
+      </p>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────
+   Main Page Component
+   ───────────────────────────────────────────── */
+export default function HeirloomPage() {
+  const [navVisible, setNavVisible] = useState(false)
+  const heroRef = useRef<HTMLElement>(null)
+
+  /* Page title */
+  useEffect(() => {
+    document.title = 'Heirloom — Digital Wedding Experiences by Dreamweavers'
+  }, [])
+
+  /* Sticky nav: show after scrolling past hero */
+  const handleScroll = useCallback(() => {
+    if (!heroRef.current) return
+    const heroBottom = heroRef.current.getBoundingClientRect().bottom
+    setNavVisible(heroBottom <= 0)
+  }, [])
+
+  useEffect(() => {
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [handleScroll])
+
+  /* Scroll to section 3 */
+  const scrollToHowItWorks = () => {
+    document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  /* ──── PLAYFAIR & INTER FONT TOKENS ──── */
+  const playfair = 'font-[family-name:var(--font-playfair)]'
+  const inter = 'font-[family-name:var(--font-inter)]'
+
+  return (
+    <main className={`${inter} antialiased`}>{/* ───── Sticky Navigation ───── */}<nav
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+        navVisible
+          ? 'opacity-100 translate-y-0'
+          : 'opacity-0 -translate-y-4 pointer-events-none'
+      }`}
+      style={{
+        background: 'rgba(252, 249, 242, 0.92)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+      }}
+    >
+      <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+        <span className={`${playfair} text-lg font-semibold text-charcoal-ink tracking-tight`}>
+          Dreamweavers
+        </span>
+        <a
+          href="mailto:enquiry@dreamweavers.com.sg?subject=Heirloom%20Enquiry"
+          className={`${inter} text-xs font-medium tracking-widest uppercase text-cinematic-gold border border-cinematic-gold/60 px-5 py-2 rounded-sm hover:bg-cinematic-gold hover:text-paper-cream transition-colors duration-300`}
+        >
+          Enquire
+        </a>
+      </div>
+    </nav>
+
+      {/* ═══════════════════════════════════════════
+          SECTION 1: HERO
+          ═══════════════════════════════════════════ */}
+      <section
+        ref={heroRef}
+        className="relative min-h-screen flex items-center justify-center overflow-hidden"
+      >
+        {/* Background image */}
+        <Image
+          src="/heirloom/hero-bg.png"
+          alt="Elegant wedding invitation with champagne and roses at golden hour"
+          fill
+          className="object-cover object-center"
+          priority
+          sizes="100vw"
+        />
+
+        {/* Dark overlay */}
+        <div className="absolute inset-0 bg-charcoal-ink/60" />
+
+        {/* Bottom gradient for seamless transition */}
+        <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-charcoal-ink/40 to-transparent" />
+
+        {/* Content */}
+        <div className="relative z-10 max-w-3xl mx-auto px-6 text-center">
+          <h1
+            className={`${playfair} text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-semibold text-white leading-[1.1] tracking-tight`}
+            style={{
+              opacity: 0,
+              animation: 'fadeInUp 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards',
+            }}
+          >
+            Your wedding begins before your guests arrive.
+          </h1>
+
+          <p
+            className={`${inter} mt-6 text-base sm:text-lg text-white/75 leading-relaxed max-w-xl mx-auto`}
+            style={{
+              opacity: 0,
+              animation: 'fadeInUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.6s forwards',
+            }}
+          >
+            A beautifully personalised digital wedding experience by Dreamweavers.
+          </p>
+
+          <p
+            className={`${inter} mt-4 text-xs tracking-[0.25em] uppercase text-cinematic-gold/90`}
+            style={{
+              opacity: 0,
+              animation: 'fadeInUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.9s forwards',
+            }}
+          >
+            Since 1998 · Singapore
+          </p>
+
+          <div
+            className="mt-10"
+            style={{
+              opacity: 0,
+              animation: 'fadeInUp 1s cubic-bezier(0.16, 1, 0.3, 1) 1.2s forwards',
+            }}
+          >
+            <button
+              onClick={scrollToHowItWorks}
+              className={`${inter} border border-cinematic-gold text-cinematic-gold px-8 py-3 text-sm font-medium tracking-widest uppercase hover:bg-cinematic-gold hover:text-charcoal-ink transition-all duration-300 cursor-pointer`}
+            >
+              Discover Heirloom
+            </button>
+          </div>
+        </div>
+
+        {/* Scroll indicator */}
+        <div
+          className="absolute bottom-8 left-1/2 -translate-x-1/2"
+          style={{
+            opacity: 0,
+            animation: 'fadeInUp 1s ease 1.6s forwards',
+          }}
+        >
+          <div className="w-px h-10 bg-gradient-to-b from-transparent to-white/40" />
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════
+          SECTION 2: THE PROBLEM → THE REVEAL
+          ═══════════════════════════════════════════ */}
+      <section className="py-24 sm:py-32 md:py-40 bg-paper-cream">
+        <div className="max-w-5xl mx-auto px-6">
+          <RevealSection>
+            <h2
+              className={`${playfair} text-3xl sm:text-4xl md:text-5xl font-semibold text-charcoal-ink text-center leading-tight`}
+            >
+              More Than an Invitation.
+            </h2>
+          </RevealSection>
+
+          <RevealSection delay={150}>
+            <p
+              className={`${inter} mt-4 sm:mt-6 text-base sm:text-lg text-charcoal-ink/60 text-center max-w-2xl mx-auto leading-relaxed`}
+            >
+              Most digital invitations deliver information. Heirloom delivers an experience.
+            </p>
+          </RevealSection>
+
+          {/* Comparison grid */}
+          <div className="mt-16 sm:mt-20 grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
+            {/* Left: Traditional */}
+            <RevealSection delay={250}>
+              <div className="border border-charcoal-ink/10 rounded-sm p-8 sm:p-10">
+                <h3
+                  className={`${inter} text-xs font-medium tracking-[0.2em] uppercase text-charcoal-ink/40 mb-8`}
+                >
+                  Traditional Digital Invitation
+                </h3>
+                <ul className="space-y-5">
+                  {[
+                    'Static image or PDF',
+                    'Limited personalisation',
+                    'No emotional storytelling',
+                    'Separate RSVP management',
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-3">
+                      <span className="text-charcoal-ink/25 mt-0.5 flex-shrink-0">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="block">
+                          <line x1="2" y1="2" x2="14" y2="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                          <line x1="14" y1="2" x2="2" y2="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                        </svg>
+                      </span>
+                      <span className={`${inter} text-sm sm:text-base text-charcoal-ink/65 leading-relaxed`}>
+                        {item}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </RevealSection>
+
+            {/* Right: Heirloom */}
+            <RevealSection delay={400}>
+              <div className="border-2 border-cinematic-gold/40 rounded-sm p-8 sm:p-10 bg-cinematic-gold/[0.03]">
+                <h3
+                  className={`${inter} text-xs font-medium tracking-[0.2em] uppercase text-cinematic-gold mb-8`}
+                >
+                  Heirloom by Dreamweavers
+                </h3>
+                <ul className="space-y-5">
+                  {[
+                    'Personalised digital experience',
+                    'Music, video, and animation',
+                    'Interactive guest journey',
+                    'Integrated RSVP and guest management',
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-3">
+                      <span className="text-cinematic-gold mt-0.5 flex-shrink-0">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="block">
+                          <polyline points="3,8 7,12 13,4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </span>
+                      <span className={`${inter} text-sm sm:text-base text-charcoal-ink/80 leading-relaxed font-medium`}>
+                        {item}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </RevealSection>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════
+          SECTION 3: HOW IT WORKS
+          ═══════════════════════════════════════════ */}
+      <section
+        id="how-it-works"
+        className="py-24 sm:py-32 md:py-40 bg-champagne-silk/30"
+      >
+        <div className="max-w-5xl mx-auto px-6">
+          <RevealSection>
+            <h2
+              className={`${playfair} text-3xl sm:text-4xl md:text-5xl font-semibold text-charcoal-ink text-center leading-tight`}
+            >
+              Three Steps to Your Wedding Experience.
+            </h2>
+          </RevealSection>
+
+          <div className="mt-16 sm:mt-20 grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
+            {/* Step 1 */}
+            <RevealSection delay={100}>
+              <div className="border border-cinematic-gold/30 rounded-sm p-8 sm:p-10 bg-paper-cream/60 h-full flex flex-col">
+                <span
+                  className={`${playfair} text-3xl sm:text-4xl font-light text-cinematic-gold/60`}
+                >
+                  01
+                </span>
+                <h3
+                  className={`${playfair} text-xl sm:text-2xl font-semibold text-charcoal-ink mt-4`}
+                >
+                  Design
+                </h3>
+                <p
+                  className={`${inter} text-xs tracking-[0.15em] uppercase text-cinematic-gold/70 mt-1`}
+                >
+                  Create your invitation
+                </p>
+                <p
+                  className={`${inter} text-sm text-charcoal-ink/65 leading-relaxed mt-5 flex-1`}
+                >
+                  Choose from thoughtfully curated colour palettes, refined typography, and elegant layouts. Add your favourite photos and personal touches — every detail is yours to shape.
+                </p>
+              </div>
+            </RevealSection>
+
+            {/* Step 2 */}
+            <RevealSection delay={250}>
+              <div className="border border-cinematic-gold/30 rounded-sm p-8 sm:p-10 bg-paper-cream/60 h-full flex flex-col">
+                <span
+                  className={`${playfair} text-3xl sm:text-4xl font-light text-cinematic-gold/60`}
+                >
+                  02
+                </span>
+                <h3
+                  className={`${playfair} text-xl sm:text-2xl font-semibold text-charcoal-ink mt-4`}
+                >
+                  Share
+                </h3>
+                <p
+                  className={`${inter} text-xs tracking-[0.15em] uppercase text-cinematic-gold/70 mt-1`}
+                >
+                  Send to your guests
+                </p>
+                <p
+                  className={`${inter} text-sm text-charcoal-ink/65 leading-relaxed mt-5 flex-1`}
+                >
+                  Share a single link or a beautifully designed QR code. Your invitation reaches every guest effortlessly — no envelopes, no postage, no delays.
+                </p>
+              </div>
+            </RevealSection>
+
+            {/* Step 3 */}
+            <RevealSection delay={400}>
+              <div className="border border-cinematic-gold/30 rounded-sm p-8 sm:p-10 bg-paper-cream/60 h-full flex flex-col">
+                <span
+                  className={`${playfair} text-3xl sm:text-4xl font-light text-cinematic-gold/60`}
+                >
+                  03
+                </span>
+                <h3
+                  className={`${playfair} text-xl sm:text-2xl font-semibold text-charcoal-ink mt-4`}
+                >
+                  Celebrate
+                </h3>
+                <p
+                  className={`${inter} text-xs tracking-[0.15em] uppercase text-cinematic-gold/70 mt-1`}
+                >
+                  Watch the magic unfold
+                </p>
+                <p
+                  className={`${inter} text-sm text-charcoal-ink/65 leading-relaxed mt-5 flex-1`}
+                >
+                  Your guests receive a curated journey — from your love story to the event schedule, from heartfelt wishes to shared photo memories. The experience begins the moment they open the link.
+                </p>
+              </div>
+            </RevealSection>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════
+          SECTION 4: THE GUEST EXPERIENCE
+          ═══════════════════════════════════════════ */}
+      <section className="py-24 sm:py-32 md:py-40 bg-paper-cream">
+        <div className="max-w-6xl mx-auto px-6">
+          <RevealSection>
+            <h2
+              className={`${playfair} text-3xl sm:text-4xl md:text-5xl font-semibold text-charcoal-ink text-center leading-tight max-w-3xl mx-auto`}
+            >
+              They Don't Just Receive an Invitation.
+              <br className="hidden sm:block" />
+              <span className="text-cinematic-gold"> They Enter Your World.</span>
+            </h2>
+          </RevealSection>
+
+          <RevealSection delay={150}>
+            <p
+              className={`${inter} mt-5 sm:mt-6 text-base sm:text-lg text-charcoal-ink/65 text-center max-w-xl mx-auto leading-relaxed`}
+            >
+              This is what your guests will experience.
+            </p>
+          </RevealSection>
+
+          {/* Phone mockups — horizontal scroll on mobile, grid on desktop */}
+          <div className="mt-14 sm:mt-16 md:mt-20">
+            {/* Mobile: horizontal scroll */}
+            <div className="flex md:hidden gap-6 overflow-x-auto pb-6 px-2 snap-x snap-mandatory no-scrollbar">
+              {PHONES.map((phone) => (
+                <div key={phone.label} className="snap-center">
+                  <PhoneMockup {...phone} />
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop: grid */}
+            <div className="hidden md:flex justify-center gap-8 lg:gap-10 flex-wrap">
+              {PHONES.map((phone) => (
+                <PhoneMockup key={phone.label} {...phone} />
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════
+          SECTION 5: CLOSING / ENQUIRY
+          ═══════════════════════════════════════════ */}
+      <section className="py-24 sm:py-32 md:py-40 bg-paper-cream">
+        <div className="max-w-2xl mx-auto px-6 text-center">
+          <RevealSection>
+            <span
+              className={`${inter} text-xs tracking-[0.3em] uppercase text-cinematic-gold/80 font-medium`}
+            >
+              Begin Your Journey
+            </span>
+          </RevealSection>
+
+          <RevealSection delay={150}>
+            <h2
+              className={`${playfair} text-3xl sm:text-4xl md:text-[2.75rem] font-semibold text-charcoal-ink mt-6 leading-tight`}
+            >
+              Beautiful Invitations. Seamless Planning. Thoughtfully Crafted.
+            </h2>
+          </RevealSection>
+
+          <RevealSection delay={300}>
+            <p
+              className={`${inter} mt-6 text-base sm:text-lg text-charcoal-ink/65 leading-relaxed`}
+            >
+              Heirloom by Dreamweavers transforms your love story into an unforgettable digital experience — one your guests will remember long after the celebration.
+            </p>
+          </RevealSection>
+
+          <RevealSection delay={450}>
+            <div className="mt-10 sm:mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
+              <a
+                href="mailto:enquiry@dreamweavers.com.sg?subject=Heirloom%20Enquiry"
+                className={`${inter} inline-block bg-cinematic-gold text-charcoal-ink px-8 py-3.5 text-sm font-medium tracking-widest uppercase hover:bg-cinematic-gold/90 transition-colors duration-300 w-full sm:w-auto text-center`}
+              >
+                Enquire Now
+              </a>
+              <a
+                href="tel:+6563362505"
+                className={`${inter} inline-block border border-charcoal-ink/20 text-charcoal-ink/70 px-8 py-3.5 text-sm font-medium tracking-widest uppercase hover:border-charcoal-ink/50 hover:text-charcoal-ink transition-all duration-300 w-full sm:w-auto text-center`}
+              >
+                Call Us
+              </a>
+            </div>
+          </RevealSection>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════
+          FOOTER
+          ═══════════════════════════════════════════ */}
+      <footer className="py-8 bg-paper-cream border-t border-charcoal-ink/5">
+        <p className={`${inter} text-xs text-charcoal-ink/30 text-center tracking-wide`}
+        >
+          © 2025 Dreamweavers Pte Ltd. All rights reserved.
+        </p>
+      </footer>
+    </main>
+  )
+}
