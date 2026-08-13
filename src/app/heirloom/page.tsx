@@ -216,7 +216,7 @@ export default function HeirloomPage() {
       {/* ═══════════════════════════════════════════
           SECTION 2: THE PROBLEM → THE REVEAL
           ═══════════════════════════════════════════ */}
-      <section className="py-48 sm:py-72 md:py-96 bg-paper-cream">
+      <section className="py-56 sm:py-80 md:py-[28rem] bg-paper-cream">
         <div className="max-w-5xl mx-auto px-6">
           <RevealSection>
             <h2
