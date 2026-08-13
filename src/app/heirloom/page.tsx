@@ -158,9 +158,13 @@ export default function HeirloomPage() {
       }}
     >
       <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-        <span className={`${playfair} text-lg font-semibold text-charcoal-ink tracking-tight`}>
-          Dreamweavers
-        </span>
+        <Image
+          src="/dreamweavers-logo.png"
+          alt="Dreamweavers"
+          width={120}
+          height={12}
+          className="h-6 w-auto object-contain"
+        />
         <a
           href="mailto:enquiry@dreamweavers.com.sg?subject=Heirloom%20Enquiry"
           className={`${inter} text-xs font-medium tracking-widest uppercase text-cinematic-gold border border-cinematic-gold/60 px-5 py-2 rounded-sm hover:bg-cinematic-gold hover:text-paper-cream transition-colors duration-300`}
@@ -256,7 +260,7 @@ export default function HeirloomPage() {
       {/* ═══════════════════════════════════════════
           SECTION 2: THE PROBLEM → THE REVEAL
           ═══════════════════════════════════════════ */}
-      <section className="py-24 sm:py-32 md:py-40 bg-paper-cream">
+      <section className="py-32 sm:py-44 md:py-56 bg-paper-cream">
         <div className="max-w-5xl mx-auto px-6">
           <RevealSection>
             <h2
@@ -345,7 +349,7 @@ export default function HeirloomPage() {
           ═══════════════════════════════════════════ */}
       <section
         id="how-it-works"
-        className="py-24 sm:py-32 md:py-40 bg-champagne-silk/30"
+        className="py-32 sm:py-44 md:py-56 bg-champagne-silk/30"
       >
         <div className="max-w-5xl mx-auto px-6">
           <RevealSection>
@@ -441,7 +445,7 @@ export default function HeirloomPage() {
       {/* ═══════════════════════════════════════════
           SECTION 4: THE GUEST EXPERIENCE
           ═══════════════════════════════════════════ */}
-      <section className="py-24 sm:py-32 md:py-40 bg-paper-cream">
+      <section className="py-32 sm:py-44 md:py-56 bg-paper-cream">
         <div className="max-w-6xl mx-auto px-6">
           <RevealSection>
             <h2
@@ -536,7 +540,7 @@ export default function HeirloomPage() {
       <footer className="py-8 bg-paper-cream border-t border-charcoal-ink/5">
         <p className={`${inter} text-xs text-charcoal-ink/30 text-center tracking-wide`}
         >
-          © 2025 Dreamweavers Pte Ltd. All rights reserved.
+          © 2026 DREAMWEAVERS DIGITAL HEIRLOOMS. All rights reserved.
         </p>
       </footer>
     </main>
