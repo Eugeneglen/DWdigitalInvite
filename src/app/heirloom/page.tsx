@@ -1,7 +1,14 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import Image from 'next/image'
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
+import { X } from 'lucide-react'
 
 /* ─────────────────────────────────────────────
    Reveal Section Wrapper
@@ -116,9 +123,44 @@ export default function HeirloomPage() {
     document.title = 'Heirloom — Digital Wedding Experiences by Dreamweavers'
   }, [])
 
+  /* Enquiry dialog state */
+  const [enquiryOpen, setEnquiryOpen] = useState(false)
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    message: '',
+  })
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+
   /* Scroll to section 3 */
   const scrollToHowItWorks = () => {
     document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  const handleEnquirySubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/heirloom/enquiry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+      if (res.ok) {
+        setSubmitted(true)
+        setFormData({ name: '', email: '', phone: '', message: '' })
+        setTimeout(() => {
+          setEnquiryOpen(false)
+          setSubmitted(false)
+        }, 2200)
+      }
+    } catch {
+      /* silently handle */
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   /* ──── PLAYFAIR & INTER FONT TOKENS ──── */
@@ -431,7 +473,7 @@ export default function HeirloomPage() {
               alt="Dreamweavers"
               width={120}
               height={14}
-              className="h-[27px] sm:h-[30px] w-auto mx-auto object-contain"
+              className="h-[22px] sm:h-[24px] w-auto mx-auto object-contain"
             />
             <span
               className={`${inter} block text-xs tracking-[0.3em] uppercase text-cinematic-gold/80 font-medium mt-6`}
@@ -458,16 +500,160 @@ export default function HeirloomPage() {
 
           <RevealSection delay={450}>
             <div className="mt-10 sm:mt-12">
-              <a
-                href="mailto:enquiry@dreamweavers.com.sg?subject=Heirloom%20Enquiry"
-                className={`${inter} inline-block bg-cinematic-gold text-charcoal-ink px-8 py-3.5 text-sm font-medium tracking-widest uppercase hover:bg-cinematic-gold/90 transition-colors duration-300`}
+              <button
+                onClick={() => setEnquiryOpen(true)}
+                className={`${inter} inline-block bg-cinematic-gold text-charcoal-ink px-8 py-3.5 text-sm font-medium tracking-widest uppercase hover:bg-cinematic-gold/90 transition-colors duration-300 cursor-pointer`}
               >
                 Enquire Now
-              </a>
+              </button>
             </div>
           </RevealSection>
         </div>
       </section>
+
+      {/* ═══════════════════════════════════════════
+          ENQUIRY DIALOG
+          ═══════════════════════════════════════════ */}
+      <Dialog open={enquiryOpen} onOpenChange={setEnquiryOpen}>
+        <DialogContent
+          showCloseButton={false}
+          className="sm:max-w-[460px] bg-paper-cream border-charcoal-ink/10 rounded-none p-0 overflow-hidden"
+          overlayClassName="bg-black/40 backdrop-blur-sm"
+        >
+          {/* Close button */}
+          <button
+            onClick={() => setEnquiryOpen(false)}
+            className="absolute top-5 right-5 z-10 text-charcoal-ink/40 hover:text-charcoal-ink/70 transition-colors cursor-pointer"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" strokeWidth={1.5} />
+          </button>
+
+          <DialogTitle className="sr-only">Enquire Now</DialogTitle>
+          <DialogDescription className="sr-only">Contact Dreamweavers about Heirloom digital wedding invitations</DialogDescription>
+
+          {!submitted ? (
+            <form onSubmit={handleEnquirySubmit} className="px-8 sm:px-10 pt-8 pb-10">
+              {/* Header */}
+              <div className="mb-7">
+                <h3
+                  className={`${playfair} text-2xl sm:text-[28px] font-semibold text-charcoal-ink leading-tight`}
+                >
+                  Contact Concierge
+                </h3>
+                <p className={`${inter} text-sm text-charcoal-ink/50 mt-2 leading-relaxed`}>
+                  We'd love to hear from you. Share your details and we'll be in touch shortly.
+                </p>
+              </div>
+
+              {/* Divider */}
+              <div className="h-px bg-charcoal-ink/10 mb-7" />
+
+              {/* Form fields */}
+              <div className="space-y-6">
+                {/* Full Name */}
+                <div className="space-y-2">
+                  <label
+                    htmlFor="enquiry-name"
+                    className={`${inter} block text-[11px] font-medium tracking-[0.15em] uppercase text-charcoal-ink/40`}
+                  >
+                    Full Name
+                  </label>
+                  <input
+                    id="enquiry-name"
+                    type="text"
+                    required
+                    placeholder="Your full name"
+                    value={formData.name}
+                    onChange={(e) => setFormData((d) => ({ ...d, name: e.target.value }))}
+                    className={`${inter} w-full bg-transparent border-0 border-b border-charcoal-ink/20 focus:border-charcoal-ink/60 text-charcoal-ink text-base placeholder:text-charcoal-ink/30 pb-2.5 px-0 outline-none transition-colors duration-200`}
+                  />
+                </div>
+
+                {/* Email Address */}
+                <div className="space-y-2">
+                  <label
+                    htmlFor="enquiry-email"
+                    className={`${inter} block text-[11px] font-medium tracking-[0.15em] uppercase text-charcoal-ink/40`}
+                  >
+                    Email Address
+                  </label>
+                  <input
+                    id="enquiry-email"
+                    type="email"
+                    required
+                    placeholder="you@example.com"
+                    value={formData.email}
+                    onChange={(e) => setFormData((d) => ({ ...d, email: e.target.value }))}
+                    className={`${inter} w-full bg-transparent border-0 border-b border-charcoal-ink/20 focus:border-charcoal-ink/60 text-charcoal-ink text-base placeholder:text-charcoal-ink/30 pb-2.5 px-0 outline-none transition-colors duration-200`}
+                  />
+                </div>
+
+                {/* Contact Number */}
+                <div className="space-y-2">
+                  <label
+                    htmlFor="enquiry-phone"
+                    className={`${inter} block text-[11px] font-medium tracking-[0.15em] uppercase text-charcoal-ink/40`}
+                  >
+                    Contact Number
+                  </label>
+                  <input
+                    id="enquiry-phone"
+                    type="tel"
+                    placeholder="+65 XXXX XXXX"
+                    value={formData.phone}
+                    onChange={(e) => setFormData((d) => ({ ...d, phone: e.target.value }))}
+                    className={`${inter} w-full bg-transparent border-0 border-b border-charcoal-ink/20 focus:border-charcoal-ink/60 text-charcoal-ink text-base placeholder:text-charcoal-ink/30 pb-2.5 px-0 outline-none transition-colors duration-200`}
+                  />
+                </div>
+
+                {/* Reason for Contact */}
+                <div className="space-y-2">
+                  <label
+                    htmlFor="enquiry-message"
+                    className={`${inter} block text-[11px] font-medium tracking-[0.15em] uppercase text-charcoal-ink/40`}
+                  >
+                    Reason for Contact
+                  </label>
+                  <textarea
+                    id="enquiry-message"
+                    required
+                    rows={3}
+                    placeholder="Tell us how we can help..."
+                    value={formData.message}
+                    onChange={(e) => setFormData((d) => ({ ...d, message: e.target.value }))}
+                    className={`${inter} w-full bg-transparent border-0 border-b border-charcoal-ink/20 focus:border-charcoal-ink/60 text-charcoal-ink text-base placeholder:text-charcoal-ink/30 pb-2.5 px-0 pt-1 outline-none transition-colors duration-200 resize-none`}
+                  />
+                </div>
+              </div>
+
+              {/* Submit button */}
+              <button
+                type="submit"
+                disabled={submitting}
+                className={`${inter} mt-9 w-full bg-charcoal-ink text-paper-cream py-3.5 text-sm font-medium tracking-[0.2em] uppercase hover:bg-charcoal-ink/85 transition-colors duration-300 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer`}
+              >
+                {submitting ? 'Sending...' : 'Send Message'}
+              </button>
+            </form>
+          ) : (
+            /* Success state */
+            <div className="px-8 sm:px-10 pt-12 pb-10 text-center">
+              <div className="w-12 h-12 mx-auto mb-5 rounded-full border border-cinematic-gold/40 flex items-center justify-center">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-cinematic-gold">
+                  <polyline points="6,12 10,16 18,8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <h3 className={`${playfair} text-xl font-semibold text-charcoal-ink`}>
+                Thank You
+              </h3>
+              <p className={`${inter} text-sm text-charcoal-ink/55 mt-2 leading-relaxed`}>
+                We've received your enquiry and will be in touch within 24 hours.
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* ═══════════════════════════════════════════
           FOOTER
