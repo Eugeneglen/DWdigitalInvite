@@ -135,24 +135,18 @@ export default function HeirloomPage() {
       >
         {/* Background image */}
         <Image
-          src="/heirloom/hero-bg.png"
-          alt="Elegant wedding invitation with champagne and roses at golden hour"
+          src="/heirloom/hero-bg.avif"
+          alt="Dreamweavers Heirloom digital wedding invitation"
           fill
           className="object-cover object-center"
           priority
           sizes="100vw"
         />
 
-        {/* Dark overlay */}
-        <div className="absolute inset-0 bg-charcoal-ink/60" />
-
-        {/* Bottom gradient for seamless transition */}
-        <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-charcoal-ink/40 to-transparent" />
-
         {/* Content */}
         <div className="relative z-10 max-w-3xl mx-auto px-6 text-center">
           <h1
-            className={`${playfair} text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-semibold text-white leading-[1.1] tracking-tight`}
+            className={`${playfair} text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-semibold text-charcoal-ink leading-[1.1] tracking-tight`}
             style={{
               opacity: 0,
               animation: 'fadeInUp 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards',
@@ -162,7 +156,7 @@ export default function HeirloomPage() {
           </h1>
 
           <p
-            className={`${inter} mt-6 text-base sm:text-lg text-white/75 leading-relaxed max-w-xl mx-auto`}
+            className={`${inter} mt-6 text-base sm:text-lg text-charcoal-ink/65 leading-relaxed max-w-xl mx-auto`}
             style={{
               opacity: 0,
               animation: 'fadeInUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.6s forwards',
@@ -205,7 +199,7 @@ export default function HeirloomPage() {
             animation: 'fadeInUp 1s ease 1.6s forwards',
           }}
         >
-          <div className="w-px h-10 bg-gradient-to-b from-transparent to-white/40" />
+          <div className="w-px h-10 bg-gradient-to-b from-transparent to-charcoal-ink/30" />
         </div>
       </section>
 
