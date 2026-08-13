@@ -426,8 +426,15 @@ export default function HeirloomPage() {
       <section className="py-20 sm:py-24 md:py-28 bg-paper-cream">
         <div className="max-w-2xl mx-auto px-6 text-center">
           <RevealSection>
+            <Image
+              src="/dreamweavers-logo.png"
+              alt="Dreamweavers"
+              width={120}
+              height={14}
+              className="h-7 sm:h-8 w-auto mx-auto object-contain opacity-70"
+            />
             <span
-              className={`${inter} text-xs tracking-[0.3em] uppercase text-cinematic-gold/80 font-medium`}
+              className={`${inter} block text-xs tracking-[0.3em] uppercase text-cinematic-gold/80 font-medium mt-6`}
             >
               Begin Your Journey
             </span>
@@ -450,18 +457,12 @@ export default function HeirloomPage() {
           </RevealSection>
 
           <RevealSection delay={450}>
-            <div className="mt-10 sm:mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div className="mt-10 sm:mt-12">
               <a
                 href="mailto:enquiry@dreamweavers.com.sg?subject=Heirloom%20Enquiry"
-                className={`${inter} inline-block bg-cinematic-gold text-charcoal-ink px-8 py-3.5 text-sm font-medium tracking-widest uppercase hover:bg-cinematic-gold/90 transition-colors duration-300 w-full sm:w-auto text-center`}
+                className={`${inter} inline-block bg-cinematic-gold text-charcoal-ink px-8 py-3.5 text-sm font-medium tracking-widest uppercase hover:bg-cinematic-gold/90 transition-colors duration-300`}
               >
                 Enquire Now
-              </a>
-              <a
-                href="tel:+6563362505"
-                className={`${inter} inline-block border border-charcoal-ink/20 text-charcoal-ink/70 px-8 py-3.5 text-sm font-medium tracking-widest uppercase hover:border-charcoal-ink/50 hover:text-charcoal-ink transition-all duration-300 w-full sm:w-auto text-center`}
-              >
-                Call Us
               </a>
             </div>
           </RevealSection>
