@@ -50,17 +50,17 @@ function RevealSection({ children, className = '', delay = 0 }: {
 }
 
 /* ─────────────────────────────────────────────
-   Phone Mockup Component
+   Gallery Card (Portrait Image + Overlay Label)
    ───────────────────────────────────────────── */
-const PHONES = [
-  { src: '/heirloom/guest-hero.png', label: 'The First Impression', alt: 'Heirloom guest-facing hero screen showing couple names' },
-  { src: '/heirloom/guest-schedule.png', label: 'The Day, Beautifully Planned', alt: 'Schedule page with event timeline' },
-  { src: '/heirloom/guest-story.png', label: 'Your Love Story', alt: 'Love story introduction section' },
-  { src: '/heirloom/guest-wishes.png', label: 'Wishes From Loved Ones', alt: 'Guest wishes and blessings page' },
-  { src: '/heirloom/guest-moments.png', label: 'Treasured Moments', alt: 'Photo moments gallery' },
+const GALLERY = [
+  { src: '/heirloom/guest-hero.png', label: 'Eleanor & James', alt: 'Heirloom guest-facing hero screen' },
+  { src: '/heirloom/guest-schedule.png', label: 'The Day', alt: 'Schedule page with event timeline' },
+  { src: '/heirloom/guest-story.png', label: 'Our Story', alt: 'Love story introduction section' },
+  { src: '/heirloom/guest-wishes.png', label: 'Wishes', alt: 'Guest wishes and blessings page' },
+  { src: '/heirloom/guest-moments.png', label: 'Moments', alt: 'Photo moments gallery' },
 ] as const
 
-function PhoneMockup({ src, label, alt }: (typeof PHONES)[number]) {
+function GalleryCard({ src, label, alt, index }: (typeof GALLERY)[number] & { index: number }) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -83,30 +83,26 @@ function PhoneMockup({ src, label, alt }: (typeof PHONES)[number]) {
   return (
     <div
       ref={ref}
-      className="flex-shrink-0 w-56 sm:w-64"
+      className="relative aspect-[3/4] overflow-hidden group"
       style={{
         opacity: 0,
         transform: 'translateY(24px)',
-        transition: 'opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
+        transition: `opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.1}s, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.1}s`,
       }}
     >
-      {/* Phone frame */}
-      <div className="relative rounded-[2rem] border-[6px] border-charcoal-ink/80 overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.15),0_4px_16px_rgba(0,0,0,0.1)] bg-charcoal-ink">
-        {/* Notch */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-5 bg-charcoal-ink rounded-b-xl z-10" />
-        <Image
-          src={src}
-          alt={alt}
-          width={256}
-          height={512}
-          className="w-full h-auto block"
-          sizes="(max-width: 640px) 224px, 256px"
-        />
+      <Image
+        src={src}
+        alt={alt}
+        fill
+        className="object-cover object-top transition-transform duration-700 group-hover:scale-105"
+        sizes="(max-width: 768px) 33vw, 20vw"
+      />
+      {/* Bottom overlay */}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent pt-16 pb-5 px-4">
+        <p className="font-[family-name:var(--font-playfair)] text-white text-center text-base sm:text-lg font-semibold leading-tight">
+          {label}
+        </p>
       </div>
-      {/* Label */}
-      <p className="mt-4 text-center text-xs sm:text-sm font-[family-name:var(--font-inter)] text-charcoal-ink/60 tracking-wide uppercase">
-        {label}
-      </p>
     </div>
   )
 }
@@ -216,7 +212,7 @@ export default function HeirloomPage() {
       {/* ═══════════════════════════════════════════
           SECTION 2: THE PROBLEM → THE REVEAL
           ═══════════════════════════════════════════ */}
-      <section className="py-56 sm:py-80 md:py-[28rem] bg-paper-cream">
+      <section className="py-20 sm:py-24 md:py-28 bg-paper-cream">
         <div className="max-w-5xl mx-auto px-6">
           <RevealSection>
             <h2
@@ -228,19 +224,19 @@ export default function HeirloomPage() {
 
           <RevealSection delay={150}>
             <p
-              className={`${inter} mt-4 sm:mt-6 text-base sm:text-lg text-charcoal-ink/60 text-center max-w-2xl mx-auto leading-relaxed`}
+              className={`${inter} mt-4 sm:mt-5 text-base sm:text-lg text-charcoal-ink/60 text-center max-w-2xl mx-auto leading-relaxed`}
             >
               Most digital invitations deliver information. Heirloom delivers an experience.
             </p>
           </RevealSection>
 
           {/* Comparison grid */}
-          <div className="mt-16 sm:mt-20 grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
+          <div className="mt-10 sm:mt-14 grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10">
             {/* Left: Traditional */}
             <RevealSection delay={250}>
               <div className="border border-charcoal-ink/10 rounded-sm p-8 sm:p-10">
                 <h3
-                  className={`${inter} text-xs font-medium tracking-[0.2em] uppercase text-charcoal-ink/40 mb-8`}
+                  className={`${inter} text-xs font-medium tracking-[0.2em] uppercase text-charcoal-ink/40 mb-7`}
                 >
                   Traditional Digital Invitation
                 </h3>
@@ -269,9 +265,9 @@ export default function HeirloomPage() {
 
             {/* Right: Heirloom */}
             <RevealSection delay={400}>
-              <div className="border-2 border-cinematic-gold/40 rounded-sm p-8 sm:p-10 bg-cinematic-gold/[0.03]">
+              <div className="border border-cinematic-gold/30 rounded-sm p-8 sm:p-10">
                 <h3
-                  className={`${inter} text-xs font-medium tracking-[0.2em] uppercase text-cinematic-gold mb-8`}
+                  className={`${inter} text-xs font-medium tracking-[0.2em] uppercase text-cinematic-gold mb-7`}
                 >
                   Heirloom by Dreamweavers
                 </h3>
@@ -305,7 +301,7 @@ export default function HeirloomPage() {
           ═══════════════════════════════════════════ */}
       <section
         id="how-it-works"
-        className="py-48 sm:py-72 md:py-96 bg-champagne-silk/30"
+        className="py-20 sm:py-24 md:py-28 bg-champagne-silk/40"
       >
         <div className="max-w-5xl mx-auto px-6">
           <RevealSection>
@@ -316,12 +312,12 @@ export default function HeirloomPage() {
             </h2>
           </RevealSection>
 
-          <div className="mt-16 sm:mt-20 grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
+          <div className="mt-10 sm:mt-14 grid grid-cols-1 sm:grid-cols-3 gap-5 sm:gap-7">
             {/* Step 1 */}
             <RevealSection delay={100}>
-              <div className="border border-cinematic-gold/30 rounded-sm p-8 sm:p-10 bg-paper-cream/60 h-full flex flex-col">
+              <div className="border border-charcoal-ink/[0.06] rounded-sm p-7 sm:p-9 h-full flex flex-col">
                 <span
-                  className={`${playfair} text-3xl sm:text-4xl font-light text-cinematic-gold/60`}
+                  className={`${playfair} text-4xl sm:text-5xl font-light text-cinematic-gold/60`}
                 >
                   01
                 </span>
@@ -331,7 +327,7 @@ export default function HeirloomPage() {
                   Design
                 </h3>
                 <p
-                  className={`${inter} text-xs tracking-[0.15em] uppercase text-cinematic-gold/70 mt-1`}
+                  className={`${inter} text-[11px] tracking-[0.15em] uppercase text-cinematic-gold/70 mt-1`}
                 >
                   Create your invitation
                 </p>
@@ -345,9 +341,9 @@ export default function HeirloomPage() {
 
             {/* Step 2 */}
             <RevealSection delay={250}>
-              <div className="border border-cinematic-gold/30 rounded-sm p-8 sm:p-10 bg-paper-cream/60 h-full flex flex-col">
+              <div className="border border-charcoal-ink/[0.06] rounded-sm p-7 sm:p-9 h-full flex flex-col">
                 <span
-                  className={`${playfair} text-3xl sm:text-4xl font-light text-cinematic-gold/60`}
+                  className={`${playfair} text-4xl sm:text-5xl font-light text-cinematic-gold/60`}
                 >
                   02
                 </span>
@@ -357,7 +353,7 @@ export default function HeirloomPage() {
                   Share
                 </h3>
                 <p
-                  className={`${inter} text-xs tracking-[0.15em] uppercase text-cinematic-gold/70 mt-1`}
+                  className={`${inter} text-[11px] tracking-[0.15em] uppercase text-cinematic-gold/70 mt-1`}
                 >
                   Send to your guests
                 </p>
@@ -371,9 +367,9 @@ export default function HeirloomPage() {
 
             {/* Step 3 */}
             <RevealSection delay={400}>
-              <div className="border border-cinematic-gold/30 rounded-sm p-8 sm:p-10 bg-paper-cream/60 h-full flex flex-col">
+              <div className="border border-charcoal-ink/[0.06] rounded-sm p-7 sm:p-9 h-full flex flex-col">
                 <span
-                  className={`${playfair} text-3xl sm:text-4xl font-light text-cinematic-gold/60`}
+                  className={`${playfair} text-4xl sm:text-5xl font-light text-cinematic-gold/60`}
                 >
                   03
                 </span>
@@ -383,7 +379,7 @@ export default function HeirloomPage() {
                   Celebrate
                 </h3>
                 <p
-                  className={`${inter} text-xs tracking-[0.15em] uppercase text-cinematic-gold/70 mt-1`}
+                  className={`${inter} text-[11px] tracking-[0.15em] uppercase text-cinematic-gold/70 mt-1`}
                 >
                   Watch the magic unfold
                 </p>
@@ -401,7 +397,7 @@ export default function HeirloomPage() {
       {/* ═══════════════════════════════════════════
           SECTION 4: THE GUEST EXPERIENCE
           ═══════════════════════════════════════════ */}
-      <section className="py-48 sm:py-72 md:py-96 bg-paper-cream">
+      <section className="py-20 sm:py-24 md:py-28 bg-white">
         <div className="max-w-6xl mx-auto px-6">
           <RevealSection>
             <h2
@@ -415,29 +411,17 @@ export default function HeirloomPage() {
 
           <RevealSection delay={150}>
             <p
-              className={`${inter} mt-5 sm:mt-6 text-base sm:text-lg text-charcoal-ink/65 text-center max-w-xl mx-auto leading-relaxed`}
+              className={`${inter} mt-4 sm:mt-5 text-base sm:text-lg text-charcoal-ink/65 text-center max-w-xl mx-auto leading-relaxed`}
             >
               This is what your guests will experience.
             </p>
           </RevealSection>
 
-          {/* Phone mockups — horizontal scroll on mobile, grid on desktop */}
-          <div className="mt-14 sm:mt-16 md:mt-20">
-            {/* Mobile: horizontal scroll */}
-            <div className="flex md:hidden gap-6 overflow-x-auto pb-6 px-2 snap-x snap-mandatory no-scrollbar">
-              {PHONES.map((phone) => (
-                <div key={phone.label} className="snap-center">
-                  <PhoneMockup {...phone} />
-                </div>
-              ))}
-            </div>
-
-            {/* Desktop: grid */}
-            <div className="hidden md:flex justify-center gap-8 lg:gap-10 flex-wrap">
-              {PHONES.map((phone) => (
-                <PhoneMockup key={phone.label} {...phone} />
-              ))}
-            </div>
+          {/* Gallery — 5 equal-width portrait cards */}
+          <div className="mt-10 sm:mt-14 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
+            {GALLERY.map((card, i) => (
+              <GalleryCard key={card.label} {...card} index={i} />
+            ))}
           </div>
         </div>
       </section>
@@ -445,7 +429,7 @@ export default function HeirloomPage() {
       {/* ═══════════════════════════════════════════
           SECTION 5: CLOSING / ENQUIRY
           ═══════════════════════════════════════════ */}
-      <section className="py-40 sm:py-56 md:py-72 bg-paper-cream">
+      <section className="py-20 sm:py-24 md:py-28 bg-paper-cream">
         <div className="max-w-2xl mx-auto px-6 text-center">
           <RevealSection>
             <span
