@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef } from 'react'
 import Image from 'next/image'
 
 /* ─────────────────────────────────────────────
@@ -115,25 +115,10 @@ function PhoneMockup({ src, label, alt }: (typeof PHONES)[number]) {
    Main Page Component
    ───────────────────────────────────────────── */
 export default function HeirloomPage() {
-  const [navVisible, setNavVisible] = useState(false)
-  const heroRef = useRef<HTMLElement>(null)
-
   /* Page title */
   useEffect(() => {
     document.title = 'Heirloom — Digital Wedding Experiences by Dreamweavers'
   }, [])
-
-  /* Sticky nav: show after scrolling past hero */
-  const handleScroll = useCallback(() => {
-    if (!heroRef.current) return
-    const heroBottom = heroRef.current.getBoundingClientRect().bottom
-    setNavVisible(heroBottom <= 0)
-  }, [])
-
-  useEffect(() => {
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [handleScroll])
 
   /* Scroll to section 3 */
   const scrollToHowItWorks = () => {
@@ -145,40 +130,11 @@ export default function HeirloomPage() {
   const inter = 'font-[family-name:var(--font-inter)]'
 
   return (
-    <main className={`${inter} antialiased`}>{/* ───── Sticky Navigation ───── */}<nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-        navVisible
-          ? 'opacity-100 translate-y-0'
-          : 'opacity-0 -translate-y-4 pointer-events-none'
-      }`}
-      style={{
-        background: 'rgba(252, 249, 242, 0.92)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-      }}
-    >
-      <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-        <Image
-          src="/dreamweavers-logo.png"
-          alt="Dreamweavers"
-          width={120}
-          height={12}
-          className="h-6 w-auto object-contain"
-        />
-        <a
-          href="mailto:enquiry@dreamweavers.com.sg?subject=Heirloom%20Enquiry"
-          className={`${inter} text-xs font-medium tracking-widest uppercase text-cinematic-gold border border-cinematic-gold/60 px-5 py-2 rounded-sm hover:bg-cinematic-gold hover:text-paper-cream transition-colors duration-300`}
-        >
-          Enquire
-        </a>
-      </div>
-    </nav>
-
+    <main className={`${inter} antialiased`}>
       {/* ═══════════════════════════════════════════
           SECTION 1: HERO
           ═══════════════════════════════════════════ */}
       <section
-        ref={heroRef}
         className="relative min-h-screen flex items-center justify-center overflow-hidden"
       >
         {/* Background image */}
