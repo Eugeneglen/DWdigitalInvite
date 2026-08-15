@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import Image from 'next/image'
 
 /* ─────────────────────────────────────────────
@@ -50,60 +50,199 @@ function RevealSection({ children, className = '', delay = 0 }: {
 }
 
 /* ─────────────────────────────────────────────
-   Gallery Card (Portrait Image + Overlay Label)
+   Mobile Demo Modal
    ───────────────────────────────────────────── */
-const GALLERY = [
-  { src: '/heirloom/guest-hero.png', label: 'Eleanor & James', alt: 'Heirloom guest-facing hero screen' },
-  { src: '/heirloom/guest-schedule.png', label: 'The Day', alt: 'Schedule page with event timeline' },
-  { src: '/heirloom/guest-story.png', label: 'Our Story', alt: 'Love story introduction section' },
-  { src: '/heirloom/guest-wishes.png', label: 'Wishes', alt: 'Guest wishes and blessings page' },
-  { src: '/heirloom/guest-moments.png', label: 'Moments', alt: 'Photo moments gallery' },
-] as const
-
-function GalleryCard({ src, label, alt, index }: (typeof GALLERY)[number] & { index: number }) {
-  const ref = useRef<HTMLDivElement>(null)
+function MobileDemoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          el.style.opacity = '1'
-          el.style.transform = 'translateY(0)'
-          observer.unobserve(el)
-        }
-      },
-      { threshold: 0.1 }
-    )
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
+    if (open) {
+      document.body.style.overflow = 'hidden'
+      const t = setTimeout(() => videoRef.current?.play().catch(() => {}), 150)
+      return () => { clearTimeout(t); document.body.style.overflow = '' }
+    } else {
+      document.body.style.overflow = ''
+      videoRef.current?.pause()
+    }
+  }, [open])
+
+  // Close on Escape
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [open, onClose])
+
+  if (!open) return null
 
   return (
     <div
-      ref={ref}
-      className="relative aspect-[3/4] overflow-hidden group"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8"
       style={{
         opacity: 0,
-        transform: 'translateY(24px)',
-        transition: `opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.1}s, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.1}s`,
+        animation: 'fadeIn 0.3s ease forwards',
       }}
+      onClick={onClose}
     >
-      <Image
-        src={src}
-        alt={alt}
-        fill
-        className="object-cover object-top transition-transform duration-700 group-hover:scale-105"
-        sizes="(max-width: 768px) 33vw, 20vw"
-      />
-      {/* Bottom overlay */}
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent pt-16 pb-5 px-4">
-        <p className="font-[family-name:var(--font-playfair)] text-white text-center text-base sm:text-lg font-semibold leading-tight">
-          {label}
-        </p>
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-charcoal-ink/80 backdrop-blur-sm" />
+
+      {/* Phone mockup frame */}
+      <div
+        className="relative z-10 flex-shrink-0"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          opacity: 0,
+          animation: 'scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards',
+        }}
+      >
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute -top-12 right-0 text-white/70 hover:text-white transition-colors cursor-pointer"
+          aria-label="Close mobile demo"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+
+        {/* Device frame */}
+        <div className="relative bg-charcoal-ink rounded-[2.5rem] p-3 shadow-2xl shadow-black/40">
+          {/* Notch */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-6 bg-charcoal-ink rounded-b-2xl z-20" />
+
+          {/* Screen */}
+          <div className="relative w-[260px] h-[535px] md:w-[300px] md:h-[618px] bg-black rounded-[2rem] overflow-hidden">
+            <video
+              ref={videoRef}
+              src="/heirloom/preview/hero-video.mp4"
+              autoPlay
+              loop
+              muted
+              playsInline
+              poster="/heirloom/preview/hero.png"
+              className="w-full h-full object-cover"
+            />
+          </div>
+
+          {/* Home indicator */}
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-28 h-1 bg-white/30 rounded-full" />
+        </div>
       </div>
     </div>
+  )
+}
+
+/* ─────────────────────────────────────────────
+   Desktop Video Section (Full-screen)
+   ───────────────────────────────────────────── */
+function DesktopVideoSection({ onOpenMobileDemo }: { onOpenMobileDemo: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const sectionRef = useRef<HTMLElement>(null)
+  const [hasEntered, setHasEntered] = useState(false)
+
+  useEffect(() => {
+    const el = videoRef.current
+    if (!el) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          el.play().catch(() => {})
+          if (!hasEntered) setHasEntered(true)
+        } else {
+          el.pause()
+        }
+      },
+      { threshold: 0.25 }
+    )
+
+    observer.observe(el)
+    return () => { observer.disconnect(); el.pause() }
+  }, [hasEntered])
+
+  return (
+    <section ref={sectionRef} className="relative w-full h-screen overflow-hidden bg-black">
+      {/* Desktop video — fills entire viewport */}
+      <video
+        ref={videoRef}
+        src="/heirloom/preview/desktop-video.mp4"
+        poster="/heirloom/preview/desktop-poster.png"
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+
+      {/* Gradient overlay for text readability */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/30" />
+
+      {/* Content overlay */}
+      <div className="relative z-10 h-full flex flex-col items-center justify-center px-6">
+        <p
+          className="font-[family-name:var(--font-inter)] text-xs tracking-[0.25em] uppercase text-white/60 mb-4"
+          style={{
+            opacity: hasEntered ? 0 : undefined,
+            animation: hasEntered ? 'fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards' : undefined,
+          }}
+        >
+          The Guest Experience
+        </p>
+
+        <h2
+          className="font-[family-name:var(--font-playfair)] text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold text-white text-center leading-tight max-w-3xl"
+          style={{
+            opacity: hasEntered ? 0 : undefined,
+            animation: hasEntered ? 'fadeInUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards' : undefined,
+          }}
+        >
+          They Don&apos;t Just Receive an Invitation.
+          <br />
+          <span className="text-cinematic-gold">They Enter Your World.</span>
+        </h2>
+
+        <p
+          className="font-[family-name:var(--font-inter)] mt-4 text-base text-white/70 text-center max-w-lg leading-relaxed"
+          style={{
+            opacity: hasEntered ? 0 : undefined,
+            animation: hasEntered ? 'fadeInUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.6s forwards' : undefined,
+          }}
+        >
+          This is what your guests will experience.
+        </p>
+
+        {/* View Mobile Demo button */}
+        <div
+          className="mt-10"
+          style={{
+            opacity: hasEntered ? 0 : undefined,
+            animation: hasEntered ? 'fadeInUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.8s forwards' : undefined,
+          }}
+        >
+          <button
+            onClick={onOpenMobileDemo}
+            className="font-[family-name:var(--font-inter)] border border-cinematic-gold text-cinematic-gold px-8 py-3 text-sm font-medium tracking-widest uppercase hover:bg-cinematic-gold hover:text-charcoal-ink transition-all duration-300 cursor-pointer"
+          >
+            View Mobile Demo
+          </button>
+        </div>
+      </div>
+
+      {/* Scroll indicator */}
+      <div
+        className="absolute bottom-8 left-1/2 -translate-x-1/2"
+        style={{
+          opacity: hasEntered ? 0 : undefined,
+          animation: hasEntered ? 'fadeInUp 1s ease 1.2s forwards' : undefined,
+        }}
+      >
+        <div className="w-px h-10 bg-gradient-to-b from-transparent to-white/30" />
+      </div>
+    </section>
   )
 }
 
@@ -111,6 +250,10 @@ function GalleryCard({ src, label, alt, index }: (typeof GALLERY)[number] & { in
    Main Page Component
    ───────────────────────────────────────────── */
 export default function HeirloomPage() {
+  const [mobileDemoOpen, setMobileDemoOpen] = useState(false)
+  const openMobileDemo = useCallback(() => setMobileDemoOpen(true), [])
+  const closeMobileDemo = useCallback(() => setMobileDemoOpen(false), [])
+
   /* Page title */
   useEffect(() => {
     document.title = 'Heirloom — Digital Wedding Experiences by Dreamweavers'
@@ -248,9 +391,7 @@ export default function HeirloomPage() {
                           <line x1="14" y1="2" x2="2" y2="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                         </svg>
                       </span>
-                      <span className={`${inter} text-sm sm:text-base text-charcoal-ink/65 leading-relaxed`}>
-                        {item}
-                      </span>
+                      <span className={`${inter} text-sm sm:text-base text-charcoal-ink/65 leading-relaxed`}>{item}</span>
                     </li>
                   ))}
                 </ul>
@@ -278,9 +419,7 @@ export default function HeirloomPage() {
                           <polyline points="3,8 7,12 13,4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       </span>
-                      <span className={`${inter} text-sm sm:text-base text-charcoal-ink/80 leading-relaxed font-medium`}>
-                        {item}
-                      </span>
+                      <span className={`${inter} text-sm sm:text-base text-charcoal-ink/80 leading-relaxed font-medium`}>{item}</span>
                     </li>
                   ))}
                 </ul>
@@ -389,36 +528,12 @@ export default function HeirloomPage() {
       </section>
 
       {/* ═══════════════════════════════════════════
-          SECTION 4: THE GUEST EXPERIENCE
+          SECTION 4: FULL-SCREEN DESKTOP VIDEO
           ═══════════════════════════════════════════ */}
-      <section className="py-20 sm:py-24 md:py-28 bg-white">
-        <div className="max-w-6xl mx-auto px-6">
-          <RevealSection>
-            <h2
-              className={`${playfair} text-3xl sm:text-4xl md:text-5xl font-semibold text-charcoal-ink text-center leading-tight max-w-3xl mx-auto`}
-            >
-              They Don't Just Receive an Invitation.
-              <br className="hidden sm:block" />
-              <span className="text-cinematic-gold"> They Enter Your World.</span>
-            </h2>
-          </RevealSection>
+      <DesktopVideoSection onOpenMobileDemo={openMobileDemo} />
 
-          <RevealSection delay={150}>
-            <p
-              className={`${inter} mt-4 sm:mt-5 text-base sm:text-lg text-charcoal-ink/65 text-center max-w-xl mx-auto leading-relaxed`}
-            >
-              This is what your guests will experience.
-            </p>
-          </RevealSection>
-
-          {/* Gallery — 5 equal-width portrait cards */}
-          <div className="mt-10 sm:mt-14 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
-            {GALLERY.map((card, i) => (
-              <GalleryCard key={card.label} {...card} index={i} />
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Mobile Demo Modal */}
+      <MobileDemoModal open={mobileDemoOpen} onClose={closeMobileDemo} />
 
       {/* ═══════════════════════════════════════════
           SECTION 5: CLOSING / ENQUIRY
@@ -477,8 +592,7 @@ export default function HeirloomPage() {
           FOOTER
           ═══════════════════════════════════════════ */}
       <footer className="py-8 bg-paper-cream border-t border-charcoal-ink/5">
-        <p className={`${inter} text-xs text-charcoal-ink/30 text-center tracking-wide`}
-        >
+        <p className={`${inter} text-xs text-charcoal-ink/30 text-center tracking-wide`}>
           © 2026 DREAMWEAVERS DIGITAL HEIRLOOMS. All rights reserved.
         </p>
       </footer>
