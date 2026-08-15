@@ -56,6 +56,15 @@ const FALLBACK_COUPLE_NAME = 'Eleanor & James';
 function formatTime(timeStr: string | null | undefined): string {
   if (!timeStr) return '';
   try {
+    // Handle bare HH:MM (e.g. "16:00") stored in DB
+    const bareMatch = timeStr.match(/^(\d{1,2}):(\d{2})$/);
+    if (bareMatch) {
+      const h = parseInt(bareMatch[1], 10);
+      const m = bareMatch[2];
+      const period = h >= 12 ? 'PM' : 'AM';
+      const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+      return `${h12}:${m} ${period}`;
+    }
     const d = new Date(timeStr);
     if (isNaN(d.getTime())) return '';
     return d.toLocaleTimeString('en-SG', { hour: 'numeric', minute: '2-digit', hour12: true }).toUpperCase();
@@ -139,7 +148,7 @@ export default function SchedulePage() {
       details: (() => {
         const scheduleDetails = schedules
           .filter((s) => s.startTime)
-          .sort((a, b) => new Date(a.startTime!).getTime() - new Date(b.startTime!).getTime())
+          .sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? ''))
           .map((s) => {
             const time = formatTime(s.startTime);
             return `${time} — ${s.title}`;
