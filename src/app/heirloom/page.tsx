@@ -146,11 +146,11 @@ function DesktopVideoSection({ onOpenMobileDemo }: { onOpenMobileDemo: () => voi
   const inter = 'font-[family-name:var(--font-inter)]'
 
   return (
-    <section className="py-20 sm:py-24 md:py-28" style={{ backgroundColor: '#2C2520' }}>
+    <section className="py-20 sm:py-24 md:py-28 bg-paper-cream">
       <div className="max-w-4xl mx-auto px-6">
         <RevealSection>
           <h2
-            className={`${playfair} text-3xl sm:text-4xl md:text-5xl font-semibold text-white text-center leading-tight max-w-3xl mx-auto`}
+            className={`${playfair} text-3xl sm:text-4xl md:text-5xl font-semibold text-charcoal-ink text-center leading-tight max-w-3xl mx-auto`}
           >
             They Don&apos;t Just Receive an Invitation.
             <br className="hidden sm:block" />
@@ -160,7 +160,7 @@ function DesktopVideoSection({ onOpenMobileDemo }: { onOpenMobileDemo: () => voi
 
         <RevealSection delay={150}>
           <p
-            className={`${inter} mt-4 sm:mt-5 text-base sm:text-lg text-white/60 text-center max-w-xl mx-auto leading-relaxed`}
+            className={`${inter} mt-4 sm:mt-5 text-base sm:text-lg text-charcoal-ink/60 text-center max-w-xl mx-auto leading-relaxed`}
           >
             This is what your guests will experience.
           </p>
@@ -168,7 +168,7 @@ function DesktopVideoSection({ onOpenMobileDemo }: { onOpenMobileDemo: () => voi
 
         <RevealSection delay={300}>
           <div className="mt-10 sm:mt-14 w-4/5 mx-auto">
-            <div className="relative rounded-lg overflow-hidden shadow-2xl shadow-black/50 ring-1 ring-white/10">
+            <div className="relative rounded-lg overflow-hidden shadow-2xl shadow-charcoal-ink/20 ring-1 ring-charcoal-ink/10">
               <video
                 ref={videoRef}
                 src="/heirloom/preview/desktop-video.mp4"
