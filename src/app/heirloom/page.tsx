@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import Image from 'next/image'
 
 /* ─────────────────────────────────────────────
@@ -54,19 +55,17 @@ function RevealSection({ children, className = '', delay = 0 }: {
    ───────────────────────────────────────────── */
 function MobileDemoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden'
-      const t = setTimeout(() => videoRef.current?.play().catch(() => {}), 150)
-      return () => { clearTimeout(t); document.body.style.overflow = '' }
-    } else {
-      document.body.style.overflow = ''
-      videoRef.current?.pause()
-    }
+    if (!open) return
+    document.body.style.overflow = 'hidden'
+    const t = setTimeout(() => videoRef.current?.play().catch(() => {}), 200)
+    return () => { clearTimeout(t); document.body.style.overflow = '' }
   }, [open])
 
-  // Close on Escape
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -74,12 +73,13 @@ function MobileDemoModal({ open, onClose }: { open: boolean; onClose: () => void
     return () => window.removeEventListener('keydown', handler)
   }, [open, onClose])
 
-  if (!open) return null
+  if (!open || !mounted) return null
 
-  return (
+  const content = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8"
+      className="fixed inset-0 flex items-center justify-center p-4 md:p-8"
       style={{
+        zIndex: 9999,
         opacity: 0,
         animation: 'fadeIn 0.3s ease forwards',
       }}
@@ -90,59 +90,64 @@ function MobileDemoModal({ open, onClose }: { open: boolean; onClose: () => void
 
       {/* Phone mockup frame */}
       <div
-        className="relative z-10 flex-shrink-0"
+        className="relative flex-shrink-0"
+        style={{ zIndex: 10000 }}
         onClick={(e) => e.stopPropagation()}
-        style={{
-          opacity: 0,
-          animation: 'scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards',
-        }}
-      >
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute -top-12 right-0 text-white/70 hover:text-white transition-colors cursor-pointer"
-          aria-label="Close mobile demo"
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+        <div
+          style={{
+            opacity: 0,
+            animation: 'scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards',
+          }}
+        >
+          {/* Close button */}
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute -top-12 right-0 text-white/70 hover:text-white transition-colors cursor-pointer"
+            aria-label="Close mobile demo"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
 
-        {/* Device frame */}
-        <div className="relative bg-charcoal-ink rounded-[2.5rem] p-3 shadow-2xl shadow-black/40">
-          {/* Notch */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-6 bg-charcoal-ink rounded-b-2xl z-20" />
+          {/* Device frame */}
+          <div className="relative bg-charcoal-ink rounded-[2.5rem] p-3 shadow-2xl shadow-black/40">
+            {/* Notch */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-6 bg-charcoal-ink rounded-b-2xl" style={{ zIndex: 20 }} />
 
-          {/* Screen */}
-          <div className="relative w-[260px] h-[535px] md:w-[300px] md:h-[618px] bg-black rounded-[2rem] overflow-hidden">
-            <video
-              ref={videoRef}
-              src="/heirloom/preview/hero-video.mp4"
-              autoPlay
-              loop
-              muted
-              playsInline
-              poster="/heirloom/preview/hero.png"
-              className="w-full h-full object-cover"
-            />
+            {/* Screen */}
+            <div className="relative w-[260px] h-[535px] md:w-[300px] md:h-[618px] bg-black rounded-[2rem] overflow-hidden">
+              <video
+                ref={videoRef}
+                src="/heirloom/preview/hero-video.mp4"
+                autoPlay
+                loop
+                muted
+                playsInline
+                poster="/heirloom/preview/hero.png"
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+            {/* Home indicator */}
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-28 h-1 bg-white/30 rounded-full" />
           </div>
-
-          {/* Home indicator */}
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-28 h-1 bg-white/30 rounded-full" />
         </div>
       </div>
     </div>
   )
+
+  return createPortal(content, document.body)
 }
 
 /* ─────────────────────────────────────────────
-   Desktop Video Section (Full-screen)
+   Desktop Video Section
    ───────────────────────────────────────────── */
 function DesktopVideoSection({ onOpenMobileDemo }: { onOpenMobileDemo: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const sectionRef = useRef<HTMLElement>(null)
-  const [hasEntered, setHasEntered] = useState(false)
 
   useEffect(() => {
     const el = videoRef.current
@@ -152,95 +157,72 @@ function DesktopVideoSection({ onOpenMobileDemo }: { onOpenMobileDemo: () => voi
       ([entry]) => {
         if (entry.isIntersecting) {
           el.play().catch(() => {})
-          if (!hasEntered) setHasEntered(true)
         } else {
           el.pause()
         }
       },
-      { threshold: 0.25 }
+      { threshold: 0.2 }
     )
 
     observer.observe(el)
     return () => { observer.disconnect(); el.pause() }
-  }, [hasEntered])
+  }, [])
+
+  const playfair = 'font-[family-name:var(--font-playfair)]'
+  const inter = 'font-[family-name:var(--font-inter)]'
 
   return (
-    <section ref={sectionRef} className="relative w-full h-screen overflow-hidden bg-black">
-      {/* Desktop video — fills entire viewport */}
-      <video
-        ref={videoRef}
-        src="/heirloom/preview/desktop-video.mp4"
-        poster="/heirloom/preview/desktop-poster.png"
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="absolute inset-0 w-full h-full object-cover"
-      />
+    <section className="py-20 sm:py-24 md:py-28 bg-charcoal-ink">
+      <div className="max-w-4xl mx-auto px-6">
+        {/* Heading & copy */}
+        <RevealSection>
+          <h2
+            className={`${playfair} text-3xl sm:text-4xl md:text-5xl font-semibold text-white text-center leading-tight max-w-3xl mx-auto`}
+          >
+            They Don&apos;t Just Receive an Invitation.
+            <br className="hidden sm:block" />
+            <span className="text-cinematic-gold"> They Enter Your World.</span>
+          </h2>
+        </RevealSection>
 
-      {/* Gradient overlay for text readability */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/30" />
+        <RevealSection delay={150}>
+          <p
+            className={`${inter} mt-4 sm:mt-5 text-base sm:text-lg text-white/60 text-center max-w-xl mx-auto leading-relaxed`}
+          >
+            This is what your guests will experience.
+          </p>
+        </RevealSection>
 
-      {/* Content overlay */}
-      <div className="relative z-10 h-full flex flex-col items-center justify-center px-6">
-        <p
-          className="font-[family-name:var(--font-inter)] text-xs tracking-[0.25em] uppercase text-white/60 mb-4"
-          style={{
-            opacity: hasEntered ? 0 : undefined,
-            animation: hasEntered ? 'fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards' : undefined,
-          }}
-        >
-          The Guest Experience
-        </p>
-
-        <h2
-          className="font-[family-name:var(--font-playfair)] text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold text-white text-center leading-tight max-w-3xl"
-          style={{
-            opacity: hasEntered ? 0 : undefined,
-            animation: hasEntered ? 'fadeInUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards' : undefined,
-          }}
-        >
-          They Don&apos;t Just Receive an Invitation.
-          <br />
-          <span className="text-cinematic-gold">They Enter Your World.</span>
-        </h2>
-
-        <p
-          className="font-[family-name:var(--font-inter)] mt-4 text-base text-white/70 text-center max-w-lg leading-relaxed"
-          style={{
-            opacity: hasEntered ? 0 : undefined,
-            animation: hasEntered ? 'fadeInUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.6s forwards' : undefined,
-          }}
-        >
-          This is what your guests will experience.
-        </p>
+        {/* Video — 80% width, centered */}
+        <RevealSection delay={300}>
+          <div className="mt-10 sm:mt-14 w-4/5 mx-auto">
+            <div className="relative rounded-lg overflow-hidden shadow-2xl shadow-black/50 ring-1 ring-white/10">
+              <video
+                ref={videoRef}
+                src="/heirloom/preview/desktop-video.mp4"
+                poster="/heirloom/preview/desktop-poster.png"
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="w-full h-auto block"
+              />
+            </div>
+          </div>
+        </RevealSection>
 
         {/* View Mobile Demo button */}
-        <div
-          className="mt-10"
-          style={{
-            opacity: hasEntered ? 0 : undefined,
-            animation: hasEntered ? 'fadeInUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.8s forwards' : undefined,
-          }}
-        >
-          <button
-            onClick={onOpenMobileDemo}
-            className="font-[family-name:var(--font-inter)] border border-cinematic-gold text-cinematic-gold px-8 py-3 text-sm font-medium tracking-widest uppercase hover:bg-cinematic-gold hover:text-charcoal-ink transition-all duration-300 cursor-pointer"
-          >
-            View Mobile Demo
-          </button>
-        </div>
-      </div>
-
-      {/* Scroll indicator */}
-      <div
-        className="absolute bottom-8 left-1/2 -translate-x-1/2"
-        style={{
-          opacity: hasEntered ? 0 : undefined,
-          animation: hasEntered ? 'fadeInUp 1s ease 1.2s forwards' : undefined,
-        }}
-      >
-        <div className="w-px h-10 bg-gradient-to-b from-transparent to-white/30" />
+        <RevealSection delay={450}>
+          <div className="mt-10 text-center">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onOpenMobileDemo() }}
+              className={`${inter} border border-cinematic-gold text-cinematic-gold px-8 py-3 text-sm font-medium tracking-widest uppercase hover:bg-cinematic-gold hover:text-charcoal-ink transition-all duration-300 cursor-pointer`}
+            >
+              View Mobile Demo
+            </button>
+          </div>
+        </RevealSection>
       </div>
     </section>
   )
