@@ -121,11 +121,11 @@ export default function BackgroundColorPicker() {
           style={{ backgroundColor: color }}
         >
           <div
-            className="absolute inset-0 flex items-center justify-center text-xs font-medium whitespace-nowrap transition-colors duration-300"
+            className="absolute inset-0 flex flex-col items-center justify-center px-2 transition-colors duration-300"
             style={{ color: autoText, opacity: 0.7 }}
           >
-            {color.toUpperCase()}
-            <span className="ml-2">— {isDark ? 'Dark' : 'Light'}</span>
+            <span className="text-[11px] font-semibold font-mono leading-none">{color.toUpperCase()}</span>
+            <span className="text-[9px] font-medium mt-0.5 opacity-70 leading-none">{isDark ? 'Dark' : 'Light'}</span>
           </div>
           <input
             type="color"
