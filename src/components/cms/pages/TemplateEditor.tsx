@@ -463,11 +463,11 @@ function TemplateColorPicker({ value, onChange, label, defaultColor }: TemplateC
         style={{ backgroundColor: value }}
       >
         <div
-          className="absolute inset-0 flex items-center justify-center text-xs font-medium opacity-70 transition-colors duration-300"
-          style={{ color: autoText }}
+          className="absolute inset-0 flex items-center justify-center text-xs font-medium whitespace-nowrap transition-colors duration-300"
+          style={{ color: autoText, opacity: 0.8 }}
         >
           {value.toUpperCase()}
-          <span className="ml-2 opacity-70">— {isDark ? 'Dark' : 'Light'}</span>
+          <span className="ml-2">— {isDark ? 'Dark' : 'Light'}</span>
         </div>
         <input
           type="color"
