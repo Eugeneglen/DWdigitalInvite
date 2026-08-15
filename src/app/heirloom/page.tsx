@@ -3,6 +3,17 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import Image from 'next/image'
 
+/* ─── Keyframes needed by this page (tailwind-output.css doesn't include these) ─── */
+const HEIRLOOM_KEYFRAMES = `
+@keyframes fadeIn {
+  to { opacity: 1; }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+`
+
 /* ─────────────────────────────────────────────
    Reveal Section Wrapper
    ───────────────────────────────────────────── */
@@ -220,6 +231,7 @@ export default function HeirloomPage() {
 
   return (
     <main className={`${inter} antialiased`}>
+      <style dangerouslySetInnerHTML={{ __html: HEIRLOOM_KEYFRAMES }} />
       {/* ═══════════════════════════════════════════
           SECTION 1: HERO
           ═══════════════════════════════════════════ */}
@@ -368,21 +380,60 @@ export default function HeirloomPage() {
             </h2>
           </RevealSection>
 
-          <div className="mt-10 sm:mt-14 grid grid-cols-1 sm:grid-cols-3 gap-10 sm:gap-14 md:gap-16">
-            {[
-              { num: '01', title: 'Design', sub: 'Create your invitation', desc: 'Choose from thoughtfully curated colour palettes, refined typography, and elegant layouts. Add your favourite photos and personal touches — every detail is yours to shape.' },
-              { num: '02', title: 'Share', sub: 'Send to your guests', desc: 'Share a single link or a beautifully designed QR code. Your invitation reaches every guest effortlessly — no envelopes, no postage, no delays.' },
-              { num: '03', title: 'Celebrate', sub: 'Watch the magic unfold', desc: 'Your guests receive a curated journey — from your love story to the event schedule, from heartfelt wishes to shared photo memories. The experience begins the moment they open the link.' },
-            ].map((step, i) => (
-              <RevealSection key={step.num} delay={100 + i * 150}>
-                <div className="border border-charcoal-ink/[0.06] rounded-sm p-7 sm:p-9 h-full flex flex-col">
-                  <span className={`${playfair} text-4xl sm:text-5xl font-light text-cinematic-gold/60`}>{step.num}</span>
-                  <h3 className={`${playfair} text-xl sm:text-2xl font-semibold text-charcoal-ink mt-4`}>{step.title}</h3>
-                  <p className={`${inter} text-[11px] tracking-[0.15em] uppercase text-cinematic-gold/70 mt-1`}>{step.sub}</p>
-                  <p className={`${inter} text-sm text-charcoal-ink/65 leading-relaxed mt-5 flex-1`}>{step.desc}</p>
-                </div>
-              </RevealSection>
-            ))}
+          <div className="mt-10 sm:mt-14 grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10">
+            {/* Step 1 */}
+            <RevealSection delay={100}>
+              <div className="border border-charcoal-ink/[0.05] rounded-sm p-10 md:p-12 h-full flex flex-col">
+                <span className={`${playfair} text-5xl md:text-[3.5rem] font-light text-cinematic-gold/50 leading-none`}>
+                  01
+                </span>
+                <h3 className={`${playfair} text-xl md:text-[1.75rem] font-semibold mt-5`}>
+                  Design
+                </h3>
+                <p className={`${inter} text-[10px] tracking-[0.18em] uppercase text-cinematic-gold/60 mt-1.5`}>
+                  Create your invitation
+                </p>
+                <p className={`${inter} text-sm text-charcoal-ink/60 leading-[1.7] mt-6 flex-1`}>
+                  Choose from thoughtfully curated colour palettes, refined typography, and elegant layouts. Add your favourite photos and personal touches — every detail is yours to shape.
+                </p>
+              </div>
+            </RevealSection>
+
+            {/* Step 2 */}
+            <RevealSection delay={250}>
+              <div className="border border-charcoal-ink/[0.05] rounded-sm p-10 md:p-12 h-full flex flex-col">
+                <span className={`${playfair} text-5xl md:text-[3.5rem] font-light text-cinematic-gold/50 leading-none`}>
+                  02
+                </span>
+                <h3 className={`${playfair} text-xl md:text-[1.75rem] font-semibold mt-5`}>
+                  Share
+                </h3>
+                <p className={`${inter} text-[10px] tracking-[0.18em] uppercase text-cinematic-gold/60 mt-1.5`}>
+                  Send to your guests
+                </p>
+                <p className={`${inter} text-sm text-charcoal-ink/60 leading-[1.7] mt-6 flex-1`}>
+                  Share a single link or a beautifully designed QR code. Your invitation reaches every guest effortlessly — no envelopes, no postage, no delays.
+                </p>
+              </div>
+            </RevealSection>
+
+            {/* Step 3 */}
+            <RevealSection delay={400}>
+              <div className="border border-charcoal-ink/[0.05] rounded-sm p-10 md:p-12 h-full flex flex-col">
+                <span className={`${playfair} text-5xl md:text-[3.5rem] font-light text-cinematic-gold/50 leading-none`}>
+                  03
+                </span>
+                <h3 className={`${playfair} text-xl md:text-[1.75rem] font-semibold mt-5`}>
+                  Celebrate
+                </h3>
+                <p className={`${inter} text-[10px] tracking-[0.18em] uppercase text-cinematic-gold/60 mt-1.5`}>
+                  Watch the magic unfold
+                </p>
+                <p className={`${inter} text-sm text-charcoal-ink/60 leading-[1.7] mt-6 flex-1`}>
+                  Your guests receive a curated journey — from your love story to the event schedule, from heartfelt wishes to shared photo memories. The experience begins the moment they open the link.
+                </p>
+              </div>
+            </RevealSection>
           </div>
         </div>
       </section>
