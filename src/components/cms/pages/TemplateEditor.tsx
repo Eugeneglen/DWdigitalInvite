@@ -459,15 +459,15 @@ function TemplateColorPicker({ value, onChange, label, defaultColor }: TemplateC
       </div>
       {/* Current colour preview bar */}
       <div
-        className="relative h-11 rounded-md border border-charcoal-ink/10 overflow-hidden transition-colors duration-300"
+        className="relative h-14 rounded-md border border-charcoal-ink/10 overflow-hidden transition-colors duration-300"
         style={{ backgroundColor: value }}
       >
         <div
-          className="absolute inset-0 flex flex-col items-center justify-center px-2 transition-colors duration-300"
-          style={{ color: autoText, opacity: 0.8 }}
+          className="absolute inset-0 flex flex-col items-center justify-center px-2 transition-colors duration-300 pointer-events-none"
+          style={{ color: autoText }}
         >
           <span className="text-[11px] font-semibold font-mono leading-none">{value.toUpperCase()}</span>
-          <span className="text-[9px] font-medium mt-0.5 opacity-70 leading-none">{isDark ? 'Dark' : 'Light'}</span>
+          <span className="text-[10px] font-semibold mt-1 leading-none">{isDark ? 'Dark' : 'Light'}</span>
         </div>
         <input
           type="color"
@@ -502,22 +502,25 @@ function TemplateColorPicker({ value, onChange, label, defaultColor }: TemplateC
               </div>
             )}
             <span
-              className="absolute -top-7 left-1/2 -translate-x-1/2 text-[10px] font-medium px-1.5 py-0.5 rounded bg-charcoal-ink text-paper-cream opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10"
+              className="absolute -top-7 left-1/2 -translate-x-1/2 text-[10px] font-medium px-1.5 py-0.5 rounded bg-charcoal-ink text-paper-cream opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10"
             >
               {preset.label}
             </span>
           </button>
         ))}
       </div>
-      {defaultColor && value.toUpperCase() !== defaultColor.toUpperCase() && (
-        <button
-          type="button"
-          onClick={() => onChange(defaultColor)}
-          className="text-[11px] text-charcoal-ink/40 hover:text-cinematic-gold transition-colors"
-        >
-          Reset to default ({defaultColor})
-        </button>
-      )}
+      {defaultColor && value.toUpperCase() !== defaultColor.toUpperCase() && (() => {
+        const defaultPreset = COLOR_PRESETS.find(p => p.value.toUpperCase() === defaultColor.toUpperCase());
+        return (
+          <button
+            type="button"
+            onClick={() => onChange(defaultColor)}
+            className="text-[11px] text-charcoal-ink/40 hover:text-cinematic-gold transition-colors"
+          >
+            Reset to default{defaultPreset ? ` (${defaultPreset.label})` : ''}
+          </button>
+        );
+      })()}
     </div>
   );
 }

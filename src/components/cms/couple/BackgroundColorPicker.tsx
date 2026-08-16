@@ -121,11 +121,11 @@ export default function BackgroundColorPicker() {
           style={{ backgroundColor: color }}
         >
           <div
-            className="absolute inset-0 flex flex-col items-center justify-center px-2 transition-colors duration-300"
-            style={{ color: autoText, opacity: 0.7 }}
+            className="absolute inset-0 flex flex-col items-center justify-center px-2 transition-colors duration-300 pointer-events-none"
+            style={{ color: autoText }}
           >
             <span className="text-[11px] font-semibold font-mono leading-none">{color.toUpperCase()}</span>
-            <span className="text-[9px] font-medium mt-0.5 opacity-70 leading-none">{isDark ? 'Dark' : 'Light'}</span>
+            <span className="text-[10px] font-semibold mt-1 leading-none">{isDark ? 'Dark' : 'Light'}</span>
           </div>
           <input
             type="color"
@@ -168,7 +168,7 @@ export default function BackgroundColorPicker() {
                     </div>
                   )}
                   <span
-                    className="absolute -top-7 left-1/2 -translate-x-1/2 text-[10px] font-medium px-1.5 py-0.5 rounded bg-charcoal-ink text-paper-cream opacity-0 sm:group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10"
+                    className="absolute -top-7 left-1/2 -translate-x-1/2 text-[10px] font-medium px-1.5 py-0.5 rounded bg-charcoal-ink text-paper-cream opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10"
                   >
                     {preset.label}
                   </span>
