@@ -84,32 +84,47 @@ function MobileDemoModal({ open, onClose }: { open: boolean; onClose: () => void
 
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center p-4 md:p-8"
+      className="fixed inset-0 flex items-center justify-center p-4"
       style={{ zIndex: 9999, opacity: 0, animation: 'fadeIn 0.3s ease forwards' }}
       onClick={onClose}
     >
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
 
+      {/* Close button — overlay level, always visible and tappable */}
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 text-white/80 hover:text-white hover:bg-white/20 transition-colors cursor-pointer"
+        style={{ zIndex: 10001 }}
+        aria-label="Close mobile demo"
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+
+      {/* Phone mockup — viewport-aware sizing */}
       <div
-        className="relative flex-shrink-0"
-        style={{ zIndex: 10000, opacity: 0, animation: 'scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards' }}
+        className="relative mx-4"
+        style={{
+          zIndex: 10000,
+          opacity: 0,
+          animation: 'scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards',
+        }}
         onClick={(e) => e.stopPropagation()}
       >
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute -top-12 right-0 text-white/70 hover:text-white transition-colors cursor-pointer"
-          aria-label="Close mobile demo"
+        <div
+          className="relative bg-[#1A1A1A] rounded-[2.5rem] p-2 sm:p-3 shadow-2xl shadow-black/40 mx-auto"
+          style={{
+            width: 'min(260px, 65vw)',
+            maxWidth: '300px',
+            aspectRatio: '260 / 535',
+            maxHeight: 'calc(100vh - 100px)',
+          }}
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-
-        <div className="relative bg-[#1A1A1A] rounded-[2.5rem] p-3 shadow-2xl shadow-black/40">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-6 bg-[#1A1A1A] rounded-b-2xl" />
-          <div className="relative w-[260px] h-[535px] md:w-[300px] md:h-[618px] bg-black rounded-[2rem] overflow-hidden">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-5 bg-[#1A1A1A] rounded-b-xl" />
+          <div className="relative w-full h-full bg-black rounded-[2rem] overflow-hidden">
             <video
               ref={videoRef}
               src="/heirloom/preview/hero-video.mp4"
@@ -121,7 +136,7 @@ function MobileDemoModal({ open, onClose }: { open: boolean; onClose: () => void
               className="w-full h-full object-cover"
             />
           </div>
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-28 h-1 bg-white/30 rounded-full" />
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-24 h-1 bg-white/30 rounded-full" />
         </div>
       </div>
     </div>
