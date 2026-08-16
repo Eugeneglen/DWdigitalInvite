@@ -1,20 +1,36 @@
 import type { Metadata, Viewport } from "next";
-import { Playfair_Display, Inter } from "next/font/google";
+import localFont from "next/font/local";
 import "./tailwind-output.css";
 import { Toaster } from "@/components/ui/toaster";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 
-const playfair = Playfair_Display({
+const playfair = localFont({
+  src: [
+    {
+      path: "../fonts/PlayfairDisplay-Regular.woff2",
+      weight: "400 900",
+      style: "normal",
+    },
+    {
+      path: "../fonts/PlayfairDisplay-Italic.woff2",
+      weight: "400 900",
+      style: "italic",
+    },
+  ],
   variable: "--font-playfair",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  style: ["normal", "italic"],
+  display: "swap",
 });
 
-const inter = Inter({
+const inter = localFont({
+  src: [
+    {
+      path: "../fonts/Inter.woff2",
+      weight: "300 600",
+      style: "normal",
+    },
+  ],
   variable: "--font-inter",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
+  display: "swap",
 });
 
 export const viewport: Viewport = {
