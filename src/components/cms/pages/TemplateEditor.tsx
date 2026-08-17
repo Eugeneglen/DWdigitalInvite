@@ -2798,14 +2798,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
               {scheduleSubtitle}
             </p>
           )}
-          {schedule.length === 0 ? (
-            <p
-              className="text-center text-sm italic py-10"
-              style={{ color: bodyTextColor, fontFamily: bodyFont }}
-            >
-              No events scheduled.
-            </p>
-          ) : (
+          {schedule.length === 0 ? null : (
             <div className="relative border-l pl-8 ml-2" style={{ borderColor: `${accent}55` }}>
               <div className="flex flex-col gap-10">
                 {schedule.map((item, idx) => {
@@ -2909,14 +2902,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
               {storySubtitle}
             </p>
           )}
-          {stories.length === 0 ? (
-            <p
-              className="text-center text-sm italic py-10"
-              style={{ color: bodyTextColor, fontFamily: bodyFont }}
-            >
-              Our story coming soon.
-            </p>
-          ) : (
+          {stories.length === 0 ? null : (
             <div className="relative">
               {/* Center vertical line */}
               <div
@@ -3019,12 +3005,11 @@ function PreviewPanel({ data }: { data: TemplateData }) {
           {/* Honeymoon voting section */}
           {honeymoonEnabled && honeymoonDestinations.length > 0 && (
             <div className="mt-16 pt-12 border-t" style={{ borderColor: `${muted}33` }}>
-              <span className="block mb-2 text-[10px] md:text-xs uppercase tracking-[0.2em] font-semibold text-center" style={{ color: accent, fontFamily: headingFont }}>
-                {honeymoonEyebrow}
-              </span>
-              <h3 className="text-[48px] font-semibold mb-8 text-center leading-[1.1]" style={{ fontFamily: headingFont, color: text }}>
-                Where Next?
-              </h3>
+              {honeymoonEyebrow && (
+                <span className="block mb-2 text-[10px] md:text-xs uppercase tracking-[0.2em] font-semibold text-center" style={{ color: accent, fontFamily: headingFont }}>
+                  {honeymoonEyebrow}
+                </span>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {honeymoonDestinations.map((d, idx) => (
                   <div
@@ -3059,14 +3044,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
               {momentsSubtitle}
             </p>
           )}
-          {momentsMedia.length === 0 ? (
-            <p
-              className="text-center text-sm italic py-10"
-              style={{ color: bodyTextColor, fontFamily: bodyFont }}
-            >
-              Photos coming soon.
-            </p>
-          ) : (
+          {momentsMedia.length === 0 ? null : (
             <div className="columns-1 md:columns-2 lg:columns-3 xl:columns-4 gap-6">
               {momentsMedia.map((item, idx) => (
                 <div
@@ -3096,14 +3074,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
               {qaSubtitle}
             </p>
           )}
-          {faqs.length === 0 ? (
-            <p
-              className="text-center text-sm italic py-10"
-              style={{ color: bodyTextColor, fontFamily: bodyFont }}
-            >
-              No questions have been added yet.
-            </p>
-          ) : (
+          {faqs.length === 0 ? null : (
             <div className="border-t" style={{ borderColor: `${accent}33` }}>
               {faqs.map((faq, idx) => {
                 const isOpen = openFaqIdx === idx;
@@ -3156,25 +3127,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
           )}
         </section>
 
-        {/* ===== QA CTA (Still have questions? Message the couple) ===== */}
-        <section className="py-14 px-6 md:px-10 max-w-3xl mx-auto text-center">
-          <span className="block mb-3 text-[10px] md:text-xs uppercase tracking-[0.2em] font-semibold" style={{ color: accent, fontFamily: headingFont }}>
-            Need More Help?
-          </span>
-          <h3 className="text-[48px] font-semibold mb-4 leading-[1.1]" style={{ fontFamily: headingFont, color: text }}>
-            Still have questions?
-          </h3>
-          <p className="text-sm md:text-base leading-relaxed max-w-xl mx-auto mb-8" style={{ color: bodyTextColor, fontFamily: bodyFont }}>
-            Reach out to the couple or their concierge for any additional information.
-          </p>
-          <a
-            href="mailto:concierge@dreamweavers.events"
-            className="inline-flex items-center gap-2 px-8 py-3 rounded-full text-sm font-semibold uppercase tracking-wider transition-colors"
-            style={{ backgroundColor: accent, color: bg }}
-          >
-            Message the Couple
-          </a>
-        </section>
+
 
         {/* ===== FOOTER (links + copyright) ===== */}
         <footer
