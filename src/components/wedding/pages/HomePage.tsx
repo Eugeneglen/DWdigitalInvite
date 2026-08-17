@@ -133,7 +133,7 @@ export default function HomePage() {
       {/* ===== TOP BANNER ===== */}
       {bannerUrl && (
       <div
-        className="w-full h-[360px] md:h-[420px] mt-[54px] md:mt-[64px] relative z-40 flex items-center justify-center"
+        className="w-full h-[360px] md:h-[420px] mt-[54px] md:mt-[64px] relative z-40 bg-cover bg-center flex items-center justify-center"
         style={{ backgroundImage: `url('${bannerUrl}')` }}
       >
         <div className="relative z-10 text-center px-6">
