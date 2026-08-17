@@ -26,9 +26,6 @@ export default function SectionBanner({ title, subtitle, bannerUrl: bannerUrlPro
       className="w-full h-[360px] md:h-[420px] bg-cover bg-center mt-[54px] md:mt-[64px] relative z-40 border-b border-champagne-silk/20 flex items-center justify-center"
       style={{ backgroundImage: `url('${rawBannerUrl}')` }}
     >
-      {/* Gradient overlay — subtle dark gradient for text readability on any image */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/30" />
-
       {/* Centered text */}
       <div className="relative z-10 text-center px-6">
         {title && (
