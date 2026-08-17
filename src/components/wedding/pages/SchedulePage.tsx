@@ -6,52 +6,6 @@ import SectionBanner from '@/components/wedding/SectionBanner';
 import { usePublicWedding } from '@/hooks/usePublicWedding'
 import { useWeddingSlug } from '@/hooks/useWeddingSlug';;
 
-const CEREMONY_IMG =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuAsLNSEjy771owdkkDbKTl1nE5oEzBQFVHob_HKiQb9eJb1X7I79-CxGjCPeKwCSHhwswJRqSrt3ox_aktMQUGlyzg6Eoo5R0aH6CYxxKj5f3uZCWdaDfZEIqmxwZd5DgdvCUWZfIdnNvixcYvcspOOFnGM2ThX9BPZz-ftetacA-b6CkxEEp9BdSatnTG55-e8tZz1jlG1euZgtw17iI67tcMGtR2azzCg8GvNH-xQPfUJlAXxGC3jU9Q7dbVZPK-xnHwtTl5eRNknueI';
-const CELEBRATION_IMG =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuC01POr_eFI2RUG86kAb7dHs-q12Kj6HzxEoXpnzTnJ9n_VB9_BJL6Iy8vtGixOWTn1jVNZKDjXNQkHSy9Gsa8KI5IomZe3968VCNWHhXNZ44gbgs5LCBp4_Axjbj72RJwN0BWAIEmrqH8lgR-_j2_9Ci79wI4t583OCS4YuDca-s2xldrzBhBM-KeS4GFVFDSQdzWRY-4chmwkFfFgO3g-S4VS_jae416SCd-357i_ix3m68zwnHtpBSxyXFSjZISZ_Z66Jlxj6Npv_Lo';
-
-
-const FALLBACK_SCHEDULE_ITEMS = [
-  {
-    id: 'fallback-1',
-    eventType: 'ceremony',
-    title: 'The Ceremony',
-    description: 'Join us as we exchange our vows and start our new chapter together.',
-    startTime: '2027-12-25T16:00:00',
-    endTime: null,
-    location: 'Formal Attire',
-    sortOrder: 0,
-  },
-  {
-    id: 'fallback-2',
-    eventType: 'cocktail',
-    title: 'Cocktail Hour',
-    description: 'Enjoy signature drinks and light hors d\'oeuvres in the garden courtyard.',
-    startTime: '2027-12-25T17:30:00',
-    endTime: null,
-    location: null,
-    sortOrder: 1,
-  },
-  {
-    id: 'fallback-3',
-    eventType: 'dinner',
-    title: 'Dinner & Dancing',
-    description: 'A seated dinner followed by a night of celebration, music, and joy on the dance floor.',
-    startTime: '2027-12-25T19:00:00',
-    endTime: null,
-    location: null,
-    sortOrder: 2,
-  },
-];
-
-const FALLBACK_DATE_TEXT = 'Saturday, December 25, 2027';
-const FALLBACK_SHORT_DATE = 'December 25, 2027';
-const FALLBACK_VENUE = 'The Singapore EDITION';
-const FALLBACK_VENUE_ADDRESS = '38 Cuscaden Road, Singapore 249731';
-const FALLBACK_VENUE_DESCRIPTION = 'Nestled in the heart of Orchard Road, The Singapore EDITION is a luxury boutique hotel blending timeless elegance with modern sophistication. Its intimate event spaces and bespoke service make it the perfect setting for an unforgettable celebration.';
-const FALLBACK_VENUE_IMAGE = 'https://sfile.chatglm.cn/images-ppt/4adf4afbb9a2.jpg';
-const FALLBACK_COUPLE_NAME = 'Eleanor & James';
 
 function formatTime(timeStr: string | null | undefined): string {
   if (!timeStr) return '';
@@ -74,34 +28,34 @@ function formatTime(timeStr: string | null | undefined): string {
 }
 
 function formatFullDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return FALLBACK_DATE_TEXT;
+  if (!dateStr) return '';
   try {
     const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return FALLBACK_DATE_TEXT;
+    if (isNaN(d.getTime())) return '';
     const day = d.toLocaleDateString('en-SG', { weekday: 'long' });
     const rest = d.toLocaleDateString('en-SG', { day: 'numeric', month: 'long', year: 'numeric' });
     return `${day}, ${rest}`;
   } catch {
-    return FALLBACK_DATE_TEXT;
+    return '';
   }
 }
 
 function formatShortDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return FALLBACK_SHORT_DATE;
+  if (!dateStr) return '';
   try {
     const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return FALLBACK_SHORT_DATE;
+    if (isNaN(d.getTime())) return '';
     return d.toLocaleDateString('en-SG', { day: 'numeric', month: 'long', year: 'numeric' });
   } catch {
-    return FALLBACK_SHORT_DATE;
+    return '';
   }
 }
 
 function getCalendarDateStr(dateStr: string | null | undefined): string {
-  if (!dateStr) return '20271225T160000/20271225T230000';
+  if (!dateStr) return '';
   try {
     const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return '20271225T160000/20271225T230000';
+    if (isNaN(d.getTime())) return '';
     const end = new Date(d.getTime() + 7 * 60 * 60 * 1000); // +7 hours
     const fmt = (dt: Date) => {
       const y = dt.getFullYear();
@@ -113,7 +67,7 @@ function getCalendarDateStr(dateStr: string | null | undefined): string {
     };
     return `${fmt(d)}/${fmt(end)}`;
   } catch {
-    return '20271225T160000/20271225T230000';
+    return '';
   }
 }
 
@@ -123,13 +77,13 @@ export default function SchedulePage() {
 
   const fullDateText = formatFullDate(data?.wedding.weddingDate);
   const shortDateText = formatShortDate(data?.wedding.weddingDate);
-  const sectionTitle = getField('schedule', 'title', 'The Schedule');
-  const timelineHeading = getField('schedule', 'subtitle', 'The Celebration');
-  const venueName = data?.wedding.venue || FALLBACK_VENUE;
-  const venueAddress = data?.wedding.venueAddress || FALLBACK_VENUE_ADDRESS;
-  const coupleName = data?.wedding.coupleName || FALLBACK_COUPLE_NAME;
+  const sectionTitle = getField('schedule', 'title', '');
+  const timelineHeading = getField('schedule', 'subtitle', '');
+  const venueName = data?.wedding.venue || '';
+  const venueAddress = data?.wedding.venueAddress || '';
+  const coupleName = data?.wedding.coupleName || '';
 
-  const schedules = (data?.schedules && data.schedules.length > 0) ? data.schedules : FALLBACK_SCHEDULE_ITEMS;
+  const schedules = data?.schedules ?? [];
   const scheduleImages = data?.mediaByCategory?.schedule ?? [];
 
   // Use CMS images if available, otherwise no image (empty state)
@@ -175,12 +129,12 @@ export default function SchedulePage() {
             <div className="aspect-[4/5] overflow-hidden rounded-lg">
               <img alt="The Ceremony" className="w-full h-full object-cover" src={ceremonyImg} />
             </div>
-          ) : <div className="aspect-[4/5] rounded-lg bg-champagne-silk/20 flex items-center justify-center"><p className="text-charcoal-ink/25 text-xs italic">Photo coming soon</p></div>}
+          ) : null}
           {celebrationImg ? (
             <div className="aspect-[4/5] overflow-hidden rounded-lg">
               <img alt="The Celebration" className="w-full h-full object-cover" src={celebrationImg} />
             </div>
-          ) : <div className="aspect-[4/5] rounded-lg bg-champagne-silk/20 flex items-center justify-center"><p className="text-charcoal-ink/25 text-xs italic">Photo coming soon</p></div>}
+          ) : null}
         </div>
         )}
 
@@ -251,7 +205,7 @@ export default function SchedulePage() {
               <img
                 alt={`${venueName} — Wedding Venue`}
                 className="w-full h-full object-cover"
-                src={getField('getting-there', 'venueImage', FALLBACK_VENUE_IMAGE)}
+                src={getField('getting-there', 'venueImage', '')}
               />
             </div>
           </div>
@@ -259,7 +213,7 @@ export default function SchedulePage() {
             <span className="text-label-sm leading-label-sm text-cinematic-gold tracking-[0.2em] uppercase font-semibold">Wedding Venue</span>
             <h3 className="font-display-hero text-headline-lg-mobile leading-headline-lg-mobile md:text-headline-md md:leading-headline-md font-semibold text-charcoal-ink">{venueName}</h3>
             <p className="text-body-md leading-body-md text-charcoal-ink/70 leading-relaxed">
-              {getField('getting-there', 'venueDescription', FALLBACK_VENUE_DESCRIPTION)}
+              {getField('getting-there', 'venueDescription', '')}
             </p>
           </div>
         </section>

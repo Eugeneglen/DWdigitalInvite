@@ -5,20 +5,17 @@ import SectionBanner from '../SectionBanner';
 import { usePublicWedding } from '@/hooks/usePublicWedding'
 import { useWeddingSlug } from '@/hooks/useWeddingSlug';;
 
-const FALLBACK_VENUE = 'The Singapore EDITION';
-const FALLBACK_ADDRESS = '38 Cuscaden Road, Singapore 249731';
-
 export default function GettingTherePage() {
   const [tab, setTab] = useState<'car' | 'transit'>('transit');
   const { data, getField } = usePublicWedding(useWeddingSlug());
 
-  const venueName = data?.wedding.venue || FALLBACK_VENUE;
-  const venueAddress = data?.wedding.venueAddress || FALLBACK_ADDRESS;
+  const venueName = data?.wedding.venue || '';
+  const venueAddress = data?.wedding.venueAddress || '';
 
   const carContent = getField('getting-there', 'carContent', '');
   const transitContent = getField('getting-there', 'transitContent', '');
-  const carTitle = getField('getting-there', 'carTitle', 'BY CAR');
-  const transitTitle = getField('getting-there', 'transitTitle', 'PUBLIC TRANSIT');
+  const carTitle = getField('getting-there', 'carTitle', '');
+  const transitTitle = getField('getting-there', 'transitTitle', '');
   const parkingNote = getField('getting-there', 'parkingNote', '');
 
   const googleMapsUrl = data?.wedding.googleMapsUrl;
@@ -35,7 +32,7 @@ export default function GettingTherePage() {
 
   return (
     <>
-      <SectionBanner title={getField('getting-there', 'title', 'Getting There')} subtitle={getField('getting-there', 'subtitle', '')} />
+      <SectionBanner title={getField('getting-there', 'title', '')} subtitle={getField('getting-there', 'subtitle', '')} />
 
       <main className="pb-section-gap px-4 md:px-canvas-margin max-w-[1440px] mx-auto min-h-screen pt-[20px] md:pt-[40px] flex flex-col gap-8">
         {/* Address */}
@@ -94,11 +91,7 @@ export default function GettingTherePage() {
                     {carContent}
                   </p>
                 </div>
-              ) : (
-                <div className="py-12 text-center">
-                  <p className="text-charcoal-ink/30 text-sm italic">Driving directions coming soon.</p>
-                </div>
-              )}
+              ) : null}
               {parkingNote && (
                 <div className="border-t border-champagne-silk/30 pt-4 space-y-2">
                   <p className="text-sm text-charcoal-ink/60 leading-relaxed">{parkingNote}</p>
@@ -118,11 +111,7 @@ export default function GettingTherePage() {
                     {transitContent}
                   </p>
                 </div>
-              ) : (
-                <div className="py-12 text-center">
-                  <p className="text-charcoal-ink/30 text-sm italic">Transit directions coming soon.</p>
-                </div>
-              )}
+              ) : null}
             </div>
           </section>
         )}

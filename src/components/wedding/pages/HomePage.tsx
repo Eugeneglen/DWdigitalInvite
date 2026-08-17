@@ -8,19 +8,7 @@ import { useLiveWeddingData } from '@/hooks/useLiveWeddingData';
 import { useImageAutoContrast } from '@/hooks/useImageAutoContrast';
 import { useHeroAutoContrast } from '@/hooks/useHeroAutoContrast';
 
-const FALLBACK_HERO_IMG =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuBeAe38AA5-0h4B5MmgQCqv54oQXyPMGznDKaw2sJI_FnTbB_yXXWOpirFlFycj_2VI02IVLouUTt86Y1J7Ls-bRsMOHPAcfSqruVoh87sfhw3vi2Z6t1C7ogCLtkvF6QbJkwuV0av8pXTrUeAAi6ymnZpvyOr8qVjTNNorAOmqRrW_fohX_xlkscmBh39K4Wtvs6TH0Nvb_X3LQQRD9W_sySN_iWbWw9O0au8u1jO-hSekE9pSGNo5zsTz3o9PWy5xbzc6lq3knkIy';
 
-const FALLBACK_BANNER_BG =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuA-OyKfcsxXAmZDArHbDXl1cVCgGUG5liFPzyHdVvMG6_4jN9pNTrN9GCrkdnegli9UPJUSPs39KJRsRP7AiLem4xYS-q1ZYq1T3DAIqyvn3wAvbdkoMVkufft0SpQw4gDTPSnIml6k62lRYobUrNu70UGIILiMZQ0fAydTXXwVZ1oswQZ-mjPT8H9mDDqfhxsMSI5zla8GKz_ILXbmdRjtRUk682dPEDBD6I81DzEx7dITgjb6vxQoee5599jkYf_vCYP7npydvxqx';
-
-const FALLBACK_TEA_IMG =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuA6SiJt49KQCmMAhF-X_tmX1Y1NKhTieT6ApO53PD9gYuvLO0e78WTxzg8BV7Wnhe6oJ6sG4SwJ4U-nH2m33dv7I89IhLgrHDkabts7ws-QwPlv-ycUzhyuBN0c04ka2inAyysumlM1w-sR8stBZ51HJOGZkQO6cAtfrn9RXWZRFlHJlUp8Jqzi-nBu3xGs57xm7L2Le06Put3xBDMAe39zkMMsdcuUkbeyw5c4Q6VxvXkSmMbcpLM-HJK1iMgYVLkn2kzqUPEALYpH';
-
-const FALLBACK_WEDDING_DATE = new Date('2027-12-25T16:00:00').getTime();
-const FALLBACK_COUPLE_NAME = 'Eleanor & James';
-const FALLBACK_DATE_TEXT = 'December 25, 2027';
-const FALLBACK_HERO_DESCRIPTION = 'Together with their families, request the pleasure of your company';
 
 function useCountdown(targetTimestamp: number) {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, mins: 0, secs: 0 });
@@ -45,32 +33,32 @@ function useCountdown(targetTimestamp: number) {
 }
 
 function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return FALLBACK_DATE_TEXT;
+  if (!dateStr) return '';
   try {
     const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return FALLBACK_DATE_TEXT;
+    if (isNaN(d.getTime())) return '';
     return d.toLocaleDateString('en-SG', { day: 'numeric', month: 'long', year: 'numeric' });
   } catch {
-    return FALLBACK_DATE_TEXT;
+    return '';
   }
 }
 
 function parseWeddingTimestamp(dateStr: string | null | undefined): number {
-  if (!dateStr) return FALLBACK_WEDDING_DATE;
+  if (!dateStr) return Date.now() + 365*24*3600*1000;
   try {
     const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return FALLBACK_WEDDING_DATE;
+    if (isNaN(d.getTime())) return Date.now() + 365*24*3600*1000;
     return d.getTime();
   } catch {
-    return FALLBACK_WEDDING_DATE;
+    return Date.now() + 365*24*3600*1000;
   }
 }
 
 export default function HomePage() {
   const { data, getField } = usePublicWedding(useWeddingSlug());
 
-  const bannerUrl = data?.wedding.bannerUrl || FALLBACK_BANNER_BG;
-  const heroImgUrl = data?.wedding.heroImageUrl || FALLBACK_HERO_IMG;
+  const bannerUrl = data?.wedding.bannerUrl || '';
+  const heroImgUrl = data?.wedding.heroImageUrl || '';
 
   // Independent auto-contrast for the banner headline — samples the actual
   // banner IMAGE pixels (not the page background) to pick text colour.
@@ -79,23 +67,23 @@ export default function HomePage() {
 
   // Hero section auto-contrast — samples the BOTTOM of the image where text sits
   const heroContrast = useHeroAutoContrast(heroImgUrl, heroVideoUrl);
-  const coupleName = getField('hero', 'title') || data?.wedding.coupleName || FALLBACK_COUPLE_NAME;
+  const coupleName = getField('hero', 'title') || data?.wedding.coupleName || '';
   const heroSubtitle = getField('hero', 'subtitle', '');
   const dateText = getField('hero', 'dateDisplay') || formatDate(data?.wedding.weddingDate);
   const countdownDateStr = getField('hero', 'countdownDate');
   const weddingTimestamp = countdownDateStr
     ? parseWeddingTimestamp(countdownDateStr)
     : parseWeddingTimestamp(data?.wedding.weddingDate);
-  const heroDescription = getField('hero', 'description', FALLBACK_HERO_DESCRIPTION);
+  const heroDescription = getField('hero', 'description', '');
 
   // Ceremony section
   const teaCeremonyEnabled = getField('hero', 'teaCeremonyEnabled', 'true') === 'true';
-  const teaCeremonyImage = getField('hero', 'teaCeremonyImage', FALLBACK_TEA_IMG);
-  const teaCeremonyLabel = getField('hero', 'teaCeremonyLabel', 'The Tradition');
-  const teaCeremonyTitle = getField('hero', 'teaCeremonyTitle', 'The Ceremony Section');
+  const teaCeremonyImage = getField('hero', 'teaCeremonyImage', '');
+  const teaCeremonyLabel = getField('hero', 'teaCeremonyLabel', '');
+  const teaCeremonyTitle = getField('hero', 'teaCeremonyTitle', '');
   const teaCeremonyBody = getField('hero', 'teaCeremonyBody', '');
 
-  const teaCeremonySection = teaCeremonyEnabled ? (
+  const teaCeremonySection = (teaCeremonyEnabled && teaCeremonyImage && teaCeremonyTitle) ? (
           <section className="py-section-gap px-4 md:px-canvas-margin max-w-[1440px] mx-auto">
             <div className="max-w-4xl mx-auto flex flex-col items-center">
               <div className="relative w-full aspect-[2/3] md:aspect-auto md:h-[800px] overflow-hidden rounded-lg shadow-xl mb-8 group">
@@ -117,12 +105,12 @@ export default function HomePage() {
   ) : null;
 
   // CMS font — applied ONLY to the master head copy (couple name)
-  const heroFont = getField('hero', 'fontFamily', 'Playfair Display');
+  const heroFont = getField('hero', 'fontFamily', '');
 
   // Narrative section
-  const narrativeLabel = getField('hero', 'narrativeLabel', 'The Prelude');
-  const narrativeTitle = getField('hero', 'narrativeTitle', 'Our Story Begins Here');
-  const narrativeBody = getField('hero', 'narrativeBody', 'Every great romance is a narrative woven over time. Ours began with a serendipitous meeting and has evolved into a tapestry of shared adventures, quiet moments, and a profound commitment to one another.');
+  const narrativeLabel = getField('hero', 'narrativeLabel', '');
+  const narrativeTitle = getField('hero', 'narrativeTitle', '');
+  const narrativeBody = getField('hero', 'narrativeBody', '');
 
   const countdown = useCountdown(weddingTimestamp);
   const { setSection } = useNavigationStore();
@@ -144,8 +132,8 @@ export default function HomePage() {
     <>
       {/* ===== TOP BANNER ===== */}
       <div
-        className="w-full h-[360px] md:h-[420px] bg-cover bg-center mt-[54px] md:mt-[64px] relative z-40 flex items-center justify-center"
-        style={{ backgroundImage: `url('${bannerUrl}')` }}
+        className="w-full h-[360px] md:h-[420px] mt-[54px] md:mt-[64px] relative z-40 flex items-center justify-center"
+        style={{ backgroundImage: bannerUrl ? `url('${bannerUrl}')` : undefined, backgroundColor: bannerUrl ? undefined : 'var(--color-cinematic-gold, #D4AF37)' }}
       >
         <div className="relative z-10 text-center px-6">
           <h1
@@ -174,7 +162,7 @@ export default function HomePage() {
         {/* ===== HERO SECTION ===== */}
         <section className="relative h-[795px] md:h-screen w-full flex flex-col justify-end overflow-hidden">
           {/* Background — full bleed, video or image */}
-          <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0 z-0" style={(!heroVideoUrl && !heroImgUrl) ? { backgroundColor: '#2C2C2C' } : undefined}>
             {heroVideoUrl ? (
               <video
                 autoPlay
@@ -184,13 +172,13 @@ export default function HomePage() {
                 className="w-full h-full object-cover object-center"
                 src={heroVideoUrl}
               />
-            ) : (
+            ) : heroImgUrl ? (
               <img
                 alt="Hero Wedding Portrait"
                 className="w-full h-full object-cover object-center"
                 src={heroImgUrl}
               />
-            )}
+            ) : null}
           </div>
 
           {/* Content Overlay */}
@@ -310,15 +298,17 @@ export default function HomePage() {
         {teaCeremonySection}
 
         {/* ===== NARRATIVE SECTION ===== */}
+        {narrativeTitle && (
         <section className="py-section-gap px-4 md:px-canvas-margin max-w-[1440px] mx-auto">
           <div className="max-w-3xl mx-auto text-center space-y-8">
-            <span className="font-label-sm text-label-sm leading-label-sm text-cinematic-gold tracking-[0.2em] uppercase block font-semibold">{narrativeLabel}</span>
+            {narrativeLabel && <span className="font-label-sm text-label-sm leading-label-sm text-cinematic-gold tracking-[0.2em] uppercase block font-semibold">{narrativeLabel}</span>}
             <h3 className="font-display-hero text-headline-lg-mobile leading-headline-lg-mobile md:text-headline-lg md:leading-headline-lg font-semibold text-charcoal-ink">{narrativeTitle}</h3>
-            <p className="font-body-md text-body-md text-charcoal-ink/80 leading-relaxed">
+            {narrativeBody && <p className="font-body-md text-body-md text-charcoal-ink/80 leading-relaxed">
               {narrativeBody}
-            </p>
+            </p>}
           </div>
         </section>
+        )}
       </main>
 
       {/* ===== FLOATING ACTION BUTTON ===== */}

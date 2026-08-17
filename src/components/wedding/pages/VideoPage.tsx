@@ -67,14 +67,7 @@ export default function VideoPage() {
 
   // No video configured — show empty state
   if (!videoUrl) {
-    return (
-      <div className="min-h-screen bg-paper-cream">
-        <SectionBanner title={videoTitle} subtitle="A moment to remember" />
-        <div className="px-6 py-16 max-w-3xl mx-auto text-center">
-          <p className="text-sm text-charcoal-ink/30 italic">No video has been added yet.</p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (

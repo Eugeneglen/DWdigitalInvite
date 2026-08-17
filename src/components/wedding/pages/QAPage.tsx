@@ -9,13 +9,13 @@ export default function QAPage() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const { data, getField } = usePublicWedding(useWeddingSlug());
 
-  const sectionTitle = getField('qa', 'title', 'Frequently Asked');
-  const sectionSubtitle = getField('qa', 'subtitle', 'Everything you need to know for our celebration.');
-  const contactPrompt = getField('qa', 'contactPrompt', 'Still have questions? Message the couple');
-  const contactEmail = getField('qa', 'contactEmail', 'concierge@dreamweavers.events');
-  const ctaDescription = getField('qa', 'ctaDescription', 'Our concierge is standing by to assist with any questions about the event, travel, accommodations, or special arrangements.');
-  const ctaButtonLabel = getField('qa', 'ctaButtonLabel', 'Message the Couple');
-  const ctaEyebrow = getField('qa', 'ctaEyebrow', 'NEED MORE HELP?');
+  const sectionTitle = getField('qa', 'title', '');
+  const sectionSubtitle = getField('qa', 'subtitle', '');
+  const contactPrompt = getField('qa', 'contactPrompt', '');
+  const contactEmail = getField('qa', 'contactEmail', '');
+  const ctaDescription = getField('qa', 'ctaDescription', '');
+  const ctaButtonLabel = getField('qa', 'ctaButtonLabel', '');
+  const ctaEyebrow = getField('qa', 'ctaEyebrow', '');
 
   const faqs = data?.faqs ?? [];
 
@@ -81,37 +81,37 @@ export default function QAPage() {
           </div>
         </section>
 
-        {faqs.length === 0 && (
-          <section className="max-w-[800px] mx-auto mb-section-gap text-center py-12">
-            <p className="text-charcoal-ink/30 italic">No questions have been added yet.</p>
-          </section>
-        )}
+        {faqs.length === 0 && null}
 
-        {/* CTA */}
+        {/* CTA — only render if there's meaningful content */}
+        {contactPrompt && contactEmail && (
         <section className="animate-orchestral delay-400 max-w-2xl mx-auto bg-paper-cream/40 py-16 px-8 text-center">
+          {ctaEyebrow && (
           <p
             className="text-cinematic-gold uppercase tracking-[0.2em] mb-3"
             style={{ fontSize: '12px', lineHeight: '16px', letterSpacing: '0.1em', fontWeight: 600 }}
           >
             {ctaEyebrow}
           </p>
+          )}
           <h2
             className="text-charcoal-ink italic mb-4"
             style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, fontSize: '32px', lineHeight: '40px' }}
           >
             {contactPrompt}
           </h2>
-          <p className="text-charcoal-ink/60 mb-10 max-w-md mx-auto" style={{ fontSize: '16px', lineHeight: '24px' }}>
+          {ctaDescription && <p className="text-charcoal-ink/60 mb-10 max-w-md mx-auto" style={{ fontSize: '16px', lineHeight: '24px' }}>
             {ctaDescription}
-          </p>
+          </p>}
           <a
             href={`mailto:${contactEmail}?subject=Wedding%20Inquiry`}
             className="bg-charcoal-ink text-paper-cream rounded px-8 py-3.5 text-[13px] font-semibold uppercase tracking-[0.08em] hover:opacity-90 transition-opacity duration-300 inline-flex items-center gap-2.5 no-underline"
           >
             <span className="material-symbols-outlined text-paper-cream" style={{ fontSize: '18px' }}>mail</span>
-            {ctaButtonLabel}
+            {ctaButtonLabel || 'Contact'}
           </a>
         </section>
+        )}
       </main>
     </>
   );

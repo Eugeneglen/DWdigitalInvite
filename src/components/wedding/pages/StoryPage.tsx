@@ -5,46 +5,6 @@ import SectionBanner from '../SectionBanner';
 import { usePublicWedding } from '@/hooks/usePublicWedding'
 import { useWeddingSlug } from '@/hooks/useWeddingSlug';;
 
-const HERO_IMG =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuBZxkwieg-SjxgRYOZxJlQ1v05okmlTqzvosp-ANHaaCSQStncGv3ORTlPiE-uSYP7mQcE_wcB5Povhsm25x-eThbTLAYPt1XD-14RTSL9R5a1etGsU54CUWIwAK_4ckHoB-gD85mc-uqQwOckXVYmn0J7u0r6WkNQ2eFKKTBWBJ8yU_nirHHy8GC7vKRVnGPL6P_TymHuuKnjM3ERN9Zvho_5v7pICElncd6F8dHF-lVKppvz4kKyQe9je7CIDwOSBlcyxaGU6yY-D';
-
-const FALLBACK_SUBTITLE = 'A narrative woven through time, capturing the moments that led us here.';
-
-const FALLBACK_STORIES = [
-  {
-    id: 'fallback-1',
-    title: 'The First Chapter',
-    content: 'It began over accidentally swapped coffee orders at a local cafe. A simple mistake that sparked a conversation lasting hours, marking the quiet inception of a lifelong journey.',
-    date: '2018-10-01',
-    imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAQPSczTWgJLZS_vzNbN6wuPsTVw72YpOY0ldIaXb2nEM0DjbAoH__IyOfEvlXkIvif3k6TiVwdgbsAPvCUuustCXJ5ogM8o9Mf8qfnHNM052duEcCK8KPbJVfqn8sOuo9cpUPx6XWqHpBxvEfinvKzqiiI7zy3XkVYQ7w0ElfPw1kVlE-oTiwbdti2a6Q3pUBuogYx0KyKtviULD2olRj3ZTd29I37Yi80hUtQtS9LWTuKEtFJvAKUdLp2wmjdEM8om4Ku67LEDI4t',
-    sortOrder: 0,
-  },
-  {
-    id: 'fallback-2',
-    title: 'The Proposal',
-    content: 'Underneath a canopy of winter stars in the mountains, a question was asked and answered. A moment frozen in time, framed by crisp air and profound certainty.',
-    date: '2021-12-01',
-    imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBzzvAxvGICtmDJ5Ase_8SKR0gvAAqXe_96pLSdSUEjYyVgenag3qekxDbjpLG_SXknWJEoOXPP_XcdU4WMSloZvzj9Pn-dxdG0BBlp0lglCSzzoxLL3-2CaKrawuVRqBglPiiimHDNTlMHai2pnrr404Xg8EgQq8tdW5qRhs-bx2k6N52M80DDUW27KtR0Nc4-WkNjwCsNX8XuiyHBZTqdhpBqml323YRMNj-0offH-_Sn3jp1yxw-EAZs939pzoyGzEfpRwsteoXv',
-    sortOrder: 1,
-  },
-];
-
-const FALLBACK_TIDBITS = [
-  {
-    q: 'Who said "I love you" first?',
-    a: 'It was mutual, during a particularly chaotic road trip where we got hopelessly lost but completely enjoyed the detour.',
-  },
-  {
-    q: 'Favorite shared hobby?',
-    a: 'Collecting vintage records and spending Sunday mornings listening to them while attempting to perfect our French press technique.',
-  },
-];
-
-const FALLBACK_DESTINATIONS = [
-  { name: 'Amalfi Coast' },
-  { name: 'Kyoto' },
-];
-
 interface Tidbit {
   q: string;
   a: string;
@@ -54,12 +14,12 @@ interface Destination {
   name: string;
 }
 
-function safeParseJSON<T>(str: string | undefined | null, fallback: T): T {
-  if (!str) return fallback;
+function safeParseJSON<T>(str: string | undefined | null): T | null {
+  if (!str) return null;
   try {
     return JSON.parse(str) as T;
   } catch {
-    return fallback;
+    return null;
   }
 }
 
@@ -84,24 +44,24 @@ export default function StoryPage() {
   const weddingSlug = useWeddingSlug();
   const { data, getField } = usePublicWedding(weddingSlug);
 
-  const subtitle = getField('story', 'subtitle', FALLBACK_SUBTITLE);
+  const subtitle = getField('story', 'subtitle', '');
   const stories = (data?.stories && data.stories.length > 0) ? data.stories : [];
   const storyImages = data?.mediaByCategory?.story ?? [];
   const heroImg = storyImages[0]?.url || '';
 
   // Tidbits — read from CMS content, fallback to defaults
   const tidbitsEnabled = getField('story', 'tidbitsEnabled', 'true') === 'true';
-  const tidbits = safeParseJSON<Tidbit[]>(getField('story', 'tidbits', ''), FALLBACK_TIDBITS);
-  const tidbitsTitle = getField('story', 'tidbitsTitle', 'Tidbits');
-  const tidbitsSubtitle = getField('story', 'tidbitsSubtitle', 'A few things you might not know.');
+  const tidbits = safeParseJSON<Tidbit[]>(getField('story', 'tidbits', ''));
+  const tidbitsTitle = getField('story', 'tidbitsTitle', '');
+  const tidbitsSubtitle = getField('story', 'tidbitsSubtitle', '');
 
   // Honeymoon — read from CMS content, fallback to defaults
   const honeymoonEnabled = getField('story', 'honeymoonEnabled', 'true') === 'true';
-  const destinations = safeParseJSON<Destination[]>(getField('story', 'honeymoonDestinations', ''), FALLBACK_DESTINATIONS);
-  const honeymoonTitle = getField('story', 'honeymoonTitle', 'Where Next?');
-  const honeymoonSubtitle = getField('story', 'honeymoonSubtitle', 'Help us choose our honeymoon destination. Cast your vote!');
+  const destinations = safeParseJSON<Destination[]>(getField('story', 'honeymoonDestinations', ''));
+  const honeymoonTitle = getField('story', 'honeymoonTitle', '');
+  const honeymoonSubtitle = getField('story', 'honeymoonSubtitle', '');
   const honeymoonVotes = safeParseJSON<Record<string, number>>(getField('story', 'honeymoonVotes', ''), {});
-  const honeymoonEyebrow = getField('story', 'honeymoonEyebrow', "AFTER THE 'I DO'");
+  const honeymoonEyebrow = getField('story', 'honeymoonEyebrow', '');
 
   const handleVote = useCallback(async (index: number) => {
     setVotes((prev) => {
@@ -117,7 +77,7 @@ export default function StoryPage() {
       voterNameRef.current = name;
     }
 
-    const destName = destinations[index]?.name;
+    const destName = (destinations ?? [])[index]?.name;
     if (!destName) return;
 
     try {
@@ -194,16 +154,19 @@ export default function StoryPage() {
 
   // Compute vote counts: DB votes + local session votes
   const getVoteCount = (index: number) => {
-    const destName = destinations[index]?.name;
+    const destName = (destinations ?? [])[index]?.name;
     if (!destName) return 0;
     const dbVotes = dbVoteCounts[destName] ?? 0;
     const localVote = votes[index] ? 1 : 0;
     return dbVotes + localVote;
   };
 
+  const resolvedTidbits = tidbits ?? [];
+  const resolvedDestinations = destinations ?? [];
+
   return (
     <>
-      <SectionBanner title={getField('story', 'title', 'Our Story')} />
+      <SectionBanner title={getField('story', 'title', '')} />
 
       <main ref={mainRef} className="pb-section-gap px-4 md:px-canvas-margin max-w-[1440px] mx-auto min-h-screen pt-[20px] md:pt-[40px]">
         {/* Hero Section */}
@@ -219,13 +182,8 @@ export default function StoryPage() {
         </section>
 
         {/* Timeline */}
+        {stories.length > 0 && (
         <section className="reveal py-section-gap relative">
-          {stories.length === 0 ? (
-            <div className="py-20 text-center">
-              <p className="text-charcoal-ink/30 text-sm italic">Our story coming soon.</p>
-            </div>
-          ) : (
-          <>
           <div className="absolute left-4 md:left-1/2 top-0 bottom-0 w-[1px] bg-champagne-silk/50 -translate-x-1/2" />
           <div className="flex flex-col gap-section-gap">
             {stories.map((story, idx) => {
@@ -269,12 +227,11 @@ export default function StoryPage() {
               );
             })}
           </div>
-          </>
-          )}
-        </section>
+          </section>
+        )}
 
         {/* Tidbits — only show if enabled and there are tidbits */}
-        {tidbitsEnabled && tidbits.length > 0 && (
+        {tidbitsEnabled && resolvedTidbits.length > 0 && (
           <section className="reveal py-section-gap">
             <div className="text-center mb-16">
               <h2 className="text-[32px] md:text-[48px] text-charcoal-ink mb-4" style={{ fontFamily: "'Playfair Display', serif", fontWeight: 600, lineHeight: '56px' }}>
@@ -285,7 +242,7 @@ export default function StoryPage() {
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-              {tidbits.map((item, i) => (
+              {resolvedTidbits.map((item, i) => (
                 <div
                   key={i}
                   className="p-8 border border-champagne-silk/30 bg-white/50 backdrop-blur-sm hover:shadow-[0_8px_30px_rgba(26,26,26,0.04)] transition-all duration-300"
@@ -303,7 +260,7 @@ export default function StoryPage() {
         )}
 
         {/* Honeymoon Widget — only show if enabled and there are destinations */}
-        {honeymoonEnabled && destinations.length > 0 && (
+        {honeymoonEnabled && resolvedDestinations.length > 0 && (
           <section className="reveal py-section-gap">
             <div className="max-w-2xl mx-auto text-center">
               <p
@@ -327,7 +284,7 @@ export default function StoryPage() {
 
               {/* Destination cards */}
               <div className="grid grid-cols-2 gap-4 mb-8">
-                {destinations.map((dest, i) => {
+                {resolvedDestinations.map((dest, i) => {
                   const voteCount = getVoteCount(i);
                   return (
                     <button
