@@ -83,9 +83,11 @@ async function fetchWeddingData(slug?: string): Promise<PublicWeddingData | null
   if (entry?.data) return entry.data;
   if (entry?.promise) return entry.promise;
 
+  // No slug → render the default ContentTemplate as a live demo
+  // Slug provided → fetch that specific wedding
   const url = slug
     ? `/api/wedding/public?slug=${encodeURIComponent(slug)}&XTransformPort=3000`
-    : `/api/wedding/public?XTransformPort=3000`;
+    : `/api/template-demo?XTransformPort=3000`;
 
   const promise = fetch(url)
     .then((res) => {
