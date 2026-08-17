@@ -22,15 +22,15 @@ function WishesPageInner() {
 
   const searchParams = useSearchParams();
 
-  const sectionTitle = getField('wishes', 'title', 'Wishes & Blessings');
-  const sectionSubtitle = getField('wishes', 'subtitle', 'A curated sanctuary of wisdom and love from those we cherish most.');
+  const sectionTitle = getField('wishes', 'title', '');
+  const sectionSubtitle = getField('wishes', 'subtitle', '');
   const nameLabel = getField('wishes', 'nameLabel', 'Full Name');
   const messageLabel = getField('wishes', 'messageLabel', 'Your Message');
   const relationshipLabel = getField('wishes', 'relationshipLabel', 'Relationship');
-  const submitLabel = getField('wishes', 'submitLabel', 'Weave into Archive');
-  const heirloomLabel = getField('wishes', 'heirloomLabel', 'The Living Heirloom');
-  const formEyebrow = getField('wishes', 'formEyebrow', 'YOUR TURN');
-  const formHeading = getField('wishes', 'formHeading', 'Contribute to the Heirloom');
+  const submitLabel = getField('wishes', 'submitLabel', 'Submit');
+  const heirloomLabel = getField('wishes', 'heirloomLabel', '');
+  const formEyebrow = getField('wishes', 'formEyebrow', '');
+  const formHeading = getField('wishes', 'formHeading', '');
 
   // Auto-fill the name from URL params (?name= or ?first=&last=).
   // Matches the RSVP page pattern so a single shared invitation link
@@ -156,18 +156,24 @@ function WishesPageInner() {
 
   return (
     <>
-      <SectionBanner title={sectionTitle} />
+      <SectionBanner title={sectionTitle || undefined} />
 
       <main className="pb-section-gap px-4 md:px-canvas-margin max-w-[1440px] mx-auto min-h-screen pt-[20px] md:pt-[40px]">
         {/* Intro */}
+        {(heirloomLabel || sectionSubtitle) && (
         <section className="max-w-[1440px] mx-auto px-8 md:px-canvas-margin mb-24 text-center">
+          {heirloomLabel && (
           <span className="text-cinematic-gold uppercase mb-4 block tracking-[0.4em]" style={{ fontSize: '12px', lineHeight: '16px', letterSpacing: '0.1em', fontWeight: 600, fontFamily: "'Inter', sans-serif" }}>
             {heirloomLabel}
           </span>
+          )}
+          {sectionSubtitle && (
           <p className="max-w-2xl mx-auto text-lg md:text-xl text-charcoal-ink/70 leading-relaxed italic">
             {sectionSubtitle}
           </p>
+          )}
         </section>
+        )}
 
         {/* Masonry Wish Cards */}
         <section className="max-w-[1440px] mx-auto px-8 md:px-canvas-margin mb-32">
@@ -257,20 +263,26 @@ function WishesPageInner() {
         <section className="max-w-[1440px] mx-auto px-8 md:px-canvas-margin mb-32">
           <div className="max-w-2xl mx-auto">
             {/* Section header */}
+            {(formEyebrow || formHeading) && (
             <div className="text-center mb-12">
+              {formEyebrow && (
               <p
                 className="text-cinematic-gold uppercase tracking-[0.2em] mb-3"
                 style={{ fontSize: '12px', lineHeight: '16px', letterSpacing: '0.1em', fontWeight: 600 }}
               >
                 {formEyebrow}
               </p>
+              )}
+              {formHeading && (
               <h2
                 className="text-charcoal-ink italic"
                 style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, fontSize: '32px', lineHeight: '40px' }}
               >
                 {formHeading}
               </h2>
+              )}
             </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Full Name */}

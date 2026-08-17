@@ -131,11 +131,13 @@ export default function HomePage() {
   return (
     <>
       {/* ===== TOP BANNER ===== */}
+      {bannerUrl && (
       <div
         className="w-full h-[360px] md:h-[420px] mt-[54px] md:mt-[64px] relative z-40 flex items-center justify-center"
-        style={{ backgroundImage: bannerUrl ? `url('${bannerUrl}')` : undefined, backgroundColor: bannerUrl ? undefined : 'var(--color-cinematic-gold, #D4AF37)' }}
+        style={{ backgroundImage: `url('${bannerUrl}')` }}
       >
         <div className="relative z-10 text-center px-6">
+          {coupleName && (
           <h1
             className="font-display-hero text-[44px] md:text-[72px] leading-[1.05] tracking-tight font-bold"
             style={{
@@ -146,6 +148,7 @@ export default function HomePage() {
           >
             {coupleName}
           </h1>
+          )}
           {heroSubtitle && (
             <p
               className="mt-2 text-sm md:text-base italic tracking-wide"
@@ -156,13 +159,15 @@ export default function HomePage() {
           )}
         </div>
       </div>
+      )}
 
       {/* ===== MAIN CONTENT ===== */}
       <main className="pb-section-gap px-4 md:px-canvas-margin max-w-[1440px] mx-auto min-h-screen pt-[20px] md:pt-[40px]">
         {/* ===== HERO SECTION ===== */}
-        <section className="relative h-[795px] md:h-screen w-full flex flex-col justify-end overflow-hidden">
+        {(heroVideoUrl || heroImgUrl || dateText || heroDescription) && (
+        <section className="relative w-full flex flex-col justify-end overflow-hidden" style={{ minHeight: (heroVideoUrl || heroImgUrl) ? '795px' : 'auto', height: (heroVideoUrl || heroImgUrl) ? undefined : 'auto' }}>
           {/* Background — full bleed, video or image */}
-          <div className="absolute inset-0 z-0" style={(!heroVideoUrl && !heroImgUrl) ? { backgroundColor: '#2C2C2C' } : undefined}>
+          <div className="absolute inset-0 z-0" style={{ display: (heroVideoUrl || heroImgUrl) ? 'block' : 'none' }}>
             {heroVideoUrl ? (
               <video
                 autoPlay
@@ -294,6 +299,7 @@ export default function HomePage() {
             </span>
           </div>
         </section>
+        )}
 
         {teaCeremonySection}
 

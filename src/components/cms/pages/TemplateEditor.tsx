@@ -2593,16 +2593,18 @@ function PreviewPanel({ data }: { data: TemplateData }) {
   // rendered as an intro paragraph inside each section instead).
   // Uses useImageAutoContrast for dynamic text colour (same as gold standard
   // SectionBanner.tsx). No gradient overlay — the hook picks readable text.
+  // Only render section banner when there is a banner IMAGE.
+  // When no image exists, the title is shown inline within the section content instead.
   const renderSectionBanner = (title: string) => {
-    if (!bannerUrl && !title) return null;
+    if (!bannerUrl) return null;
     return (
       <div
         className="relative w-full flex items-center justify-center"
         style={{
-          ...(bannerUrl ? { backgroundImage: `url('${bannerUrl}')`, backgroundSize: 'cover', backgroundPosition: 'center' } : { backgroundColor: `${accent}22` }),
-          height: bannerUrl ? '420px' : 'auto',
-          minHeight: title ? '200px' : '0',
-          padding: bannerUrl ? '0' : '60px 24px',
+          backgroundImage: `url('${bannerUrl}')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          height: '420px',
         }}
       >
         <div className="relative z-10 text-center px-6">
@@ -2626,15 +2628,15 @@ function PreviewPanel({ data }: { data: TemplateData }) {
         style={{ backgroundColor: bg, color: text, fontFamily: bodyFont }}
       >
         {/* ===== TOP BANNER (full-bleed background image with couple name) ===== */}
-        {/* Only renders when there is a banner image or hero title */}
-        {(bannerUrl || heroTitle) && (
+        {/* Only renders when there is a banner image */}
+        {bannerUrl && (
           <div
             className="relative w-full flex items-center justify-center"
             style={{
-              ...(bannerUrl ? { backgroundImage: `url('${bannerUrl}')`, backgroundSize: 'cover', backgroundPosition: 'center' } : { backgroundColor: `${accent}22` }),
-              height: bannerUrl ? '420px' : 'auto',
-              minHeight: heroTitle ? '200px' : '0',
-              padding: bannerUrl ? '0' : '60px 24px',
+              backgroundImage: `url('${bannerUrl}')`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              height: '420px',
             }}
           >
             <div className="relative z-10 text-center px-6">
@@ -2657,11 +2659,27 @@ function PreviewPanel({ data }: { data: TemplateData }) {
             </div>
           </div>
         )}
+        {/* Inline title when no banner image */}
+        {!bannerUrl && heroTitle && (
+          <div className="text-center py-16 px-6">
+            <h1
+              className="text-[44px] md:text-[72px] leading-[1.05] tracking-tight font-bold"
+              style={{ fontFamily: headingFont, color: text }}
+            >
+              {heroTitle}
+            </h1>
+            {heroSubtitle && (
+              <p className="mt-2 text-sm md:text-base italic tracking-wide" style={{ color: bodyTextColor }}>
+                {heroSubtitle}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* ===== HERO PORTRAIT (full-bleed image + date + description + countdown) ===== */}
         {/* Only renders when there is a hero image, date, or description */}
         {(heroImageUrl || dateDisplay || heroDescription) && (
-          <div className="relative w-full overflow-hidden" style={{ height: heroImageUrl ? '520px' : 'auto', backgroundColor: heroImageUrl ? undefined : '#2C2C2C' }}>
+          <div className="relative w-full overflow-hidden" style={{ height: heroImageUrl ? '520px' : 'auto' }}>
             {heroImageUrl && (
               <img
                 src={heroImageUrl}
@@ -2769,11 +2787,17 @@ function PreviewPanel({ data }: { data: TemplateData }) {
         </section>
         )}
 
-        {/* ===== SCHEDULE (section banner + timeline of events) ===== */}
+        {/* ===== SCHEDULE ===== */}
         {(schedule.length > 0 || scheduleTitle || scheduleImages.length > 0 || scheduleSubtitle || dateDisplay) && (
         <>
         {renderSectionBanner(scheduleTitle)}
         <section className="py-14 px-6 md:px-10 max-w-3xl mx-auto">
+          {/* Inline title when no banner image */}
+          {!bannerUrl && scheduleTitle && (
+            <h2 className="text-center mb-10" style={{ fontFamily: headingFont, color: text, fontSize: '36px', fontWeight: 600 }}>
+              {scheduleTitle}
+            </h2>
+          )}
           {/* Schedule intro portraits (2 images side-by-side) */}
           {scheduleImages.length > 0 && (
             <div className="grid grid-cols-2 gap-4 mb-12">
@@ -2880,11 +2904,17 @@ function PreviewPanel({ data }: { data: TemplateData }) {
         </>
         )}
 
-        {/* ===== STORY (section banner + zigzag timeline of chapters) ===== */}
+        {/* ===== STORY ===== */}
         {(stories.length > 0 || storyTitle || storyImages.length > 0 || storySubtitle || (tidbitsEnabled && tidbits.length > 0) || (honeymoonEnabled && honeymoonDestinations.length > 0)) && (
         <>
         {renderSectionBanner(storyTitle)}
         <section className="py-14 px-6 md:px-10 max-w-4xl mx-auto">
+          {/* Inline title when no banner image */}
+          {!bannerUrl && storyTitle && (
+            <h2 className="text-center mb-10" style={{ fontFamily: headingFont, color: text, fontSize: '36px', fontWeight: 600 }}>
+              {storyTitle}
+            </h2>
+          )}
           {/* Story hero image (16:9) */}
           {storyImages.length > 0 && (
             <div className="w-full aspect-[16/9] overflow-hidden rounded-lg shadow-xl mb-10">
@@ -3038,11 +3068,17 @@ function PreviewPanel({ data }: { data: TemplateData }) {
         </>
         )}
 
-        {/* ===== MOMENTS (section banner + masonry gallery) ===== */}
+        {/* ===== MOMENTS ===== */}
         {(momentsMedia.length > 0 || momentsTitle || momentsSubtitle) && (
         <>
         {renderSectionBanner(momentsTitle)}
         <section className="py-14 px-6 md:px-10 max-w-5xl mx-auto">
+          {/* Inline title when no banner image */}
+          {!bannerUrl && momentsTitle && (
+            <h2 className="text-center mb-10" style={{ fontFamily: headingFont, color: text, fontSize: '36px', fontWeight: 600 }}>
+              {momentsTitle}
+            </h2>
+          )}
           {momentsSubtitle && (
             <p
               className="text-center italic max-w-2xl mx-auto mb-10 text-sm md:text-base"
@@ -3072,11 +3108,17 @@ function PreviewPanel({ data }: { data: TemplateData }) {
         </>
         )}
 
-        {/* ===== FAQ (section banner + accordion list of Q&A) ===== */}
+        {/* ===== FAQ ===== */}
         {(faqs.length > 0 || qaTitle || qaSubtitle) && (
         <>
         {renderSectionBanner(qaTitle)}
         <section className="py-14 px-6 md:px-10 max-w-3xl mx-auto">
+          {/* Inline title when no banner image */}
+          {!bannerUrl && qaTitle && (
+            <h2 className="text-center mb-10" style={{ fontFamily: headingFont, color: text, fontSize: '36px', fontWeight: 600 }}>
+              {qaTitle}
+            </h2>
+          )}
           {qaSubtitle && (
             <p
               className="text-center italic max-w-2xl mx-auto mb-10 text-sm md:text-base"

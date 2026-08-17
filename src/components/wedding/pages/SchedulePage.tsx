@@ -198,19 +198,20 @@ export default function SchedulePage() {
         </section>
 
         {/* Wedding Venue Section */}
-        {venueEnabled && (
+        {venueEnabled && venueName && (
         <section className="stagger-4 mb-24 flex flex-col md:flex-row gap-8 md:gap-12 items-center">
           <div className="w-full md:w-1/2 shrink-0">
+            {getField('getting-there', 'venueImage', '') && (
             <div className="aspect-[4/3] overflow-hidden rounded border border-cinematic-gold/30">
               <img
-                alt={`${venueName} — Wedding Venue`}
+                alt={venueName}
                 className="w-full h-full object-cover"
                 src={getField('getting-there', 'venueImage', '')}
               />
             </div>
+            )}
           </div>
           <div className="w-full md:w-1/2 flex flex-col gap-4">
-            <span className="text-label-sm leading-label-sm text-cinematic-gold tracking-[0.2em] uppercase font-semibold">Wedding Venue</span>
             <h3 className="font-display-hero text-headline-lg-mobile leading-headline-lg-mobile md:text-headline-md md:leading-headline-md font-semibold text-charcoal-ink">{venueName}</h3>
             <p className="text-body-md leading-body-md text-charcoal-ink/70 leading-relaxed">
               {getField('getting-there', 'venueDescription', '')}
