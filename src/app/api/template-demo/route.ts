@@ -102,9 +102,10 @@ export async function GET() {
     const futureDate = new Date();
     futureDate.setMonth(futureDate.getMonth() + 6);
 
-    // ── 7. Standard feature flags for demo ───────────────────────────────
+    // ── 7. Feature flags for demo ──────────────────────────────────────
     // Enable all main tabs so visitors can see the full template experience.
     // music/video are disabled since the demo has no real media files.
+    // Gold Dust animation is ON by default (matches new wedding defaults).
     const featureFlags: Record<string, boolean> = {
       countdown: true,
       schedule: true,
@@ -117,6 +118,9 @@ export async function GET() {
       moments: true,
       music: false,
       video: false,
+      'animation:gold-dust': true,
+      'animation:flying-stars': false,
+      'animation:raining': false,
     };
 
     // ── 8. Return PublicWeddingData shape ─────────────────────────────────
