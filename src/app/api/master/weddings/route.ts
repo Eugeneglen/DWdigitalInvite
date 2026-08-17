@@ -229,14 +229,26 @@ export async function POST(req: NextRequest) {
     // Seed the 3 individual animation feature rows.
     // Each animation style is its own WeddingFeature row with featureKey
     // 'animation:gold-dust', 'animation:flying-stars', 'animation:raining'.
-    // The admin's toggle selection from the wizard determines isEnabled.
-    // Couples can later toggle these ON/OFF via their Couple CMS Home page.
+    // Read the admin's toggle settings from the default ContentTemplate's
+    // hero content (set via Template Editor > Home > Ambient Animations).
     const ANIMATION_STYLE_KEYS = ['animation:gold-dust', 'animation:flying-stars', 'animation:raining'];
+    let templateAnimFlags: Record<string, boolean> = {};
+    try {
+      const defaultTemplate = await db.contentTemplate.findFirst({ where: { isDefault: true, isActive: true } });
+      if (defaultTemplate) {
+        const templateContent = JSON.parse(defaultTemplate.content) as { section: string; fieldKey: string; fieldValue: string }[];
+        for (const c of templateContent) {
+          if (c.section === 'hero' && ANIMATION_STYLE_KEYS.includes(c.fieldKey)) {
+            templateAnimFlags[c.fieldKey] = c.fieldValue === 'true';
+          }
+        }
+      }
+    } catch { /* non-blocking */ }
     await db.weddingFeature.createMany({
       data: ANIMATION_STYLE_KEYS.map((key) => ({
         weddingId: wedding.id,
         featureKey: key,
-        isEnabled: enabledFeatures.includes(key),
+        isEnabled: templateAnimFlags[key] ?? (key === 'animation:gold-dust'),
       })),
     }).catch(() => {
       // Defensive — ignore errors if rows already exist

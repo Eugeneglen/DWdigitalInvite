@@ -105,7 +105,16 @@ export async function GET() {
     // ── 7. Feature flags for demo ──────────────────────────────────────
     // Enable all main tabs so visitors can see the full template experience.
     // music/video are disabled since the demo has no real media files.
-    // Gold Dust animation is ON by default (matches new wedding defaults).
+    // Animation flags are read from the template's hero content fields
+    // (set via the Template Editor's "Ambient Animations" toggles).
+    const getAnimFlag = (key: string) => {
+      const val = contentMap['hero']?.[key];
+      // If admin explicitly set a value in the template, use it.
+      // Otherwise fall back to defaults (gold-dust ON, others OFF).
+      if (val !== undefined) return val === 'true';
+      return key === 'animation:gold-dust';
+    };
+
     const featureFlags: Record<string, boolean> = {
       countdown: true,
       schedule: true,
@@ -118,9 +127,9 @@ export async function GET() {
       moments: true,
       music: false,
       video: false,
-      'animation:gold-dust': true,
-      'animation:flying-stars': false,
-      'animation:raining': false,
+      'animation:gold-dust': getAnimFlag('animation:gold-dust'),
+      'animation:flying-stars': getAnimFlag('animation:flying-stars'),
+      'animation:raining': getAnimFlag('animation:raining'),
     };
 
     // ── 8. Return PublicWeddingData shape ─────────────────────────────────
