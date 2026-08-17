@@ -100,6 +100,8 @@ interface TemplateMediaItem {
  * @returns summary of items created, or null if no template was found
  */
 export async function seedDefaultWeddingContent(info: WeddingCreateInfo): Promise<{
+  templateId: string;
+  templateName: string;
   content: number;
   schedule: number;
   faqs: number;
@@ -110,12 +112,36 @@ export async function seedDefaultWeddingContent(info: WeddingCreateInfo): Promis
   const dateDisplay = formatDateDisplay(weddingDate);
 
   // ── Find the default ContentTemplate ──────────────────────────────────
-  const template = await db.contentTemplate.findFirst({
+  // First, look for an explicit default (isDefault: true, isActive: true).
+  // If none exists (e.g. admin forgot to click "Set as Default"), fall back
+  // to the first active template so new weddings are never created empty.
+  let template = await db.contentTemplate.findFirst({
     where: { isDefault: true, isActive: true },
   });
 
   if (!template) {
-    console.error('[wedding-defaults] No default ContentTemplate found — cannot seed content');
+    // Fallback: use the first active template (sorted by sortOrder)
+    template = await db.contentTemplate.findFirst({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    if (template) {
+      console.warn(`[wedding-defaults] No explicit default template found — falling back to first active template: "${template.name}" (${template.id}). Consider setting it as default via the CMS.`);
+      // Auto-promote: mark this template as default so future calls are faster
+      // and the admin sees it correctly in the CMS. Non-blocking.
+      await db.contentTemplate.updateMany({
+        where: { isDefault: true },
+        data: { isDefault: false },
+      }).catch(() => {});
+      await db.contentTemplate.update({
+        where: { id: template.id },
+        data: { isDefault: true },
+      }).catch(() => {});
+    }
+  }
+
+  if (!template) {
+    console.error('[wedding-defaults] No active ContentTemplate found at all — cannot seed content. Please create a template in Admin CMS > Content Templates.');
     return null;
   }
 
@@ -232,6 +258,8 @@ export async function seedDefaultWeddingContent(info: WeddingCreateInfo): Promis
   }
 
   return {
+    templateId: template.id,
+    templateName: template.name,
     content: contentItems.length,
     schedule: scheduleItems.length,
     faqs: faqItems.length,

@@ -234,7 +234,11 @@ export async function POST(req: NextRequest) {
     const ANIMATION_STYLE_KEYS = ['animation:gold-dust', 'animation:flying-stars', 'animation:raining'];
     let templateAnimFlags: Record<string, boolean> = {};
     try {
-      const defaultTemplate = await db.contentTemplate.findFirst({ where: { isDefault: true, isActive: true } });
+      // Same fallback logic as wedding-defaults.ts: try isDefault first, then first active
+      let defaultTemplate = await db.contentTemplate.findFirst({ where: { isDefault: true, isActive: true } });
+      if (!defaultTemplate) {
+        defaultTemplate = await db.contentTemplate.findFirst({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } });
+      }
       if (defaultTemplate) {
         const templateContent = JSON.parse(defaultTemplate.content) as { section: string; fieldKey: string; fieldValue: string }[];
         for (const c of templateContent) {
@@ -256,9 +260,19 @@ export async function POST(req: NextRequest) {
 
     // Seed default content, schedule, FAQs, and stories so the couple has
     // a starting template to customize (rather than an empty shell).
+    let templateSeedResult: {
+      templateId: string;
+      templateName: string;
+      content: number;
+      schedule: number;
+      faqs: number;
+      stories: number;
+      media: number;
+    } | null = null;
+    let templateSeedError: string | null = null;
     try {
       const { seedDefaultWeddingContent } = await import('@/lib/wedding-defaults');
-      await seedDefaultWeddingContent({
+      templateSeedResult = await seedDefaultWeddingContent({
         weddingId: wedding.id,
         coupleName: data.coupleName,
         brideName: data.brideName,
@@ -268,7 +282,12 @@ export async function POST(req: NextRequest) {
         venue: data.venue || null,
         venueAddress: data.venueAddress,
       });
+      if (!templateSeedResult) {
+        templateSeedError = 'No active content template found — wedding created without default content. Please create/set a template in Admin CMS > Content Templates.';
+        console.error(`[master/weddings POST] ${templateSeedError}`);
+      }
     } catch (err) {
+      templateSeedError = err instanceof Error ? err.message : String(err);
       console.error('[master/weddings POST] Default content seed failed (non-blocking):', err);
     }
 
@@ -320,7 +339,7 @@ export async function POST(req: NextRequest) {
       console.error('Onboarding email failed (non-blocking):', emailError);
     }
 
-    // Return wedding + generated credentials
+    // Return wedding + generated credentials + template seed info
     return NextResponse.json({
       wedding,
       credentials: {
@@ -331,6 +350,9 @@ export async function POST(req: NextRequest) {
         jobNumber,
         accessExpiryDate: accessExpiryDate.toISOString(),
       },
+      templateSeed: templateSeedResult
+        ? { applied: true, ...templateSeedResult }
+        : { applied: false, error: templateSeedError || 'Unknown error' },
     }, { status: 201 });
   } catch (error) {
     console.error('Wedding create error:', error);

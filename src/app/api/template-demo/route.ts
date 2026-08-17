@@ -15,9 +15,18 @@ import { db } from '@/lib/db';
 export async function GET() {
   try {
     // ── 1. Fetch the default template ─────────────────────────────────────
-    const template = await db.contentTemplate.findFirst({
+    // First try explicit default, then fall back to first active template
+    // (same resilience logic as wedding-defaults.ts)
+    let template = await db.contentTemplate.findFirst({
       where: { isDefault: true, isActive: true },
     });
+
+    if (!template) {
+      template = await db.contentTemplate.findFirst({
+        where: { isActive: true },
+        orderBy: { sortOrder: 'asc' },
+      });
+    }
 
     if (!template) {
       return NextResponse.json({ error: 'No default template set' }, { status: 404 });
