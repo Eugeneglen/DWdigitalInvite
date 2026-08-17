@@ -2593,24 +2593,31 @@ function PreviewPanel({ data }: { data: TemplateData }) {
   // rendered as an intro paragraph inside each section instead).
   // Uses useImageAutoContrast for dynamic text colour (same as gold standard
   // SectionBanner.tsx). No gradient overlay — the hook picks readable text.
-  const renderSectionBanner = (title: string) => (
-    <div
-      className="relative w-full flex items-center justify-center"
-      style={{
-        ...(bannerUrl ? { backgroundImage: `url('${bannerUrl}')`, backgroundSize: 'cover', backgroundPosition: 'center' } : { backgroundColor: `${accent}22` }),
-        height: '420px',
-      }}
-    >
-      <div className="relative z-10 text-center px-6">
-        <h1
-          className="text-[44px] md:text-[72px] leading-[1.05] tracking-tight font-bold drop-shadow-sm"
-          style={{ fontFamily: headingFont, color: bannerTextColor, textShadow: bannerTextShadow }}
-        >
-          {title}
-        </h1>
+  const renderSectionBanner = (title: string) => {
+    if (!bannerUrl && !title) return null;
+    return (
+      <div
+        className="relative w-full flex items-center justify-center"
+        style={{
+          ...(bannerUrl ? { backgroundImage: `url('${bannerUrl}')`, backgroundSize: 'cover', backgroundPosition: 'center' } : { backgroundColor: `${accent}22` }),
+          height: bannerUrl ? '420px' : 'auto',
+          minHeight: title ? '200px' : '0',
+          padding: bannerUrl ? '0' : '60px 24px',
+        }}
+      >
+        <div className="relative z-10 text-center px-6">
+          {title && (
+            <h1
+              className="text-[44px] md:text-[72px] leading-[1.05] tracking-tight font-bold drop-shadow-sm"
+              style={{ fontFamily: headingFont, color: bannerTextColor, textShadow: bannerTextShadow }}
+            >
+              {title}
+            </h1>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="rounded-xl border border-charcoal-ink/10 overflow-hidden shadow-sm">
@@ -2619,96 +2626,76 @@ function PreviewPanel({ data }: { data: TemplateData }) {
         style={{ backgroundColor: bg, color: text, fontFamily: bodyFont }}
       >
         {/* ===== TOP BANNER (full-bleed background image with couple name) ===== */}
-        {/* No gradient overlay — uses useImageAutoContrast to pick text colour */}
-        {/* that matches the image brightness (same as gold standard HomePage). */}
-        <div
-          className="relative w-full flex items-center justify-center"
-          style={{
-            ...(bannerUrl ? { backgroundImage: `url('${bannerUrl}')`, backgroundSize: 'cover', backgroundPosition: 'center' } : { backgroundColor: `${accent}22` }),
-            height: '420px',
-          }}
-        >
-          <div className="relative z-10 text-center px-6">
-            <h1
-              className="text-[44px] md:text-[72px] leading-[1.05] tracking-tight font-bold drop-shadow-sm"
-              style={{ fontFamily: headingFont, color: bannerTextColor, textShadow: bannerTextShadow }}
-            >
-              {heroTitle}
-            </h1>
-            {heroSubtitle && (
-              <p
-                className="mt-2 text-sm md:text-base italic tracking-wide"
-                style={{ color: bannerSubtitleColor }}
-              >
-                {heroSubtitle}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* ===== HERO PORTRAIT (full-bleed image + date + description + countdown) ===== */}
-        {/* No gradient overlay — matches gold standard HomePage which renders the */}
-        {/* raw hero image with cream text (hero images are always dark portraits). */}
-        <div className="relative w-full overflow-hidden" style={{ height: '520px', backgroundColor: heroImageUrl ? undefined : '#2C2C2C' }}>
-          {heroImageUrl && (
-            <img
-              src={heroImageUrl}
-              alt="Hero Wedding Portrait"
-              className="absolute inset-0 w-full h-full object-cover object-center"
-            />
-          )}
-          <div className="relative z-10 h-full w-full px-8 pb-12 flex flex-col items-center justify-end text-center">
-            {/* Date badge */}
-            {dateDisplay && (
-              <div className="mb-6 inline-flex items-center justify-center border border-champagne-silk/60 px-5 py-1.5 rounded-full bg-white/10 backdrop-blur-sm">
-                <span
-                  className="text-[10px] md:text-xs tracking-[0.2em] uppercase font-semibold"
-                  style={{ color: '#FFF8E7' }}
+        {/* Only renders when there is a banner image or hero title */}
+        {(bannerUrl || heroTitle) && (
+          <div
+            className="relative w-full flex items-center justify-center"
+            style={{
+              ...(bannerUrl ? { backgroundImage: `url('${bannerUrl}')`, backgroundSize: 'cover', backgroundPosition: 'center' } : { backgroundColor: `${accent}22` }),
+              height: bannerUrl ? '420px' : 'auto',
+              minHeight: heroTitle ? '200px' : '0',
+              padding: bannerUrl ? '0' : '60px 24px',
+            }}
+          >
+            <div className="relative z-10 text-center px-6">
+              {heroTitle && (
+                <h1
+                  className="text-[44px] md:text-[72px] leading-[1.05] tracking-tight font-bold drop-shadow-sm"
+                  style={{ fontFamily: headingFont, color: bannerTextColor, textShadow: bannerTextShadow }}
                 >
-                  {dateDisplay}
-                </span>
-              </div>
-            )}
-            {/* Description */}
-            {heroDescription && (
-              <p
-                className="max-w-md mx-auto mb-8 italic text-sm md:text-base"
-                style={{ color: 'rgba(255,248,231,0.85)' }}
-              >
-                {heroDescription}
-              </p>
-            )}
-            {/* Countdown */}
-            <div className="grid grid-cols-4 gap-2 md:gap-3 w-full max-w-md mx-auto">
-              {[
-                { value: countdown.days, label: 'DAYS' },
-                { value: countdown.hours, label: 'HOURS' },
-                { value: countdown.mins, label: 'MINS' },
-                { value: countdown.secs, label: 'SECS' },
-              ].map((item) => (
-                <div
-                  key={item.label}
-                  className="flex flex-col items-center justify-center rounded-lg border border-champagne-silk/50 bg-white/10 backdrop-blur-sm py-3 md:py-4"
+                  {heroTitle}
+                </h1>
+              )}
+              {heroSubtitle && (
+                <p
+                  className="mt-2 text-sm md:text-base italic tracking-wide"
+                  style={{ color: bannerSubtitleColor }}
                 >
-                  <span
-                    className="text-2xl md:text-3xl font-bold leading-none"
-                    style={{ fontFamily: headingFont, color: '#FFF8E7' }}
-                  >
-                    {String(item.value).padStart(2, '0')}
-                  </span>
-                  <span
-                    className="text-[9px] md:text-[10px] tracking-widest uppercase mt-2 font-semibold"
-                    style={{ color: 'rgba(255,248,231,0.8)' }}
-                  >
-                    {item.label}
-                  </span>
-                </div>
-              ))}
+                  {heroSubtitle}
+                </p>
+              )}
             </div>
           </div>
-        </div>
+        )}
+
+        {/* ===== HERO PORTRAIT (full-bleed image + date + description + countdown) ===== */}
+        {/* Only renders when there is a hero image, date, or description */}
+        {(heroImageUrl || dateDisplay || heroDescription) && (
+          <div className="relative w-full overflow-hidden" style={{ height: heroImageUrl ? '520px' : 'auto', backgroundColor: heroImageUrl ? undefined : '#2C2C2C' }}>
+            {heroImageUrl && (
+              <img
+                src={heroImageUrl}
+                alt="Hero Wedding Portrait"
+                className="absolute inset-0 w-full h-full object-cover object-center"
+              />
+            )}
+            <div className="relative z-10 h-full w-full px-8 pb-12 flex flex-col items-center justify-end text-center" style={{ minHeight: heroImageUrl ? undefined : 'auto', padding: heroImageUrl ? undefined : '40px 32px' }}>
+              {/* Date badge */}
+              {dateDisplay && (
+                <div className="mb-6 inline-flex items-center justify-center border border-champagne-silk/60 px-5 py-1.5 rounded-full bg-white/10 backdrop-blur-sm">
+                  <span
+                    className="text-[10px] md:text-xs tracking-[0.2em] uppercase font-semibold"
+                    style={{ color: '#FFF8E7' }}
+                  >
+                    {dateDisplay}
+                  </span>
+                </div>
+              )}
+              {/* Description */}
+              {heroDescription && (
+                <p
+                  className="max-w-md mx-auto mb-8 italic text-sm md:text-base"
+                  style={{ color: 'rgba(255,248,231,0.85)' }}
+                >
+                  {heroDescription}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ===== TEA CEREMONY (image on top + label + title + body, vertical) ===== */}
+        {(teaCeremonyImage || teaCeremonyTitle) && (
         <section className="py-14 px-6 md:px-10 max-w-5xl mx-auto">
           <div className="flex flex-col items-center gap-8">
             {teaCeremonyImage && (
@@ -2723,18 +2710,22 @@ function PreviewPanel({ data }: { data: TemplateData }) {
               </div>
             )}
             <div className="w-full max-w-2xl text-center">
+              {teaCeremonyLabel && (
               <span
                 className="block mb-2 text-[10px] md:text-xs uppercase tracking-[0.2em] font-semibold"
                 style={{ color: accent, fontFamily: headingFont }}
               >
                 {teaCeremonyLabel}
               </span>
+              )}
+              {teaCeremonyTitle && (
               <h3
                 className="text-[48px] font-semibold mb-4 leading-[1.1]"
                 style={{ fontFamily: headingFont, color: text }}
               >
                 {teaCeremonyTitle}
               </h3>
+              )}
               {teaCeremonyBody && (
                 <p
                   className="text-sm md:text-base leading-relaxed max-w-xl mx-auto"
@@ -2746,32 +2737,41 @@ function PreviewPanel({ data }: { data: TemplateData }) {
             </div>
           </div>
         </section>
+        )}
 
         {/* ===== NARRATIVE (label + title + body, centered) ===== */}
+        {narrativeTitle && (
         <section
           className="py-14 px-6 md:px-10 max-w-3xl mx-auto text-center"
         >
+          {narrativeLabel && (
           <span
             className="block mb-3 text-[10px] md:text-xs uppercase tracking-[0.2em] font-semibold"
             style={{ color: accent, fontFamily: headingFont }}
           >
             {narrativeLabel}
           </span>
+          )}
           <h3
             className="text-[48px] font-semibold mb-4 leading-[1.1]"
             style={{ fontFamily: headingFont, color: text }}
           >
             {narrativeTitle}
           </h3>
+          {narrativeBody && (
           <p
             className="text-sm md:text-base leading-relaxed max-w-2xl mx-auto"
             style={{ color: bodyTextColor, fontFamily: bodyFont }}
           >
             {narrativeBody}
           </p>
+          )}
         </section>
+        )}
 
         {/* ===== SCHEDULE (section banner + timeline of events) ===== */}
+        {(schedule.length > 0 || scheduleTitle || scheduleImages.length > 0 || scheduleSubtitle || dateDisplay) && (
+        <>
         {renderSectionBanner(scheduleTitle)}
         <section className="py-14 px-6 md:px-10 max-w-3xl mx-auto">
           {/* Schedule intro portraits (2 images side-by-side) */}
@@ -2857,15 +2857,12 @@ function PreviewPanel({ data }: { data: TemplateData }) {
           )}
           
           {/* Wedding Venue section */}
-          {(venueImage || venueDescription) && (
+          {(venueImage || venueName || venueDescription) && (
             <div className="mt-16 pt-12 border-t" style={{ borderColor: `${muted}33` }}>
-              <span className="block mb-2 text-[10px] md:text-xs uppercase tracking-[0.2em] font-semibold text-center" style={{ color: accent, fontFamily: headingFont }}>
-                Wedding Venue
-              </span>
               {venueName && (
-                <h3 className="text-[48px] font-semibold mb-6 text-center leading-[1.1]" style={{ fontFamily: headingFont, color: text }}>
-                  {venueName}
-                </h3>
+              <h3 className="text-[48px] font-semibold mb-6 text-center leading-[1.1]" style={{ fontFamily: headingFont, color: text }}>
+                {venueName}
+              </h3>
               )}
               {venueImage && (
                 <div className="aspect-[4/3] w-full overflow-hidden rounded-lg shadow-xl mb-6">
@@ -2880,8 +2877,12 @@ function PreviewPanel({ data }: { data: TemplateData }) {
             </div>
           )}
         </section>
+        </>
+        )}
 
         {/* ===== STORY (section banner + zigzag timeline of chapters) ===== */}
+        {(stories.length > 0 || storyTitle || storyImages.length > 0 || storySubtitle || (tidbitsEnabled && tidbits.length > 0) || (honeymoonEnabled && honeymoonDestinations.length > 0)) && (
+        <>
         {renderSectionBanner(storyTitle)}
         <section className="py-14 px-6 md:px-10 max-w-4xl mx-auto">
           {/* Story hero image (16:9) */}
@@ -2980,9 +2981,11 @@ function PreviewPanel({ data }: { data: TemplateData }) {
           {/* Tidbits section (Did You Know?) */}
           {tidbitsEnabled && tidbits.length > 0 && (
             <div className="mt-16 pt-12 border-t" style={{ borderColor: `${muted}33` }}>
+              {tidbitsTitle && (
               <h3 className="text-[48px] font-semibold mb-4 text-center leading-[1.1]" style={{ fontFamily: headingFont, color: text }}>
                 {tidbitsTitle}
               </h3>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
                 {tidbits.map((t, idx) => (
                   <div
@@ -3032,8 +3035,12 @@ function PreviewPanel({ data }: { data: TemplateData }) {
             </div>
           )}
         </section>
+        </>
+        )}
 
         {/* ===== MOMENTS (section banner + masonry gallery) ===== */}
+        {(momentsMedia.length > 0 || momentsTitle || momentsSubtitle) && (
+        <>
         {renderSectionBanner(momentsTitle)}
         <section className="py-14 px-6 md:px-10 max-w-5xl mx-auto">
           {momentsSubtitle && (
@@ -3062,8 +3069,12 @@ function PreviewPanel({ data }: { data: TemplateData }) {
             </div>
           )}
         </section>
+        </>
+        )}
 
         {/* ===== FAQ (section banner + accordion list of Q&A) ===== */}
+        {(faqs.length > 0 || qaTitle || qaSubtitle) && (
+        <>
         {renderSectionBanner(qaTitle)}
         <section className="py-14 px-6 md:px-10 max-w-3xl mx-auto">
           {qaSubtitle && (
@@ -3126,35 +3137,16 @@ function PreviewPanel({ data }: { data: TemplateData }) {
             </div>
           )}
         </section>
+        </>
+        )}
 
-
-
-        {/* ===== FOOTER (links + copyright) ===== */}
+        {/* ===== FOOTER ===== */}
         <footer
           className="py-12 px-6"
           style={{ borderTop: `1px solid ${muted}33`, backgroundColor: bg }}
         >
-          <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex flex-wrap items-center justify-center gap-4">
-              {['Contact Concierge', 'Privacy Policy', 'Data Protection', 'Terms of Service'].map((link) => (
-                <span
-                  key={link}
-                  className="text-[10px] uppercase tracking-[0.2em] font-semibold cursor-pointer hover:opacity-70 transition-opacity"
-                  style={{ color: bodyTextColor, fontFamily: bodyFont }}
-                >
-                  {link}
-                </span>
-              ))}
-            </div>
-            <p
-              className="text-[10px] uppercase tracking-[0.2em] font-semibold"
-              style={{ color: bodyTextColor, fontFamily: bodyFont }}
-            >
-              © {new Date().getFullYear()} Dreamweavers Digital Heirlooms
-            </p>
-          </div>
           <p
-            className="text-center text-[9px] uppercase tracking-[0.2em] mt-6 opacity-50"
+            className="text-center text-[9px] uppercase tracking-[0.2em] opacity-50"
             style={{ color: bodyTextColor, fontFamily: bodyFont }}
           >
             Template Preview · {data.name}
