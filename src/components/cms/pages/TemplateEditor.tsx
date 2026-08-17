@@ -2523,10 +2523,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
   const secondary = theme.colors.secondary;
   const muted = theme.colors.muted;
   const headingFont = `'${theme.fonts.heading}', serif`;
-  // Gold standard's globals.css overrides .font-body-md to use Playfair Display
-  // (the heading font) regardless of theme.fonts.body. Match that behavior here
-  // so the preview accurately reflects what the guest site renders.
-  const bodyFont = `'${theme.fonts.heading}', serif`;
+  const bodyFont = `'${theme.fonts.body}', serif`;
   // Gold standard uses text-charcoal-ink/80 (dark gray at 80% opacity) for body text.
   // The theme's `text` color (#2C2C2C for Classic Elegance) is the closest match.
   const bodyTextColor = text;
