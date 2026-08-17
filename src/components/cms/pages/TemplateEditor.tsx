@@ -104,13 +104,13 @@ const HOME_FIELDS: { key: string; label: string; type: 'text' | 'textarea' | 'im
   { key: 'teaCeremonyLabel', label: 'Tea Ceremony Label', type: 'text', placeholder: 'The Tradition' },
   { key: 'teaCeremonyTitle', label: 'Tea Ceremony Title', type: 'text', placeholder: 'The Tea Ceremony' },
   { key: 'teaCeremonyBody', label: 'Tea Ceremony Body', type: 'textarea', placeholder: 'A sacred tradition...' },
-  { key: 'teaCeremonyImage', label: 'Tea Ceremony Image', type: 'image', placeholder: '/wedding-images/tea-ceremony.png' },
+  { key: 'teaCeremonyImage', label: 'Tea Ceremony Image', type: 'image', placeholder: '' },
 ];
 
 // Hero/Banner images stored on WeddingAccount (not WeddingContent)
-const HERO_VISUAL_FIELDS: { key: string; label: string; aspect: string; maxWidth: string; placeholder: string }[] = [
-  { key: 'heroImageUrl', label: 'Hero Visual (Full-bleed image)', aspect: 'aspect-[16/9]', maxWidth: '480px', placeholder: '/wedding-images/hero-portrait.png' },
-  { key: 'bannerUrl', label: 'Banner Image', aspect: 'aspect-[21/9]', maxWidth: '480px', placeholder: '/wedding-images/banner-bg.png' },
+const HERO_VISUAL_FIELDS: { key: string; label: string; aspect: string; maxWidth: string }[] = [
+  { key: 'heroImageUrl', label: 'Hero Visual (Full-bleed image)', aspect: 'aspect-[16/9]', maxWidth: '480px' },
+  { key: 'bannerUrl', label: 'Banner Image', aspect: 'aspect-[21/9]', maxWidth: '480px' },
 ];
 
 const GETTING_THERE_FIELDS: { key: string; label: string; type: 'text' | 'textarea'; placeholder?: string }[] = [
@@ -2475,8 +2475,8 @@ function PreviewPanel({ data }: { data: TemplateData }) {
   const heroDescription = getField('hero', 'description', 'Together with their families, request the pleasure of your company');
   const dateDisplay = getField('hero', 'dateDisplay', 'Saturday, 25th December 2027');
   const countdownDate = getField('hero', 'countdownDate', '');
-  const heroImageUrl = getField('hero', 'heroImageUrl', '/wedding-images/hero-portrait.png');
-  const bannerUrl = getField('hero', 'bannerUrl', '/wedding-images/banner-bg.png');
+  const heroImageUrl = getField('hero', 'heroImageUrl', '');
+  const bannerUrl = getField('hero', 'bannerUrl', '');
 
   // Auto-contrast: sample the banner image pixels to pick readable text colour.
   // Same hook the gold standard uses — dynamically picks dark text for bright
@@ -2485,7 +2485,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
   const { textColor: bannerTextColor, subtitleColor: bannerSubtitleColor, textShadow: bannerTextShadow } = useImageAutoContrast(bannerUrl);
 
   // ── Tea ceremony content ───────────────────────────────────────────────
-  const teaCeremonyImage = getField('hero', 'teaCeremonyImage', '/wedding-images/tea-ceremony.png');
+  const teaCeremonyImage = getField('hero', 'teaCeremonyImage', '');
   const teaCeremonyLabel = getField('hero', 'teaCeremonyLabel', 'The Tradition');
   const teaCeremonyTitle = getField('hero', 'teaCeremonyTitle', 'The Tea Ceremony');
   const teaCeremonyBody = getField('hero', 'teaCeremonyBody', 'A sacred tradition where we honour our elders and receive their blessings with cups of tea served on bended knee.');
@@ -2595,8 +2595,11 @@ function PreviewPanel({ data }: { data: TemplateData }) {
   // SectionBanner.tsx). No gradient overlay — the hook picks readable text.
   const renderSectionBanner = (title: string) => (
     <div
-      className="relative w-full bg-cover bg-center flex items-center justify-center"
-      style={{ backgroundImage: `url('${bannerUrl}')`, height: '420px' }}
+      className="relative w-full flex items-center justify-center"
+      style={{
+        ...(bannerUrl ? { backgroundImage: `url('${bannerUrl}')`, backgroundSize: 'cover', backgroundPosition: 'center' } : { backgroundColor: `${accent}22` }),
+        height: '420px',
+      }}
     >
       <div className="relative z-10 text-center px-6">
         <h1
@@ -2619,8 +2622,11 @@ function PreviewPanel({ data }: { data: TemplateData }) {
         {/* No gradient overlay — uses useImageAutoContrast to pick text colour */}
         {/* that matches the image brightness (same as gold standard HomePage). */}
         <div
-          className="relative w-full bg-cover bg-center flex items-center justify-center"
-          style={{ backgroundImage: `url('${bannerUrl}')`, height: '420px' }}
+          className="relative w-full flex items-center justify-center"
+          style={{
+            ...(bannerUrl ? { backgroundImage: `url('${bannerUrl}')`, backgroundSize: 'cover', backgroundPosition: 'center' } : { backgroundColor: `${accent}22` }),
+            height: '420px',
+          }}
         >
           <div className="relative z-10 text-center px-6">
             <h1
@@ -2643,12 +2649,14 @@ function PreviewPanel({ data }: { data: TemplateData }) {
         {/* ===== HERO PORTRAIT (full-bleed image + date + description + countdown) ===== */}
         {/* No gradient overlay — matches gold standard HomePage which renders the */}
         {/* raw hero image with cream text (hero images are always dark portraits). */}
-        <div className="relative w-full overflow-hidden" style={{ height: '520px' }}>
-          <img
-            src={heroImageUrl}
-            alt="Hero Wedding Portrait"
-            className="absolute inset-0 w-full h-full object-cover object-center"
-          />
+        <div className="relative w-full overflow-hidden" style={{ height: '520px', backgroundColor: heroImageUrl ? undefined : '#2C2C2C' }}>
+          {heroImageUrl && (
+            <img
+              src={heroImageUrl}
+              alt="Hero Wedding Portrait"
+              className="absolute inset-0 w-full h-full object-cover object-center"
+            />
+          )}
           <div className="relative z-10 h-full w-full px-8 pb-12 flex flex-col items-center justify-end text-center">
             {/* Date badge */}
             {dateDisplay && (
@@ -2703,15 +2711,17 @@ function PreviewPanel({ data }: { data: TemplateData }) {
         {/* ===== TEA CEREMONY (image on top + label + title + body, vertical) ===== */}
         <section className="py-14 px-6 md:px-10 max-w-5xl mx-auto">
           <div className="flex flex-col items-center gap-8">
-            <div className="w-full max-w-2xl">
-              <div className="aspect-[4/5] w-full overflow-hidden rounded-lg shadow-xl group">
-                <img
-                  src={teaCeremonyImage}
-                  alt={teaCeremonyTitle}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                />
+            {teaCeremonyImage && (
+              <div className="w-full max-w-2xl">
+                <div className="aspect-[4/5] w-full overflow-hidden rounded-lg shadow-xl group">
+                  <img
+                    src={teaCeremonyImage}
+                    alt={teaCeremonyTitle}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                </div>
               </div>
-            </div>
+            )}
             <div className="w-full max-w-2xl text-center">
               <span
                 className="block mb-2 text-[10px] md:text-xs uppercase tracking-[0.2em] font-semibold"
