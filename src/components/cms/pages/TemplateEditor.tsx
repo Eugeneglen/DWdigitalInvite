@@ -2470,10 +2470,10 @@ function PreviewPanel({ data }: { data: TemplateData }) {
     content.find((c) => c.section === section && c.fieldKey === key)?.fieldValue || fallback;
 
   // ── Hero content ───────────────────────────────────────────────────────
-  const heroTitle = getField('hero', 'title', 'Couple Name');
-  const heroSubtitle = getField('hero', 'subtitle', 'Together with their families');
-  const heroDescription = getField('hero', 'description', 'Together with their families, request the pleasure of your company');
-  const dateDisplay = getField('hero', 'dateDisplay', 'Saturday, 25th December 2027');
+  const heroTitle = getField('hero', 'title', '');
+  const heroSubtitle = getField('hero', 'subtitle', '');
+  const heroDescription = getField('hero', 'description', '');
+  const dateDisplay = getField('hero', 'dateDisplay', '');
   const countdownDate = getField('hero', 'countdownDate', '');
   const heroImageUrl = getField('hero', 'heroImageUrl', '');
   const bannerUrl = getField('hero', 'bannerUrl', '');
@@ -2486,35 +2486,35 @@ function PreviewPanel({ data }: { data: TemplateData }) {
 
   // ── Tea ceremony content ───────────────────────────────────────────────
   const teaCeremonyImage = getField('hero', 'teaCeremonyImage', '');
-  const teaCeremonyLabel = getField('hero', 'teaCeremonyLabel', 'The Tradition');
-  const teaCeremonyTitle = getField('hero', 'teaCeremonyTitle', 'The Tea Ceremony');
-  const teaCeremonyBody = getField('hero', 'teaCeremonyBody', 'A sacred tradition where we honour our elders and receive their blessings with cups of tea served on bended knee.');
+  const teaCeremonyLabel = getField('hero', 'teaCeremonyLabel', '');
+  const teaCeremonyTitle = getField('hero', 'teaCeremonyTitle', '');
+  const teaCeremonyBody = getField('hero', 'teaCeremonyBody', '');
 
   // ── Narrative content ──────────────────────────────────────────────────
-  const narrativeLabel = getField('hero', 'narrativeLabel', 'The Prelude');
-  const narrativeTitle = getField('hero', 'narrativeTitle', 'Our Story Begins Here');
-  const narrativeBody = getField('hero', 'narrativeBody', 'Every great romance is a narrative woven over time. Ours began with a serendipitous meeting and has evolved into a tapestry of shared adventures, quiet moments, and a profound commitment to one another.');
+  const narrativeLabel = getField('hero', 'narrativeLabel', '');
+  const narrativeTitle = getField('hero', 'narrativeTitle', '');
+  const narrativeBody = getField('hero', 'narrativeBody', '');
 
   // ── Section titles & subtitles ─────────────────────────────────────────
-  const scheduleTitle = getField('schedule', 'title', 'The Day');
-  const scheduleSubtitle = getField('schedule', 'subtitle', 'The Celebration');
-  const storyTitle = getField('story', 'title', 'Our Story');
-  const storySubtitle = getField('story', 'subtitle', 'A narrative woven through time, capturing the moments that led us here.');
+  const scheduleTitle = getField('schedule', 'title', '');
+  const scheduleSubtitle = getField('schedule', 'subtitle', '');
+  const storyTitle = getField('story', 'title', '');
+  const storySubtitle = getField('story', 'subtitle', '');
   // Tidbits + honeymoon data (read from template content JSON fields)
   const tidbitsEnabled = getField('story', 'tidbitsEnabled') !== 'false';
-  const tidbitsTitle = getField('story', 'tidbitsTitle', 'Did You Know?');
+  const tidbitsTitle = getField('story', 'tidbitsTitle', '');
   const tidbits: { q: string; a: string }[] = (() => {
     try { return JSON.parse(getField('story', 'tidbits') || '[]'); } catch { return []; }
   })();
   const honeymoonEnabled = getField('story', 'honeymoonEnabled') !== 'false';
-  const honeymoonEyebrow = getField('story', 'honeymoonEyebrow', 'Where should we go?');
+  const honeymoonEyebrow = getField('story', 'honeymoonEyebrow', '');
   const honeymoonDestinations: { name: string }[] = (() => {
     try { return JSON.parse(getField('story', 'honeymoonDestinations') || '[]'); } catch { return []; }
   })();
-  const momentsTitle = getField('moments', 'title', 'Moments');
-  const momentsSubtitle = getField('moments', 'subtitle', 'The Journey Before the I Do—from childhood dreams to our first steps together.');
-  const qaTitle = getField('qa', 'title', 'Questions & Answers');
-  const qaSubtitle = getField('qa', 'subtitle', 'Everything you need to know for our celebration.');
+  const momentsTitle = getField('moments', 'title', '');
+  const momentsSubtitle = getField('moments', 'subtitle', '');
+  const qaTitle = getField('qa', 'title', '');
+  const qaSubtitle = getField('qa', 'subtitle', '');
 
   // ── Theme tokens ───────────────────────────────────────────────────────
   const bg = theme.colors.bg;
