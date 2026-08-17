@@ -6,13 +6,16 @@
  * (to keep the template lightweight), and stores everything as JSON in the
  * ContentTemplate table.
  *
+ * IMPORTANT: This script only creates the template if NO default template
+ * already exists. It will NEVER overwrite admin customizations made via the
+ * CMS Template Editor. This protects the admin's work across Railway
+ * redeployments.
+ *
  * Theme is extracted from the wedding's `global` section WeddingContent rows
  * (matching the reverse of wedding-defaults.ts apply logic).
  *
  * Hero/banner URLs from WeddingAccount columns are injected into the content
  * JSON so they get applied to new weddings.
- *
- * Idempotent — uses upsert by name.
  *
  * Usage: bun run scripts/seed-content-templates.ts
  */
@@ -217,22 +220,34 @@ async function main() {
     console.log(`  ✓ Hero video URL injected`);
   }
 
-  // ── 8. Upsert the ContentTemplate ─────────────────────────────────────
-  const template = await db.contentTemplate.upsert({
+  // ── 8. Create the ContentTemplate (only if no default exists) ────
+  // Never overwrite admin customizations. If a default template already
+  // exists (created via CMS or a previous seed), skip entirely.
+  const existingDefault = await db.contentTemplate.findFirst({
+    where: { isDefault: true, isActive: true },
+  });
+
+  if (existingDefault) {
+    const contentCount = JSON.parse(existingDefault.content || '[]').length;
+    console.log('');
+    console.log(`⏭️  Default template already exists: "${existingDefault.name}" (${contentCount} content items) — skipping to preserve admin customizations.`);
+    await db.$disconnect();
+    return;
+  }
+
+  // Also check if our named template already exists (but is not default)
+  const existingNamed = await db.contentTemplate.findUnique({
     where: { name: TEMPLATE_NAME },
-    update: {
-      description: 'Timeless cream and gold palette with elegant serif typography. The default template for all new couples.',
-      isDefault: true,
-      isActive: true,
-      sortOrder: 1,
-      content: JSON.stringify(contentCleaned),
-      schedule: JSON.stringify(scheduleItems),
-      faqs: JSON.stringify(faqItems),
-      stories: JSON.stringify(storiesCleaned),
-      media: JSON.stringify(mediaCleaned),
-      theme: JSON.stringify(themeData),
-    },
-    create: {
+  });
+  if (existingNamed) {
+    console.log('');
+    console.log(`⏭️  Template "${TEMPLATE_NAME}" already exists but is not the default — skipping.`);
+    await db.$disconnect();
+    return;
+  }
+
+  const template = await db.contentTemplate.create({
+    data: {
       name: TEMPLATE_NAME,
       description: 'Timeless cream and gold palette with elegant serif typography. The default template for all new couples.',
       isDefault: true,
