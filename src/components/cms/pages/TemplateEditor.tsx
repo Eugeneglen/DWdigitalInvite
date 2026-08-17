@@ -1593,19 +1593,13 @@ export default function TemplateEditor() {
                   <span className="inline-block size-1.5 rounded-full bg-cinematic-gold ml-1.5 align-middle" title="Modified" />
                 )}
               </h3>
-              <p className="text-xs text-charcoal-ink/40">39 categorised fonts with live preview. Click a font to apply it instantly to the template.</p>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <p className="text-xs text-charcoal-ink/40">Choose the headline font for section banners across all pages. All other text uses Playfair Display with auto-contrast.</p>
+              <div className="max-w-lg">
                 <TemplateFontPicker
-                  label="Heading Font"
+                  label="Banner Headline Font"
                   value={data.theme.fonts.heading}
                   onChange={(v) => updateThemeFont('heading', v)}
                   previewText="Eleanor & James"
-                />
-                <TemplateFontPicker
-                  label="Body Font"
-                  value={data.theme.fonts.body}
-                  onChange={(v) => updateThemeFont('body', v)}
-                  previewText="Together with their families"
                 />
               </div>
             </CardContent>
@@ -1631,7 +1625,7 @@ export default function TemplateEditor() {
                 <span className="font-mono text-charcoal-ink">{data.theme.colors.accent}</span>
               </div>
               <div>
-                <span className="text-charcoal-ink/50">Heading Font:</span>{' '}
+                <span className="text-charcoal-ink/50">Banner Font:</span>{' '}
                 <span className="text-charcoal-ink">{data.theme.fonts.heading}</span>
               </div>
             </div>
@@ -2522,11 +2516,12 @@ function PreviewPanel({ data }: { data: TemplateData }) {
   const accent = theme.colors.accent;
   const secondary = theme.colors.secondary;
   const muted = theme.colors.muted;
-  const headingFont = `'${theme.fonts.heading}', serif`;
-  const bodyFont = `'${theme.fonts.body}', serif`;
-  // Gold standard uses text-charcoal-ink/80 (dark gray at 80% opacity) for body text.
-  // The theme's `text` color (#2C2C2C for Classic Elegance) is the closest match.
-  const bodyTextColor = text;
+  // Banner headlines use the admin-chosen heading font; everything else is Playfair Display.
+  const bannerFont = `'${theme.fonts.heading}', serif`;
+  const BODY_FONT = "'Playfair Display', serif";
+  // Auto-contrast: compute readable text colour from the background luminance.
+  const autoTextColor = getAutoTextColor(bg);
+
 
   // ── Filtered media (moments gallery) ───────────────────────────────────
   const momentsMedia = media.filter((m) => m.category === 'moments');
@@ -2608,7 +2603,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
           {title && (
             <h1
               className="text-[44px] md:text-[72px] leading-[1.05] tracking-tight font-bold drop-shadow-sm"
-              style={{ fontFamily: headingFont, color: bannerTextColor, textShadow: bannerTextShadow }}
+              style={{ fontFamily: bannerFont, color: bannerTextColor, textShadow: bannerTextShadow }}
             >
               {title}
             </h1>
@@ -2622,7 +2617,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
     <div className="rounded-xl border border-charcoal-ink/10 overflow-hidden shadow-sm">
       <div
         className="max-h-[600px] overflow-y-auto"
-        style={{ backgroundColor: bg, color: text, fontFamily: bodyFont }}
+        style={{ backgroundColor: bg, color: autoTextColor, fontFamily: BODY_FONT }}
       >
         {/* ===== TOP BANNER (full-bleed background image with couple name) ===== */}
         {/* Only renders when there is a banner image */}
@@ -2640,7 +2635,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
               {heroTitle && (
                 <h1
                   className="text-[44px] md:text-[72px] leading-[1.05] tracking-tight font-bold drop-shadow-sm"
-                  style={{ fontFamily: headingFont, color: bannerTextColor, textShadow: bannerTextShadow }}
+                  style={{ fontFamily: bannerFont, color: bannerTextColor, textShadow: bannerTextShadow }}
                 >
                   {heroTitle}
                 </h1>
@@ -2661,12 +2656,12 @@ function PreviewPanel({ data }: { data: TemplateData }) {
           <div className="text-center py-16 px-6">
             <h1
               className="text-[44px] md:text-[72px] leading-[1.05] tracking-tight font-bold"
-              style={{ fontFamily: headingFont, color: text }}
+              style={{ fontFamily: bannerFont, color: autoTextColor }}
             >
               {heroTitle}
             </h1>
             {heroSubtitle && (
-              <p className="mt-2 text-sm md:text-base italic tracking-wide" style={{ color: bodyTextColor }}>
+              <p className="mt-2 text-sm md:text-base italic tracking-wide" style={{ color: autoTextColor }}>
                 {heroSubtitle}
               </p>
             )}
@@ -2728,7 +2723,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
               {teaCeremonyLabel && (
               <span
                 className="block mb-2 text-[10px] md:text-xs uppercase tracking-[0.2em] font-semibold"
-                style={{ color: accent, fontFamily: headingFont }}
+                style={{ color: accent, fontFamily: BODY_FONT }}
               >
                 {teaCeremonyLabel}
               </span>
@@ -2736,7 +2731,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
               {teaCeremonyTitle && (
               <h3
                 className="text-[48px] font-semibold mb-4 leading-[1.1]"
-                style={{ fontFamily: headingFont, color: text }}
+                style={{ fontFamily: BODY_FONT, color: autoTextColor }}
               >
                 {teaCeremonyTitle}
               </h3>
@@ -2744,7 +2739,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
               {teaCeremonyBody && (
                 <p
                   className="text-sm md:text-base leading-relaxed max-w-xl mx-auto"
-                  style={{ color: bodyTextColor, fontFamily: bodyFont }}
+                  style={{ color: autoTextColor, fontFamily: BODY_FONT }}
                 >
                   {teaCeremonyBody}
                 </p>
@@ -2762,21 +2757,21 @@ function PreviewPanel({ data }: { data: TemplateData }) {
           {narrativeLabel && (
           <span
             className="block mb-3 text-[10px] md:text-xs uppercase tracking-[0.2em] font-semibold"
-            style={{ color: accent, fontFamily: headingFont }}
+            style={{ color: accent, fontFamily: BODY_FONT }}
           >
             {narrativeLabel}
           </span>
           )}
           <h3
             className="text-[48px] font-semibold mb-4 leading-[1.1]"
-            style={{ fontFamily: headingFont, color: text }}
+            style={{ fontFamily: BODY_FONT, color: autoTextColor }}
           >
             {narrativeTitle}
           </h3>
           {narrativeBody && (
           <p
             className="text-sm md:text-base leading-relaxed max-w-2xl mx-auto"
-            style={{ color: bodyTextColor, fontFamily: bodyFont }}
+            style={{ color: autoTextColor, fontFamily: BODY_FONT }}
           >
             {narrativeBody}
           </p>
@@ -2791,7 +2786,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
         <section className="py-14 px-6 md:px-10 max-w-3xl mx-auto">
           {/* Inline title when no banner image */}
           {!bannerUrl && scheduleTitle && (
-            <h2 className="text-center mb-10" style={{ fontFamily: headingFont, color: text, fontSize: '36px', fontWeight: 600 }}>
+            <h2 className="text-center mb-10" style={{ fontFamily: BODY_FONT, color: autoTextColor, fontSize: '36px', fontWeight: 600 }}>
               {scheduleTitle}
             </h2>
           )}
@@ -2807,14 +2802,14 @@ function PreviewPanel({ data }: { data: TemplateData }) {
           )}
           {/* Date line */}
           {dateDisplay && (
-            <p className="text-center italic mb-12 text-sm md:text-base" style={{ color: bodyTextColor, fontFamily: bodyFont }}>
+            <p className="text-center italic mb-12 text-sm md:text-base" style={{ color: autoTextColor, fontFamily: BODY_FONT }}>
               {dateDisplay}
             </p>
           )}
           {scheduleSubtitle && (
             <p
               className="text-center italic max-w-2xl mx-auto mb-10 text-sm md:text-base"
-              style={{ color: bodyTextColor, fontFamily: bodyFont }}
+              style={{ color: autoTextColor, fontFamily: BODY_FONT }}
             >
               {scheduleSubtitle}
             </p>
@@ -2835,8 +2830,8 @@ function PreviewPanel({ data }: { data: TemplateData }) {
                             className="inline-block px-2.5 py-1 rounded text-[10px] font-medium uppercase tracking-widest"
                             style={{
                               backgroundColor: `${secondary}33`,
-                              color: text,
-                              fontFamily: bodyFont,
+                              color: autoTextColor,
+                              fontFamily: BODY_FONT,
                             }}
                           >
                             {formatTime(item.startTime)}
@@ -2845,14 +2840,14 @@ function PreviewPanel({ data }: { data: TemplateData }) {
                       </div>
                       <h4
                         className="text-lg md:text-xl font-semibold"
-                        style={{ fontFamily: headingFont, color: text }}
+                        style={{ fontFamily: BODY_FONT, color: autoTextColor }}
                       >
                         {item.title}
                       </h4>
                       {item.description && (
                         <p
                           className="text-sm mt-1 leading-relaxed"
-                          style={{ color: bodyTextColor, fontFamily: bodyFont }}
+                          style={{ color: autoTextColor, fontFamily: BODY_FONT }}
                         >
                           {item.description}
                         </p>
@@ -2862,8 +2857,8 @@ function PreviewPanel({ data }: { data: TemplateData }) {
                           className="mt-3 inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] uppercase tracking-widest font-bold"
                           style={{
                             backgroundColor: `${secondary}22`,
-                            color: text,
-                            fontFamily: bodyFont,
+                            color: autoTextColor,
+                            fontFamily: BODY_FONT,
                           }}
                         >
                           <MapPin className="size-3" />
@@ -2881,7 +2876,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
           {(venueImage || venueName || venueDescription) && (
             <div className="mt-16 pt-12 border-t" style={{ borderColor: `${muted}33` }}>
               {venueName && (
-              <h3 className="text-[48px] font-semibold mb-6 text-center leading-[1.1]" style={{ fontFamily: headingFont, color: text }}>
+              <h3 className="text-[48px] font-semibold mb-6 text-center leading-[1.1]" style={{ fontFamily: BODY_FONT, color: autoTextColor }}>
                 {venueName}
               </h3>
               )}
@@ -2891,7 +2886,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
                 </div>
               )}
               {venueDescription && (
-                <p className="text-sm md:text-base leading-relaxed max-w-2xl mx-auto text-center" style={{ color: bodyTextColor, fontFamily: bodyFont }}>
+                <p className="text-sm md:text-base leading-relaxed max-w-2xl mx-auto text-center" style={{ color: autoTextColor, fontFamily: BODY_FONT }}>
                   {venueDescription}
                 </p>
               )}
@@ -2908,7 +2903,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
         <section className="py-14 px-6 md:px-10 max-w-4xl mx-auto">
           {/* Inline title when no banner image */}
           {!bannerUrl && storyTitle && (
-            <h2 className="text-center mb-10" style={{ fontFamily: headingFont, color: text, fontSize: '36px', fontWeight: 600 }}>
+            <h2 className="text-center mb-10" style={{ fontFamily: BODY_FONT, color: autoTextColor, fontSize: '36px', fontWeight: 600 }}>
               {storyTitle}
             </h2>
           )}
@@ -2925,7 +2920,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
           {storySubtitle && (
             <p
               className="text-center italic max-w-2xl mx-auto mb-10 text-sm md:text-base"
-              style={{ color: bodyTextColor, fontFamily: bodyFont }}
+              style={{ color: autoTextColor, fontFamily: BODY_FONT }}
             >
               {storySubtitle}
             </p>
@@ -2962,20 +2957,20 @@ function PreviewPanel({ data }: { data: TemplateData }) {
                         {story.date && (
                           <span
                             className="block mb-2 uppercase tracking-[0.2em] text-[10px] md:text-xs font-semibold"
-                            style={{ color: accent, fontFamily: bodyFont }}
+                            style={{ color: accent, fontFamily: BODY_FONT }}
                           >
                             {story.date}
                           </span>
                         )}
                         <h4
                           className="text-xl md:text-2xl italic mb-3"
-                          style={{ fontFamily: headingFont, color: text, fontWeight: 500 }}
+                          style={{ fontFamily: BODY_FONT, color: autoTextColor, fontWeight: 500 }}
                         >
                           {story.title}
                         </h4>
                         <p
                           className="text-sm italic leading-relaxed"
-                          style={{ color: bodyTextColor, fontFamily: bodyFont }}
+                          style={{ color: autoTextColor, fontFamily: BODY_FONT }}
                         >
                           {story.content}
                         </p>
@@ -3009,7 +3004,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
           {tidbitsEnabled && tidbits.length > 0 && (
             <div className="mt-16 pt-12 border-t" style={{ borderColor: `${muted}33` }}>
               {tidbitsTitle && (
-              <h3 className="text-[48px] font-semibold mb-4 text-center leading-[1.1]" style={{ fontFamily: headingFont, color: text }}>
+              <h3 className="text-[48px] font-semibold mb-4 text-center leading-[1.1]" style={{ fontFamily: BODY_FONT, color: autoTextColor }}>
                 {tidbitsTitle}
               </h3>
               )}
@@ -3020,10 +3015,10 @@ function PreviewPanel({ data }: { data: TemplateData }) {
                     className="p-6 rounded-lg backdrop-blur-sm"
                     style={{ backgroundColor: `${bg}80`, border: `1px solid ${muted}22` }}
                   >
-                    <p className="text-sm md:text-base font-medium mb-2" style={{ fontFamily: headingFont, color: text }}>
+                    <p className="text-sm md:text-base font-medium mb-2" style={{ fontFamily: BODY_FONT, color: autoTextColor }}>
                       {t.q}
                     </p>
-                    <p className="text-sm leading-relaxed" style={{ color: bodyTextColor, fontFamily: bodyFont }}>
+                    <p className="text-sm leading-relaxed" style={{ color: autoTextColor, fontFamily: BODY_FONT }}>
                       {t.a}
                     </p>
                   </div>
@@ -3036,7 +3031,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
           {honeymoonEnabled && honeymoonDestinations.length > 0 && (
             <div className="mt-16 pt-12 border-t" style={{ borderColor: `${muted}33` }}>
               {honeymoonEyebrow && (
-                <span className="block mb-2 text-[10px] md:text-xs uppercase tracking-[0.2em] font-semibold text-center" style={{ color: accent, fontFamily: headingFont }}>
+                <span className="block mb-2 text-[10px] md:text-xs uppercase tracking-[0.2em] font-semibold text-center" style={{ color: accent, fontFamily: BODY_FONT }}>
                   {honeymoonEyebrow}
                 </span>
               )}
@@ -3047,7 +3042,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
                     className="p-6 rounded-lg text-center"
                     style={{ backgroundColor: `${bg}80`, border: `1px solid ${muted}22` }}
                   >
-                    <p className="text-lg md:text-xl font-medium" style={{ fontFamily: headingFont, color: text }}>
+                    <p className="text-lg md:text-xl font-medium" style={{ fontFamily: BODY_FONT, color: autoTextColor }}>
                       {d.name}
                     </p>
                     <div
@@ -3072,14 +3067,14 @@ function PreviewPanel({ data }: { data: TemplateData }) {
         <section className="py-14 px-6 md:px-10 max-w-5xl mx-auto">
           {/* Inline title when no banner image */}
           {!bannerUrl && momentsTitle && (
-            <h2 className="text-center mb-10" style={{ fontFamily: headingFont, color: text, fontSize: '36px', fontWeight: 600 }}>
+            <h2 className="text-center mb-10" style={{ fontFamily: BODY_FONT, color: autoTextColor, fontSize: '36px', fontWeight: 600 }}>
               {momentsTitle}
             </h2>
           )}
           {momentsSubtitle && (
             <p
               className="text-center italic max-w-2xl mx-auto mb-10 text-sm md:text-base"
-              style={{ color: bodyTextColor, fontFamily: bodyFont }}
+              style={{ color: autoTextColor, fontFamily: BODY_FONT }}
             >
               {momentsSubtitle}
             </p>
@@ -3112,14 +3107,14 @@ function PreviewPanel({ data }: { data: TemplateData }) {
         <section className="py-14 px-6 md:px-10 max-w-3xl mx-auto">
           {/* Inline title when no banner image */}
           {!bannerUrl && qaTitle && (
-            <h2 className="text-center mb-10" style={{ fontFamily: headingFont, color: text, fontSize: '36px', fontWeight: 600 }}>
+            <h2 className="text-center mb-10" style={{ fontFamily: BODY_FONT, color: autoTextColor, fontSize: '36px', fontWeight: 600 }}>
               {qaTitle}
             </h2>
           )}
           {qaSubtitle && (
             <p
               className="text-center italic max-w-2xl mx-auto mb-10 text-sm md:text-base"
-              style={{ color: bodyTextColor, fontFamily: bodyFont }}
+              style={{ color: autoTextColor, fontFamily: BODY_FONT }}
             >
               {qaSubtitle}
             </p>
@@ -3141,7 +3136,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
                     >
                       <h4
                         className="text-base md:text-lg pr-6"
-                        style={{ fontFamily: headingFont, color: text, fontWeight: 500 }}
+                        style={{ fontFamily: BODY_FONT, color: autoTextColor, fontWeight: 500 }}
                       >
                         {faq.question}
                       </h4>
@@ -3165,7 +3160,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
                     >
                       <p
                         className="pb-5 text-sm md:text-base leading-relaxed"
-                        style={{ color: bodyTextColor, fontFamily: bodyFont }}
+                        style={{ color: autoTextColor, fontFamily: BODY_FONT }}
                       >
                         {faq.answer}
                       </p>
@@ -3186,7 +3181,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
         >
           <p
             className="text-center text-[9px] uppercase tracking-[0.2em] opacity-50"
-            style={{ color: bodyTextColor, fontFamily: bodyFont }}
+            style={{ color: autoTextColor, fontFamily: BODY_FONT }}
           >
             Template Preview · {data.name}
           </p>

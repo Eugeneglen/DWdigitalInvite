@@ -12,8 +12,11 @@ interface SectionBannerProps {
 }
 
 export default function SectionBanner({ title, subtitle, bannerUrl: bannerUrlProp }: SectionBannerProps) {
-  const { data } = usePublicWedding(useWeddingSlug());
+  const { data, getField } = usePublicWedding(useWeddingSlug());
   const rawBannerUrl = bannerUrlProp ?? data?.wedding.bannerUrl ?? '';
+
+  // Read the admin-chosen banner headline font (stored as global.fontFamily)
+  const bannerFont = getField('global', 'fontFamily', 'Playfair Display');
 
   // Hooks must always be called (React rules of hooks)
   const { textColor: bannerTextColor, subtitleColor: bannerSubtitleColor, textShadow: bannerTextShadow } = useImageAutoContrast(rawBannerUrl);
@@ -32,7 +35,7 @@ export default function SectionBanner({ title, subtitle, bannerUrl: bannerUrlPro
           <h1
             className="text-[44px] md:text-[72px] leading-[1.05] tracking-tight font-bold drop-shadow-sm"
             style={{
-              fontFamily: "'Playfair Display', serif",
+              fontFamily: `'${bannerFont}', serif`,
               color: bannerTextColor,
               textShadow: bannerTextShadow,
             }}
