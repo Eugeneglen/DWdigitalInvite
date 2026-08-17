@@ -81,7 +81,7 @@ export default function GoldDust({ density = 'medium' }: GoldDustProps) {
   );
 
   return (
-    <div className="fixed inset-0 pointer-events-none z-[1] overflow-hidden" aria-hidden="true">
+    <div className="fixed inset-0 pointer-events-none z-[100] overflow-hidden" aria-hidden="true">
       <style dangerouslySetInnerHTML={{ __html: styles }} />
       {particles.map((p, i) => (
         <div
