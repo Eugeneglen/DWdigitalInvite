@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import {
   Search,
@@ -347,6 +347,16 @@ export default function MasterWeddings() {
 
   // ── Fetch weddings ─────────────────────────────────────────────────────
 
+  // pageRef keeps fetchWeddings stable across page changes (page is NOT a
+  // dependency), which breaks the circular dependency that made Prev/Next
+  // buttons non-functional.
+  const pageRef = useRef(page);
+  pageRef.current = page;
+
+  // Track whether the next page change is from a filter reset (debounce
+  // timer will handle the fetch) vs. a Prev/Next button click (fetch now).
+  const filterResetRef = useRef(false);
+
   const fetchWeddings = useCallback(async () => {
     try {
       setLoading(true);
@@ -354,7 +364,7 @@ export default function MasterWeddings() {
       if (search) params.set('search', search);
       if (statusFilter) params.set('status', statusFilter);
       if (planFilter) params.set('plan', planFilter);
-      params.set('page', String(page));
+      params.set('page', String(pageRef.current));
       params.set('limit', String(limit));
       const res = await fetch(
         `/api/master/weddings?${params.toString()}&XTransformPort=3000`
@@ -368,16 +378,26 @@ export default function MasterWeddings() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, planFilter, page]);
+  }, [search, statusFilter, planFilter]); // page removed — read from pageRef instead
 
-  // ── Search/filter debounce ─────────────────────────────────────────────
+  // ── Search/filter debounce (mount + filter changes) ───────────────
+  // Resets to page 1 and debounces the fetch by 300ms.
   useEffect(() => {
-    setPage(1); // reset to page 1 when filters change
-    const timer = setTimeout(() => {
-      fetchWeddings();
-    }, 300);
+    pageRef.current = 1;  // update ref immediately so fetch uses page 1
+    filterResetRef.current = true;  // signal the page effect to skip
+    setPage(1);  // update pagination UI
+    const timer = setTimeout(fetchWeddings, 300);
     return () => clearTimeout(timer);
-  }, [search, statusFilter, planFilter, fetchWeddings]);
+  }, [fetchWeddings]); // stable across page changes, only changes on filter change
+
+  // ── Page change (Prev/Next buttons) → immediate fetch ──────────────
+  useEffect(() => {
+    if (filterResetRef.current) {
+      filterResetRef.current = false;
+      return; // skip — the filter debounce timer will fetch
+    }
+    fetchWeddings();
+  }, [page]);
 
   // ── Dialog handlers ────────────────────────────────────────────────────
 
