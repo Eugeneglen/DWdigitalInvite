@@ -168,7 +168,7 @@ export default function AdminCMSView() {
 
   // Authenticated → check role before rendering
   const userRole = session?.user?.role;
-  const isAdmin = userRole === 'SUPER_ADMIN' || userRole?.startsWith('ADMIN');
+  const isAdmin = userRole === 'SUPER_ADMIN' || userRole === 'SUPER_ADMIN_1' || userRole?.startsWith('ADMIN');
 
   // Non-admin authenticated user → sign out + show access denied
   if (status === 'authenticated' && cmsReady && !isAdmin) {
