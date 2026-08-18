@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { normalizePlatformRole } from '@/lib/permissions';
+import { ANIMATION_STYLES } from '@/lib/animation-registry';
 
 interface StaffUser {
   id: string;
@@ -57,9 +58,12 @@ const ALL_FEATURES: FeatureInfo[] = [
   { key: 'gallery', label: 'Photo Gallery', description: 'Additional gallery' },
   { key: 'music', label: 'Background Music', description: 'Music player' },
   { key: 'video', label: 'Wedding Video', description: 'Embedded video' },
-  { key: 'animation:gold-dust', label: 'Gold Dust Animation', description: 'Ambient gold particles drifting upward' },
-  { key: 'animation:flying-stars', label: 'Meteors Animation', description: 'Shooting-star streaks falling through a starfield' },
-  { key: 'animation:raining', label: 'Bubbles Animation', description: 'Raindrop ripple rings expanding and fading' },
+  // Animation features derived from the canonical registry
+  ...ANIMATION_STYLES.map((s) => ({
+    key: `animation:${s.key}`,
+    label: `${s.label} Animation`,
+    description: s.description,
+  })),
   { key: 'templates', label: 'Theme Templates', description: '6 curated design themes' },
 ];
 

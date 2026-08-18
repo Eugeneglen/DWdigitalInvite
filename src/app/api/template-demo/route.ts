@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { ANIMATION_STYLES } from '@/lib/animation-registry';
 
 /**
  * GET /api/template-demo
@@ -116,13 +117,19 @@ export async function GET() {
     // music/video are disabled since the demo has no real media files.
     // Animation flags are read from the template's hero content fields
     // (set via the Template Editor's "Ambient Animations" toggles).
-    const getAnimFlag = (key: string) => {
-      const val = contentMap['hero']?.[key];
+    // Derived from ANIMATION_STYLES registry so new styles auto-appear.
+    const getAnimFlag = (featureKey: string) => {
+      const val = contentMap['hero']?.[featureKey];
       // If admin explicitly set a value in the template, use it.
       // Otherwise fall back to defaults (gold-dust ON, others OFF).
       if (val !== undefined) return val === 'true';
-      return key === 'animation:gold-dust';
+      return featureKey === 'animation:gold-dust';
     };
+
+    // Build animation feature flags from the canonical registry.
+    const animationFlags = Object.fromEntries(
+      ANIMATION_STYLES.map((s) => [`animation:${s.key}`, getAnimFlag(`animation:${s.key}`)]),
+    );
 
     const featureFlags: Record<string, boolean> = {
       countdown: true,
@@ -136,9 +143,7 @@ export async function GET() {
       moments: true,
       music: false,
       video: false,
-      'animation:gold-dust': getAnimFlag('animation:gold-dust'),
-      'animation:flying-stars': getAnimFlag('animation:flying-stars'),
-      'animation:raining': getAnimFlag('animation:raining'),
+      ...animationFlags,
     };
 
     // ── 8. Return PublicWeddingData shape ─────────────────────────────────

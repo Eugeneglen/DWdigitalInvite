@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions, hashPassword } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { hasPlatformPermission } from '@/lib/permissions';
+import { ANIMATION_STYLES } from '@/lib/animation-registry';
 import { z } from 'zod/v4';
 
 // Prevent Next.js from caching this route — always return fresh data
@@ -231,7 +232,7 @@ export async function POST(req: NextRequest) {
     // 'animation:gold-dust', 'animation:flying-stars', 'animation:raining'.
     // Read the admin's toggle settings from the default ContentTemplate's
     // hero content (set via Template Editor > Home > Ambient Animations).
-    const ANIMATION_STYLE_KEYS = ['animation:gold-dust', 'animation:flying-stars', 'animation:raining'];
+    const ANIMATION_STYLE_KEYS = ANIMATION_STYLES.map((s) => `animation:${s.key}`);
     let templateAnimFlags: Record<string, boolean> = {};
     try {
       // Same fallback logic as wedding-defaults.ts: try isDefault first, then first active
@@ -421,7 +422,7 @@ export async function PATCH(req: NextRequest) {
     // couple can toggle them via their CMS. Existing rows are preserved.
     if (updates.plan) {
       try {
-        const ANIMATION_KEYS = ['animation:gold-dust', 'animation:flying-stars', 'animation:raining'];
+        const ANIMATION_KEYS = ANIMATION_STYLES.map((s) => `animation:${s.key}`);
         for (const key of ANIMATION_KEYS) {
           const existing = await db.weddingFeature.findFirst({
             where: { weddingId: id, featureKey: key },

@@ -1,5 +1,6 @@
 'use client';
 
+import { ANIMATION_STYLES } from '@/lib/animation-registry';
 import GoldDust from './GoldDust';
 import FlyingStars from './FlyingStars';
 import RainingPetals from './RainingPetals';
@@ -37,7 +38,8 @@ function renderAnimationStyle(styleKey: string) {
   }
 }
 
-const ANIMATION_FEATURE_KEYS = ['animation:gold-dust', 'animation:flying-stars', 'animation:raining'];
+// Derive feature keys from the canonical registry so new styles auto-appear.
+const ANIMATION_FEATURE_KEYS = ANIMATION_STYLES.map((s) => `animation:${s.key}`);
 
 export default function AnimationRenderer({ featureFlags }: AnimationRendererProps) {
   if (!featureFlags) return null;

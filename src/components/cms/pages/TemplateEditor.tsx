@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import MirrorImageUpload from '@/components/cms/couple/MirrorImageUpload';
 import { isDarkBackground, getAutoTextColor } from '@/lib/contrast';
+import { ANIMATION_STYLES } from '@/lib/animation-registry';
 import { useImageAutoContrast } from '@/hooks/useImageAutoContrast';
 import { toast } from '@/hooks/use-toast';
 import { useCMSStore } from '@/store/useCMSStore';
@@ -1340,19 +1341,15 @@ export default function TemplateEditor() {
             <CardContent className="p-6 space-y-4">
               <h3 className="text-sm font-semibold text-charcoal-ink uppercase tracking-wider">Ambient Animations</h3>
               <p className="text-xs text-charcoal-ink/40">Toggle which ambient effects appear on the guest invitation. Multiple can be enabled simultaneously.</p>
-              {[
-                { key: 'animation:gold-dust', label: 'Gold Dust', desc: 'Floating gold particles drifting across the screen' },
-                { key: 'animation:flying-stars', label: 'Flying Stars', desc: 'Star-shaped sparkles trailing cursor movement' },
-                { key: 'animation:raining', label: 'Raining Petals', desc: 'Falling flower petals animation' },
-              ].map((anim) => (
-                <div key={anim.key} className="flex items-start justify-between gap-4 py-2 border-b border-charcoal-ink/5 last:border-0">
+              {ANIMATION_STYLES.map((anim) => (
+                <div key={`animation:${anim.key}`} className="flex items-start justify-between gap-4 py-2 border-b border-charcoal-ink/5 last:border-0">
                   <div className="flex-1">
                     <p className="text-sm font-medium text-charcoal-ink">{anim.label}</p>
-                    <p className="text-xs text-charcoal-ink/40">{anim.desc}</p>
+                    <p className="text-xs text-charcoal-ink/40">{anim.description}</p>
                   </div>
                   <Switch
-                    checked={getContentField('hero', anim.key) === 'true'}
-                    onCheckedChange={(checked) => setContentField('hero', anim.key, String(checked), 'TEXT')}
+                    checked={getContentField('hero', `animation:${anim.key}`) === 'true'}
+                    onCheckedChange={(checked) => setContentField('hero', `animation:${anim.key}`, String(checked), 'TEXT')}
                   />
                 </div>
               ))}
@@ -2510,6 +2507,26 @@ function PreviewPanel({ data }: { data: TemplateData }) {
   const qaTitle = getField('qa', 'title', '');
   const qaSubtitle = getField('qa', 'subtitle', '');
 
+  // ── Getting There content ──────────────────────────────────────────
+  const gettingThereTitle = getField('getting-there', 'title', '');
+  const gettingThereSubtitle = getField('getting-there', 'subtitle', '');
+  const transitTitle = getField('getting-there', 'transitTitle', '');
+  const transitContent = getField('getting-there', 'transitContent', '');
+  const carTitle = getField('getting-there', 'carTitle', '');
+  const carContent = getField('getting-there', 'carContent', '');
+  const parkingNote = getField('getting-there', 'parkingNote', '');
+
+  // ── Wishes content ────────────────────────────────────────────────
+  const wishesTitle = getField('wishes', 'title', '');
+  const wishesSubtitle = getField('wishes', 'subtitle', '');
+  const wishesHeirloomLabel = getField('wishes', 'heirloomLabel', '');
+  const wishesFormEyebrow = getField('wishes', 'formEyebrow', '');
+  const wishesFormHeading = getField('wishes', 'formHeading', '');
+  const wishesNameLabel = getField('wishes', 'nameLabel', '');
+  const wishesMessageLabel = getField('wishes', 'messageLabel', '');
+  const wishesRelationshipLabel = getField('wishes', 'relationshipLabel', '');
+  const wishesSubmitLabel = getField('wishes', 'submitLabel', '');
+
   // ── Theme tokens ───────────────────────────────────────────────────────
   const bg = theme.colors.bg;
   const text = theme.colors.text;
@@ -3060,6 +3077,76 @@ function PreviewPanel({ data }: { data: TemplateData }) {
         </>
         )}
 
+        {/* ===== GETTING THERE ===== */}
+        {(gettingThereTitle || gettingThereSubtitle || transitContent || carContent) && (
+        <>
+        {renderSectionBanner(gettingThereTitle)}
+        <section className="py-14 px-6 md:px-10 max-w-3xl mx-auto">
+          {/* Inline title when no banner image */}
+          {!bannerUrl && gettingThereTitle && (
+            <h2 className="text-center mb-10" style={{ fontFamily: BODY_FONT, color: autoTextColor, fontSize: '36px', fontWeight: 600 }}>
+              {gettingThereTitle}
+            </h2>
+          )}
+          {gettingThereSubtitle && (
+            <p
+              className="text-center italic max-w-2xl mx-auto mb-10 text-sm md:text-base"
+              style={{ color: autoTextColor, fontFamily: BODY_FONT }}
+            >
+              {gettingThereSubtitle}
+            </p>
+          )}
+          {/* Transit & Car directions */}
+          {(transitContent || carContent) && (
+            <div className="space-y-8">
+              {/* Tab bar */}
+              <div className="flex gap-3 border-b" style={{ borderColor: `${accent}33` }}>
+                {carTitle && (
+                  <span
+                    className="pb-2 text-sm font-semibold border-b-2"
+                    style={{ borderColor: accent, color: autoTextColor, fontFamily: BODY_FONT }}
+                  >
+                    {carTitle}
+                  </span>
+                )}
+                {transitTitle && (
+                  <span
+                    className="pb-2 text-sm"
+                    style={{ color: `${autoTextColor}88`, fontFamily: BODY_FONT }}
+                  >
+                    {transitTitle}
+                  </span>
+                )}
+              </div>
+              {/* Car directions */}
+              {carContent && (
+                <div className="space-y-3">
+                  <p className="text-sm md:text-base leading-relaxed whitespace-pre-line" style={{ color: autoTextColor, fontFamily: BODY_FONT }}>
+                    {carContent}
+                  </p>
+                  {parkingNote && (
+                    <div className="pt-3 border-t" style={{ borderColor: `${muted}33` }}>
+                      <p className="text-xs md:text-sm leading-relaxed whitespace-pre-line" style={{ color: `${autoTextColor}88`, fontFamily: BODY_FONT }}>
+                        {parkingNote}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              {/* Transit directions */}
+              {transitContent && (
+                <div>
+                  <p className="text-sm md:text-base leading-relaxed whitespace-pre-line" style={{ color: autoTextColor, fontFamily: BODY_FONT }}>
+                    {transitContent}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+        </>
+        )}
+
         {/* ===== MOMENTS ===== */}
         {(momentsMedia.length > 0 || momentsTitle || momentsSubtitle) && (
         <>
@@ -3094,6 +3181,132 @@ function PreviewPanel({ data }: { data: TemplateData }) {
                   />
                 </div>
               ))}
+            </div>
+          )}
+        </section>
+        </>
+        )}
+
+        {/* ===== WISHES ===== */}
+        {(wishesTitle || wishesSubtitle || wishesHeirloomLabel || wishesFormHeading) && (
+        <>
+        {renderSectionBanner(wishesTitle)}
+        <section className="py-14 px-6 md:px-10 max-w-3xl mx-auto">
+          {/* Inline title when no banner image */}
+          {!bannerUrl && wishesTitle && (
+            <h2 className="text-center mb-10" style={{ fontFamily: BODY_FONT, color: autoTextColor, fontSize: '36px', fontWeight: 600 }}>
+              {wishesTitle}
+            </h2>
+          )}
+          {/* Intro */}
+          <div className="text-center mb-16">
+            {wishesHeirloomLabel && (
+              <span
+                className="block mb-2 text-[10px] md:text-xs uppercase tracking-[0.2em] font-semibold"
+                style={{ color: accent, fontFamily: BODY_FONT }}
+              >
+                {wishesHeirloomLabel}
+              </span>
+            )}
+            {wishesSubtitle && (
+              <p
+                className="italic text-sm md:text-base"
+                style={{ color: autoTextColor, fontFamily: BODY_FONT }}
+              >
+                {wishesSubtitle}
+              </p>
+            )}
+          </div>
+          {/* Sample wish cards (visual preview only) */}
+          <div className="space-y-6 mb-16">
+            <div
+              className="p-8 rounded-lg border"
+              style={{
+                backgroundColor: bg === '#FFFFFF' || bg === '#ffffff' ? '#FCF9F2' : `${bg}88`,
+                borderColor: `${muted}22`,
+              }}
+            >
+              <p className="text-sm italic mb-3 leading-relaxed" style={{ color: autoTextColor, fontFamily: BODY_FONT }}>
+                "May your love grow stronger with each passing day…"
+              </p>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium" style={{ color: accent, fontFamily: BODY_FONT }}>— Sarah</span>
+                <span className="text-[10px] uppercase tracking-widest" style={{ color: `${autoTextColor}66`, fontFamily: BODY_FONT }}>Friend</span>
+              </div>
+            </div>
+            <div
+              className="p-8 rounded-lg"
+              style={{
+                backgroundColor: `${text}0D`,
+                color: bg,
+              }}
+            >
+              <span className="text-3xl leading-none mb-3 block" style={{ fontFamily: BODY_FONT }}>“</span>
+              <p className="text-base italic mb-3 leading-relaxed" style={{ fontFamily: BODY_FONT }}>
+                Wishing you both a lifetime of happiness and beautiful memories together.
+              </p>
+              <span className="text-xs font-medium" style={{ color: accent, fontFamily: BODY_FONT }}>— James</span>
+            </div>
+          </div>
+          {/* Form header + fields preview */}
+          {(wishesFormEyebrow || wishesFormHeading || wishesNameLabel || wishesMessageLabel) && (
+            <div className="max-w-2xl mx-auto space-y-8">
+              {wishesFormEyebrow && (
+                <span
+                  className="block text-center text-[10px] md:text-xs uppercase tracking-[0.2em] font-semibold"
+                  style={{ color: accent, fontFamily: BODY_FONT }}
+                >
+                  {wishesFormEyebrow}
+                </span>
+              )}
+              {wishesFormHeading && (
+                <h3
+                  className="text-center text-2xl md:text-[32px] italic font-bold"
+                  style={{ fontFamily: BODY_FONT, color: autoTextColor }}
+                >
+                  {wishesFormHeading}
+                </h3>
+              )}
+              <div className="space-y-4">
+                {wishesNameLabel && (
+                  <div
+                    className="h-10 rounded border-b"
+                    style={{ borderColor: `${muted}44` }}
+                  >
+                    <span className="block text-xs mt-3 ml-1" style={{ color: `${autoTextColor}44`, fontFamily: BODY_FONT }}>
+                      {wishesNameLabel}
+                    </span>
+                  </div>
+                )}
+                {wishesRelationshipLabel && (
+                  <div
+                    className="h-10 rounded border-b"
+                    style={{ borderColor: `${muted}44` }}
+                  >
+                    <span className="block text-xs mt-3 ml-1" style={{ color: `${autoTextColor}44`, fontFamily: BODY_FONT }}>
+                      {wishesRelationshipLabel}
+                    </span>
+                  </div>
+                )}
+                {wishesMessageLabel && (
+                  <div
+                    className="h-24 rounded border-b"
+                    style={{ borderColor: `${muted}44` }}
+                  >
+                    <span className="block text-xs mt-3 ml-1" style={{ color: `${autoTextColor}44`, fontFamily: BODY_FONT }}>
+                      {wishesMessageLabel}
+                    </span>
+                  </div>
+                )}
+                {wishesSubmitLabel && (
+                  <div
+                    className="h-11 rounded flex items-center justify-center text-sm font-semibold uppercase tracking-wider"
+                    style={{ backgroundColor: accent, color: bg, fontFamily: BODY_FONT }}
+                  >
+                    {wishesSubmitLabel}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </section>

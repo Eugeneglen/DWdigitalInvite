@@ -132,7 +132,7 @@ export default function CoupleHome() {
   };
 
   // Animation styles available to this couple (only those with a feature row)
-  const ANIMATION_FEATURE_KEYS = ['animation:gold-dust', 'animation:flying-stars', 'animation:raining'];
+  const ANIMATION_FEATURE_KEYS = ANIMATION_STYLES.map((s) => `animation:${s.key}`);
   const availableAnimStyles = ANIMATION_STYLES.filter((s) => `animation:${s.key}` in animFeatureStates);
 
   const getFieldValue = (fieldKey: string): string => {
