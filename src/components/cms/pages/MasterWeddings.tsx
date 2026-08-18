@@ -820,8 +820,8 @@ export default function MasterWeddings() {
         </div>
       </Card>
 
-      {/* Pagination */}
-      {total > limit && (
+      {/* Pagination — always visible when there are results */}
+      {total > 0 && (
         <div className="flex flex-wrap items-center justify-between px-1 gap-2">
           <p className="text-xs text-slate-500">
             Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total}
@@ -837,9 +837,11 @@ export default function MasterWeddings() {
               <ChevronLeft className="size-3 mr-1" />
               Prev
             </Button>
-            <span className="text-xs text-slate-500">
-              Page {page} of {totalPages}
-            </span>
+            {totalPages > 1 && (
+              <span className="text-xs text-slate-500">
+                Page {page} of {totalPages}
+              </span>
+            )}
             <Button
               variant="outline"
               size="sm"
