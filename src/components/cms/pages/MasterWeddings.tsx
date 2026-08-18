@@ -17,6 +17,7 @@ import {
   Copy,
   Check,
   KeyRound,
+  Trash2,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -279,6 +280,41 @@ export default function MasterWeddings() {
   useEffect(() => {
     fetchStaff();
   }, [fetchStaff]);
+
+  // Permanent delete confirmation dialog
+  const [deleteTarget, setDeleteTarget] = useState<Wedding | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  // ── Permanent delete handler ─────────────────────────────────────────
+  async function deletePermanentlyWedding(w: Wedding) {
+    setDeleteTarget(w);
+    setDeleteConfirmName('');
+  }
+
+  async function confirmPermanentDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/master/weddings?hard=true&XTransformPort=3000', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: deleteTarget.id, confirmName: deleteConfirmName }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: 'Delete Failed', description: err.error || 'Could not delete wedding.', variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Permanently Deleted', description: `${deleteTarget.coupleName} and all related data have been removed.` });
+      setDeleteTarget(null);
+      fetchWeddings();
+    } catch {
+      toast({ title: 'Delete Failed', description: 'Network error.', variant: 'destructive' });
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   // Credentials dialog state — lets admin retrieve registration details
   // (couple CMS URL, guest URL, login ID, password, job number) for any
@@ -735,6 +771,17 @@ export default function MasterWeddings() {
                           >
                             <Archive className="h-4 w-4" />
                             Archive
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            variant="destructive"
+                            className="text-red-600 focus:text-red-600"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deletePermanentlyWedding(w);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Delete Permanently
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -1223,6 +1270,86 @@ export default function MasterWeddings() {
               </div>
             );
           })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Permanent Delete Confirmation Dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="size-5" />
+              Delete Permanently
+            </DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. The wedding account and all related data will be permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteTarget && (
+            <div className="space-y-4 py-2">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-2">
+                <div>
+                  <Label className="text-xs text-slate-500">Couple Name</Label>
+                  <p className="text-sm font-semibold text-slate-900">{deleteTarget.coupleName}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-500">Job Number</Label>
+                  <p className="text-sm text-slate-600 font-mono">{deleteTarget.jobNumber ?? '—'}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-500">Guest URL</Label>
+                  <p className="text-sm text-slate-600 font-mono">/{deleteTarget.slug}</p>
+                </div>
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  This will permanently delete: the wedding account, all guests & RSVPs,
+                  wishes, stories, media uploads, schedule, FAQs, seating arrangements,
+                  notifications, and audit logs. Uploaded files will be removed from disk.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="delete-confirm">
+                  Type <span className="font-bold">{deleteTarget.coupleName}</span> to confirm
+                </Label>
+                <Input
+                  id="delete-confirm"
+                  placeholder={deleteTarget.coupleName}
+                  value={deleteConfirmName}
+                  onChange={(e) => setDeleteConfirmName(e.target.value)}
+                  className="border-red-200 focus-visible:ring-red-400"
+                />
+              </div>
+              <DialogFooter className="pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDeleteTarget(null)}
+                  disabled={deleting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={deleting || deleteConfirmName.trim() !== deleteTarget.coupleName}
+                  onClick={confirmPermanentDelete}
+                >
+                  {deleting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4" />
+                      Delete Permanently
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

@@ -461,7 +461,9 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-// DELETE /api/master/weddings — archive a wedding account
+// DELETE /api/master/weddings — archive (soft) or permanently delete (hard) a wedding account
+//   ?hard=true  → permanent deletion (irreversible)
+//   default     → soft delete (sets status to ARCHIVED)
 export async function DELETE(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -470,27 +472,96 @@ export async function DELETE(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id } = body;
+    const { id, confirmName } = body;
+    const { searchParams } = new URL(req.url);
+    const hard = searchParams.get('hard') === 'true';
+
     if (!id) {
       return NextResponse.json({ error: 'Wedding ID required' }, { status: 400 });
     }
 
-    await db.weddingAccount.update({
+    // Look up the wedding for confirmation + audit
+    const wedding = await db.weddingAccount.findUnique({
       where: { id },
-      data: { status: 'ARCHIVED' },
+      select: { id: true, coupleName: true, ownerId: true, slug: true },
     });
+    if (!wedding) {
+      return NextResponse.json({ error: 'Wedding not found' }, { status: 404 });
+    }
 
+    // ── Soft delete (archive) ─────────────────────────────────────────────
+    if (!hard) {
+      await db.weddingAccount.update({
+        where: { id },
+        data: { status: 'ARCHIVED' },
+      });
+
+      await db.auditLog.create({
+        data: {
+          userId: session.user.id,
+          action: 'DELETE',
+          entity: 'WeddingAccount',
+          entityId: id,
+          details: JSON.stringify({ status: 'ARCHIVED' }),
+        },
+      });
+
+      return NextResponse.json({ success: true, mode: 'archive' });
+    }
+
+    // ── Hard delete (permanent) ───────────────────────────────────────────
+    // Require the admin to type the exact couple name for confirmation
+    if (!confirmName || confirmName.trim() !== wedding.coupleName) {
+      return NextResponse.json(
+        { error: 'Confirmation mismatch. Type the exact couple name to confirm deletion.' },
+        { status: 400 },
+      );
+    }
+
+    // Delete non-cascading related records (FK without onDelete: Cascade)
+    // Order matters: children before parents
+    const weddingId = id;
+    await db.rSVPSubmission.deleteMany({ where: { weddingId } });   // GuestResponse cascades
+    await db.wish.deleteMany({ where: { weddingId } });
+    await db.contactSubmission.deleteMany({ where: { weddingId } });
+    await db.auditLog.deleteMany({ where: { weddingId } });
+    await db.notification.deleteMany({ where: { weddingId } });
+
+    // Delete the wedding account itself
+    // Cascading relations auto-deleted: UserWeddingRole, WeddingFeature,
+    // WeddingContent, WeddingMedia, EventSchedule, FAQ, StoryItem, Guest,
+    // SeatingTable, SeatingHistory, HoneymoonVote, HoneymoonSuggestion
+    await db.weddingAccount.delete({ where: { id: weddingId } });
+
+    // Clean up uploaded files on disk
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'weddings', weddingId);
+      if (fs.existsSync(uploadDir)) {
+        fs.rmSync(uploadDir, { recursive: true, force: true });
+      }
+    } catch (err) {
+      // Non-blocking — wedding is already deleted from DB
+      console.warn(`[hard-delete] File cleanup failed for ${weddingId}:`, err);
+    }
+
+    // Create a final audit log (references no wedding — it's gone)
     await db.auditLog.create({
       data: {
         userId: session.user.id,
-        action: 'DELETE',
+        action: 'HARD_DELETE',
         entity: 'WeddingAccount',
-        entityId: id,
-        details: JSON.stringify({ status: 'ARCHIVED' }),
+        entityId: weddingId,
+        details: JSON.stringify({
+          coupleName: wedding.coupleName,
+          slug: wedding.slug,
+          ownerId: wedding.ownerId,
+        }),
       },
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, mode: 'permanent' });
   } catch (error) {
     console.error('Wedding delete error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
