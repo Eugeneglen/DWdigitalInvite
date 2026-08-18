@@ -27,7 +27,7 @@ const updateUserSchema = z.object({
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 function isAuthorized(role?: string): boolean {
-  return role === 'SUPER_ADMIN' || role?.startsWith('ADMIN');
+  return role === 'SUPER_ADMIN' || role === 'SUPER_ADMIN_1' || role?.startsWith('ADMIN');
 }
 
 // ── GET ───────────────────────────────────────────────────────────────────
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Only SUPER_ADMIN can create users
-    if (session.user.role !== 'SUPER_ADMIN') {
+    if (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'SUPER_ADMIN_1') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -178,7 +178,7 @@ export async function PUT(req: NextRequest) {
     if (updates.role !== undefined) {
       // Only SUPER_ADMIN can change roles. ADMIN_* users cannot escalate
       // themselves or others to SUPER_ADMIN.
-      if (session.user.role !== 'SUPER_ADMIN') {
+      if (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'SUPER_ADMIN_1') {
         return NextResponse.json({ error: 'Only Super Admins can change user roles' }, { status: 403 });
       }
       updateData.role = updates.role;
@@ -229,7 +229,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Only SUPER_ADMIN can delete users
-    if (session.user.role !== 'SUPER_ADMIN') {
+    if (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'SUPER_ADMIN_1') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

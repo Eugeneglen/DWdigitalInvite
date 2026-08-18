@@ -27,7 +27,7 @@ const createWeddingSchema = z.object({
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'SUPER_ADMIN') {
+    if (!session?.user || (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'SUPER_ADMIN_1')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     // SUPER_ADMIN and ADMIN_1 (Consultant) can create weddings
-    if (!session?.user || (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'ADMIN_1')) {
+    if (!session?.user || (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'SUPER_ADMIN_1' && session.user.role !== 'ADMIN_1')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -264,7 +264,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'SUPER_ADMIN') {
+    if (!session?.user || (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'SUPER_ADMIN_1')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -326,7 +326,7 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'SUPER_ADMIN') {
+    if (!session?.user || (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'SUPER_ADMIN_1')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
