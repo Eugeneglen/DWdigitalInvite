@@ -23,6 +23,21 @@ async function seed() {
   });
   console.log(`✅ Admin user: ${admin.email} (${admin.role})`);
 
+  // Backup Super Admin (safety net in case primary admin has login issues)
+  const admin2Password = await bcrypt.hash('Admin@2024', 12);
+  const admin2 = await db.user.upsert({
+    where: { email: 'eugeneglen@gmail.com' },
+    update: { role: 'SUPER_ADMIN_1', passwordHash: admin2Password },
+    create: {
+      email: 'eugeneglen@gmail.com',
+      passwordHash: admin2Password,
+      name: 'Eugene (Backup Admin)',
+      role: 'SUPER_ADMIN_1',
+      isActive: true,
+    },
+  });
+  console.log(`✅ Backup admin: ${admin2.email} (${admin2.role})`);
+
   const couplePassword = await bcrypt.hash('Couple@2024', 12);
   const couple = await db.user.upsert({
     where: { email: 'eleanor@wedding.com' },
@@ -435,6 +450,7 @@ async function seed() {
   console.log('\n🎉 Seed complete! (replicates production data)');
   console.log('---');
   console.log('Admin login: admin@dreamweavers.sg / Admin@2024');
+  console.log('Backup admin: eugeneglen@gmail.com / Admin@2024');
   console.log('Couple login: eleanor@wedding.com / Couple@2024');
   console.log('---');
   console.log('Weddings: 3 (1 ACTIVE + 2 DRAFT)');
