@@ -170,14 +170,18 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id!;
         token.role = user.role;
+        console.log('[JWT] Setting token.role:', user.role);
       }
+      console.log('[JWT] Returning token with role:', token.role);
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id;
         session.user.role = token.role;
+        console.log('[SESSION] Setting session.user.role:', token.role);
       }
+      console.log('[SESSION] Returning session with user.role:', session.user?.role);
       return session;
     },
   },
