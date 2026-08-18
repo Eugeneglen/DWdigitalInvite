@@ -114,7 +114,7 @@ export function LoginModal({ open, onOpenChange, variant = 'default', targetRole
   };
 
   const currentRole = session?.user?.role;
-  const currentIsAdmin = currentRole === 'SUPER_ADMIN' || currentRole === 'ACCOUNT_MANAGER';
+  const currentIsAdmin = currentRole === 'SUPER_ADMIN' || currentRole === 'SUPER_ADMIN_1' || currentRole === 'ACCOUNT_MANAGER';
   const currentIsCouple = currentRole === 'COUPLE';
 
   // If a targetRole is specified and the current session's role doesn't match,
