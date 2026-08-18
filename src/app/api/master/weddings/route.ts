@@ -510,6 +510,12 @@ export async function DELETE(req: NextRequest) {
     }
 
     // ── Hard delete (permanent) ───────────────────────────────────────────
+    // Requires the dedicated platform:weddings:delete permission.
+    // Default seed: only SUPER_ADMIN_1/2 get it (via wildcard).
+    if (!(await hasPlatformPermission(session.user.id, session.user.role, 'platform:weddings:delete'))) {
+      return NextResponse.json({ error: 'Only users with "Delete Weddings" permission can permanently delete wedding accounts' }, { status: 403 });
+    }
+
     // Require the admin to type the exact couple name for confirmation
     if (!confirmName || confirmName.trim() !== wedding.coupleName) {
       return NextResponse.json(

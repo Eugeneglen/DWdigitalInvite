@@ -185,6 +185,7 @@ export type PlatformAction =
   | 'platform:users:manage'
   | 'platform:weddings:read'
   | 'platform:weddings:write'
+  | 'platform:weddings:delete'
   | 'platform:settings:read'
   | 'platform:settings:write'
   | 'platform:analytics:read'
@@ -505,6 +506,7 @@ export const ALL_PLATFORM_PERMISSIONS: PlatformAction[] = [
   'platform:users:manage',
   'platform:weddings:read',
   'platform:weddings:write',
+  'platform:weddings:delete',
   'platform:weddings:read-all',
   'platform:settings:read',
   'platform:settings:write',

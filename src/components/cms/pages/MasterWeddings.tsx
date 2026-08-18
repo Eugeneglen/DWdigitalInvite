@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import {
   Search,
   Plus,
@@ -61,7 +62,7 @@ import {
 } from '@/components/ui/select';
 // useCMSStore import removed — selectWedding was dead code
 import WeddingCreationWizard from './WeddingCreationWizard';
-import { normalizePlatformRole } from '@/lib/permissions';
+import { normalizePlatformRole, hasPlatformPermissionSync } from '@/lib/permissions';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -230,6 +231,9 @@ function EmptyState({ hasSearch }: { hasSearch: boolean }) {
 // ── Main Component ─────────────────────────────────────────────────────────
 
 export default function MasterWeddings() {
+  const { data: session } = useSession();
+  const canDeleteWedding = hasPlatformPermissionSync(session?.user?.role || '', 'platform:weddings:delete');
+
   // selectWedding removed — was dead code (set selectedWeddingId but nothing read it)
   // View button now uses window.open(`/${w.slug}`, '_blank') instead
 
@@ -772,17 +776,19 @@ export default function MasterWeddings() {
                             <Archive className="h-4 w-4" />
                             Archive
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            variant="destructive"
-                            className="text-red-600 focus:text-red-600"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deletePermanentlyWedding(w);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            Delete Permanently
-                          </DropdownMenuItem>
+                          {canDeleteWedding && (
+                            <DropdownMenuItem
+                              variant="destructive"
+                              className="text-red-600 focus:text-red-600"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deletePermanentlyWedding(w);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Delete Permanently
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
