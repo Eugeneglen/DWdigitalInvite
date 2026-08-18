@@ -7,7 +7,7 @@ import { db } from '@/lib/db';
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'ACCOUNT_MANAGER')) {
+    if (!session?.user || (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'SUPER_ADMIN_1' && session.user.role !== 'ACCOUNT_MANAGER')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
