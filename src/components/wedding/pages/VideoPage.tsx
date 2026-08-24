@@ -71,7 +71,7 @@ export default function VideoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-paper-cream">
+    <div className="min-h-screen wedding-surface">
       <SectionBanner title={videoTitle} subtitle="A moment to remember" />
 
       <div className="px-4 md:px-6 py-10 md:py-16 max-w-4xl mx-auto w-full">

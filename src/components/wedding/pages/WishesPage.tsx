@@ -313,7 +313,7 @@ function WishesPageInner() {
               />
 
               {/* Upload area — functional file input with preview */}
-              <div className="border-2 border-dashed border-charcoal-ink/15 rounded bg-paper-cream/40 text-center select-none">
+              <div className="border-2 border-dashed border-charcoal-ink/15 rounded wedding-surface-40 text-center select-none">
                 {imageDataUrl ? (
                   <div className="relative p-4">
                     <img
@@ -331,7 +331,7 @@ function WishesPageInner() {
                     </button>
                   </div>
                 ) : (
-                  <label className="block py-8 px-4 cursor-pointer hover:bg-paper-cream/60 transition-colors">
+                  <label className="block py-8 px-4 cursor-pointer wedding-surface-hover-60 transition-colors">
                     <span className="material-symbols-outlined text-charcoal-ink/30 text-[32px] mb-2 block">cloud_upload</span>
                     <p className="text-[14px] text-charcoal-ink/40">
                       Attach a photo or memento

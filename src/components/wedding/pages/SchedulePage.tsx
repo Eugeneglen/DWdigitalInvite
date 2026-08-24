@@ -147,7 +147,7 @@ export default function SchedulePage() {
         <section className="max-w-4xl mx-auto">
           <div className="mb-24 stagger-3">
             {/* Sticky heading */}
-            <div className="sticky top-24 md:top-40 bg-paper-cream/90 backdrop-blur-sm z-30 py-4 mb-12 border-b border-champagne-silk/30 flex items-baseline gap-4">
+            <div className="sticky top-24 md:top-40 wedding-surface-90 backdrop-blur-sm z-30 py-4 mb-12 border-b border-champagne-silk/30 flex items-baseline gap-4">
               <h2 className="font-display-hero text-headline-md leading-headline-md font-medium md:text-headline-lg md:leading-headline-lg md:font-semibold text-charcoal-ink">{timelineHeading}</h2>
               <span className="font-utility-mono text-utility-mono leading-utility-mono font-medium text-charcoal-ink/60 italic tracking-wider uppercase">{shortDateText}</span>
             </div>

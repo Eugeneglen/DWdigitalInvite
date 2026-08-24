@@ -130,7 +130,7 @@ export default function GettingTherePage() {
                 <img
                   src={customMapImage}
                   alt={`${venueName} Venue Map`}
-                  className="w-full h-[280px] object-contain bg-paper-cream"
+                  className="w-full h-[280px] object-contain wedding-surface"
                 />
               ) : (
                 <>

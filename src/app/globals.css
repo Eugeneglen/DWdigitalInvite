@@ -376,6 +376,34 @@
   color: #FCF9F2;
 }
 
+/* ── Dynamic wedding-surface utilities ─────────────────────────────
+   These follow the couple's chosen page background colour (--wedding-bg),
+   which is set on the [data-wedding-root] element by GuestSite.tsx.
+
+   Use these INSTEAD of bg-paper-cream* on guest-facing pages so that
+   panels, sticky headers, dropzones, and image containers blend with
+   the couple's chosen theme colour rather than showing a hardcoded
+   cream "boxed background" when the page bg is changed.
+
+   Fallback #FCF9F2 (DW paper-cream) is used when --wedding-bg is not
+   defined (e.g. outside the wedding site root).
+   ────────────────────────────────────────────────────────────────── */
+.wedding-surface {
+  background-color: var(--wedding-bg, #FCF9F2);
+}
+.wedding-surface-90 {
+  background-color: color-mix(in srgb, var(--wedding-bg, #FCF9F2) 90%, transparent);
+}
+.wedding-surface-60 {
+  background-color: color-mix(in srgb, var(--wedding-bg, #FCF9F2) 60%, transparent);
+}
+.wedding-surface-40 {
+  background-color: color-mix(in srgb, var(--wedding-bg, #FCF9F2) 40%, transparent);
+}
+.wedding-surface-hover-60:hover {
+  background-color: color-mix(in srgb, var(--wedding-bg, #FCF9F2) 60%, transparent);
+}
+
 /* Scroll behavior */
 html {
   scroll-behavior: smooth;
