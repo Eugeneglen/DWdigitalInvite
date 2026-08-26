@@ -6,64 +6,9 @@ import { toast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { invalidateWeddingCache } from '@/hooks/usePublicWedding';
+import { FONT_OPTIONS, FONT_CATEGORIES, DEFAULT_FONT } from '@/lib/fonts';
 
 const CONTENT_API = '/api/cms/content?XTransformPort=3000';
-
-interface FontOption {
-  value: string;
-  category: string;
-}
-
-const FONT_OPTIONS: FontOption[] = [
-  // ── Elegant Serif ────────────────────────────────────────
-  { value: 'Playfair Display', category: 'Elegant Serif' },
-  { value: 'Cormorant Garamond', category: 'Elegant Serif' },
-  { value: 'EB Garamond', category: 'Elegant Serif' },
-  { value: 'Lora', category: 'Elegant Serif' },
-  { value: 'Spectral', category: 'Elegant Serif' },
-  { value: 'Libre Baskerville', category: 'Elegant Serif' },
-  { value: 'Merriweather', category: 'Elegant Serif' },
-  { value: 'DM Serif Display', category: 'Elegant Serif' },
-  { value: 'Bodoni Moda', category: 'Elegant Serif' },
-  { value: 'Philosopher', category: 'Elegant Serif' },
-  // ── Display Serif ────────────────────────────────────────
-  { value: 'Cinzel', category: 'Display Serif' },
-  { value: 'Cinzel Decorative', category: 'Display Serif' },
-  { value: 'Prata', category: 'Display Serif' },
-  { value: 'Italiana', category: 'Display Serif' },
-  { value: 'Arizonia', category: 'Display Serif' },
-  // ── Modern Sans ─────────────────────────────────────────
-  { value: 'Montserrat', category: 'Modern Sans' },
-  { value: 'Raleway', category: 'Modern Sans' },
-  { value: 'Poppins', category: 'Modern Sans' },
-  { value: 'Lato', category: 'Modern Sans' },
-  { value: 'Quicksand', category: 'Modern Sans' },
-  { value: 'Nunito', category: 'Modern Sans' },
-  { value: 'Work Sans', category: 'Modern Sans' },
-  { value: 'Josefin Sans', category: 'Modern Sans' },
-  // ── Script & Calligraphy ─────────────────────────────────
-  { value: 'Great Vibes', category: 'Script & Calligraphy' },
-  { value: 'Alex Brush', category: 'Script & Calligraphy' },
-  { value: 'Allura', category: 'Script & Calligraphy' },
-  { value: 'Parisienne', category: 'Script & Calligraphy' },
-  { value: 'Tangerine', category: 'Script & Calligraphy' },
-  { value: 'Sacramento', category: 'Script & Calligraphy' },
-  { value: 'Petit Formal Script', category: 'Script & Calligraphy' },
-  { value: 'Cookie', category: 'Script & Calligraphy' },
-  // ── Handwritten ─────────────────────────────────────────
-  { value: 'Dancing Script', category: 'Handwritten' },
-  { value: 'Kaushan Script', category: 'Handwritten' },
-  { value: 'Caveat', category: 'Handwritten' },
-  { value: 'Amatic SC', category: 'Handwritten' },
-  { value: 'Satisfy', category: 'Handwritten' },
-  { value: 'Pacifico', category: 'Handwritten' },
-  { value: 'Lobster', category: 'Handwritten' },
-  { value: 'Yellowtail', category: 'Handwritten' },
-];
-
-const FONT_CATEGORIES = [...new Set(FONT_OPTIONS.map((f) => f.category))];
-
-const DEFAULT_FONT = 'Playfair Display';
 
 interface FontPickerProps {
   section: string;
