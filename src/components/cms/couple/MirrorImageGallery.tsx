@@ -13,8 +13,10 @@ import {
 } from '@/components/ui/dialog';
 import { invalidateWeddingCache } from '@/hooks/usePublicWedding';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
+import { getSizeGuidance, isImageMime, type FileCategory } from '@/lib/file-storage-client';
 
 const MEDIA_API = '/api/cms/media?XTransformPort=3000';
+const UPLOAD_API = '/api/cms/upload?XTransformPort=3000';
 
 interface MediaItem {
   id: string;
@@ -71,6 +73,7 @@ export default function MirrorImageGallery({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { confirm, ConfirmDialog } = useConfirmDialog();
+  const guidance = getSizeGuidance(category as FileCategory);
 
   const fetchImages = useCallback(async () => {
     try {
@@ -93,7 +96,7 @@ export default function MirrorImageGallery({
   const handleUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
-    const imageFiles = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    const imageFiles = Array.from(files).filter((f) => isImageMime(f.type));
     if (imageFiles.length === 0) {
       toast({ title: 'Invalid file', description: 'Please select image files (PNG, JPG, GIF, WebP)', variant: 'destructive' });
       return;
@@ -110,36 +113,63 @@ export default function MirrorImageGallery({
     }
 
     const toUpload = imageFiles.slice(0, remaining);
+    const guidance = getSizeGuidance(category as FileCategory);
+    const maxSize = 25 * 1024 * 1024; // 25 MB (auto-optimised)
+
     setUploading(true);
+    let successCount = 0;
     for (const file of toUpload) {
-      try {
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = (e) => resolve(e.target?.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
+      // Client-side size pre-check
+      if (file.size > maxSize) {
+        const fileMB = (file.size / 1024 / 1024).toFixed(1);
+        toast({
+          title: 'File too large',
+          description: `"${file.name}" is ${fileMB} MB — max is 25 MB. Recommended: ${guidance.recommendedPixels} px. Server will auto-resize and compress.`,
+          variant: 'destructive',
         });
+        continue;
+      }
+      try {
+        // Step 1: Upload to /api/cms/upload (server-side optimises via sharp)
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('category', category);
+        const uploadRes = await fetch(UPLOAD_API, { method: 'POST', body: formData });
+        if (!uploadRes.ok) {
+          const err = await uploadRes.json().catch(() => ({}));
+          throw new Error((err as { error?: string }).error || 'Failed to upload');
+        }
+        const uploadResult = await uploadRes.json();
+
+        // Step 2: Create media library entry with the file URL (not base64)
         const res = await fetch(MEDIA_API, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: dataUrl, fileName: file.name, category, fileType: 'IMAGE' }),
+          body: JSON.stringify({
+            url: uploadResult.url,
+            fileName: file.name,
+            category,
+            fileType: 'IMAGE',
+            fileSize: uploadResult.fileSize,
+          }),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          throw new Error((err as { error?: string }).error || 'Failed to upload');
+          throw new Error((err as { error?: string }).error || 'Failed to save');
         }
+        successCount++;
       } catch (err) {
         toast({
           title: 'Upload failed',
-          description: err instanceof Error ? err.message : 'Failed to upload image',
+          description: err instanceof Error ? err.message : `Failed to upload ${file.name}`,
           variant: 'destructive',
         });
       }
     }
     setUploading(false);
-    if (toUpload.length > 0) {
+    if (successCount > 0) {
       invalidateWeddingCache();
-      toast({ title: 'Success', description: `${toUpload.length} image${toUpload.length > 1 ? 's' : ''} added to ${label}` });
+      toast({ title: 'Success', description: `${successCount} image${successCount > 1 ? 's' : ''} added to ${label}` });
     }
     fetchImages();
   };
@@ -276,7 +306,9 @@ export default function MirrorImageGallery({
                 <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-medium bg-charcoal-ink text-paper-cream">
                   <ImagePlus className="size-3.5" /> Add Images
                 </span>
-                <p className="text-[11px] text-charcoal-ink/40 mt-1">Up to {maxImages} · Mirrors guest-site framing</p>
+                <p className="text-[11px] text-charcoal-ink/40 mt-1">
+                  Up to {maxImages} · Max 25 MB each · {guidance.recommendedPixels} recommended · Auto-optimised
+                </p>
               </>
             )}
           </button>

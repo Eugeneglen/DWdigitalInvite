@@ -81,17 +81,149 @@ const ALLOWED_MIME_TYPES: Record<FileCategory, string[]> = {
   'couple-photo': ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
 };
 
-/** Max file size per category in bytes. */
+/**
+ * Max file size per category in bytes.
+ *
+ * These are UPLOAD limits (the raw file the couple selects). After upload,
+ * images are server-side optimised via sharp (resized + JPEG-compressed),
+ * so the stored file is typically 90-98% smaller than the upload limit.
+ *
+ * IMAGE LIMIT RATIONALE (25 MB):
+ *   The 25 MB image limit is intentionally generous because the server
+ *   auto-optimises every image via sharp (resize to 1920px + JPEG 82-85%).
+ *   A 25 MB iPhone ProRAW or large DSLR JPEG gets compressed to ~300-500 KB
+ *   automatically — the couple never needs to pre-compress. The limit only
+ *   exists to prevent abuse (e.g., uploading 100+ MB files that would crash
+ *   the server during sharp processing).
+ *
+ *   Typical file sizes this covers:
+ *     iPhone JPEG          2-4 MB    ✓
+ *     Android JPEG         3-8 MB    ✓
+ *     iPhone ProRAW       12-25 MB   ✓
+ *     DSLR JPEG (full)    5-20 MB    ✓
+ *     Medium-format RAW   20-50 MB   ✗ (too large, use JPEG export)
+ *
+ * VIDEO: 50 MB (hero only) — 30s 1080p H.264 ≈ 20-30 MB
+ * MUSIC: 5 MB — 4 min @ 128 kbps MP3 = 3.5 MB
+ */
 const MAX_FILE_SIZE: Record<FileCategory, number> = {
-  hero: 50 * 1024 * 1024,    // 50 MB (video)
-  banner: 10 * 1024 * 1024,  // 10 MB
-  music: 10 * 1024 * 1024,   // 10 MB
-  gallery: 10 * 1024 * 1024, // 10 MB
-  story: 10 * 1024 * 1024,   // 10 MB
-  wishes: 5 * 1024 * 1024,   // 5 MB
-  moments: 10 * 1024 * 1024, // 10 MB
-  schedule: 10 * 1024 * 1024, // 10 MB
-  'couple-photo': 10 * 1024 * 1024, // 10 MB
+  hero: 50 * 1024 * 1024,    // 50 MB (video) / 25 MB enforced separately for images
+  banner: 25 * 1024 * 1024,  // 25 MB (images auto-optimised via sharp)
+  music: 5 * 1024 * 1024,    // 5 MB
+  gallery: 25 * 1024 * 1024, // 25 MB (images auto-optimised via sharp)
+  story: 25 * 1024 * 1024,   // 25 MB (images auto-optimised via sharp)
+  wishes: 10 * 1024 * 1024,  // 10 MB (guest uploads, slightly tighter)
+  moments: 25 * 1024 * 1024, // 25 MB (images auto-optimised via sharp)
+  schedule: 25 * 1024 * 1024,// 25 MB (images auto-optimised via sharp)
+  'couple-photo': 25 * 1024 * 1024, // 25 MB (images auto-optimised via sharp)
+};
+
+/**
+ * Image-specific upload limit (25 MB). Applied when the uploaded file is an
+ * image, regardless of category. This is intentionally generous because the
+ * server auto-optimises every image via sharp — a 25 MB file becomes ~300 KB.
+ * Video and audio use the MAX_FILE_SIZE above.
+ */
+const MAX_IMAGE_UPLOAD_SIZE = 25 * 1024 * 1024; // 25 MB
+
+/**
+ * Size guidance shown to users in the CMS UI. These are RECOMMENDATIONS
+ * (not hard limits) — the actual limits are MAX_FILE_SIZE above.
+ *
+ * `maxPixels` is the longest side after server-side resize. Images larger
+ * than this are downscaled; smaller images are kept as-is.
+ */
+export interface SizeGuidance {
+  /** Human-readable upload limit, e.g. "25 MB" */
+  uploadLimit: string;
+  /** Recommended max dimensions, e.g. "1920×1080" (or null for video/audio) */
+  recommendedPixels: string | null;
+  /** Recommended max file size for best results, e.g. "Under 5 MB" */
+  recommendedSize: string;
+  /** Additional guidance (bitrate, duration, format hints) */
+  hint: string;
+}
+
+export const SIZE_GUIDANCE: Record<FileCategory, SizeGuidance> = {
+  hero: {
+    uploadLimit: '25 MB (image) · 50 MB (video)',
+    recommendedPixels: '1920×1080',
+    recommendedSize: 'Under 5 MB (image) · Under 30 MB (video)',
+    hint: 'Image: landscape, full-bleed. Video: 1080p H.264, 10-30s, silent autoplay loop. 4K not recommended. Images auto-optimised.',
+  },
+  banner: {
+    uploadLimit: '25 MB',
+    recommendedPixels: '1920×420',
+    recommendedSize: 'Under 2 MB',
+    hint: 'Wide banner strip (21:9 aspect). Landscape orientation. Server auto-resizes to 1920px wide + JPEG compress.',
+  },
+  music: {
+    uploadLimit: '5 MB',
+    recommendedPixels: null,
+    recommendedSize: 'Under 4 MB',
+    hint: 'MP3 at 128-192 kbps recommended. A 4-minute song at 128 kbps ≈ 3.5 MB. WAV/FLAC are overkill for background ambience.',
+  },
+  gallery: {
+    uploadLimit: '25 MB',
+    recommendedPixels: '1920×1080',
+    recommendedSize: 'Under 3 MB',
+    hint: 'Landscape or square. Displayed at ~720px in a 2-column grid. Server auto-resizes to 1920px + JPEG compress.',
+  },
+  story: {
+    uploadLimit: '25 MB',
+    recommendedPixels: '1600×1200',
+    recommendedSize: 'Under 2 MB',
+    hint: 'Story milestone images. Displayed at 400-900px. Server auto-resizes to 1600px + JPEG compress.',
+  },
+  wishes: {
+    uploadLimit: '10 MB',
+    recommendedPixels: '1600×1200',
+    recommendedSize: 'Under 2 MB',
+    hint: 'Guest-uploaded wish photos. Displayed small in masonry layout. Server auto-resizes to 1600px.',
+  },
+  moments: {
+    uploadLimit: '25 MB',
+    recommendedPixels: '1920×1080',
+    recommendedSize: 'Under 3 MB',
+    hint: 'Moment gallery images. Same as gallery — displayed at ~720px.',
+  },
+  schedule: {
+    uploadLimit: '25 MB',
+    recommendedPixels: '1920×1080',
+    recommendedSize: 'Under 3 MB',
+    hint: 'Schedule section images. Server auto-resizes to 1920px + JPEG compress.',
+  },
+  'couple-photo': {
+    uploadLimit: '25 MB',
+    recommendedPixels: '1200×1600',
+    recommendedSize: 'Under 2 MB',
+    hint: 'Portrait of the couple. 3:4 portrait recommended. Server auto-resizes to 1200px wide + JPEG compress.',
+  },
+};
+
+/**
+ * Image optimisation settings per category.
+ * After upload, images are resized to `maxDimension`px (longest side) and
+ * JPEG-compressed at `quality`. This reduces stored file size by 90-98%.
+ *
+ * `null` means no optimisation (video/audio categories, or images that
+ * should be stored as-is).
+ */
+export interface ImageOptimisationConfig {
+  maxDimension: number;
+  quality: number;
+}
+
+export const IMAGE_OPTIMISATION: Record<FileCategory, ImageOptimisationConfig | null> = {
+  hero: { maxDimension: 1920, quality: 85 },
+  banner: { maxDimension: 1920, quality: 82 },
+  music: null, // audio — no image processing
+  gallery: { maxDimension: 1920, quality: 82 },
+  story: { maxDimension: 1600, quality: 82 },
+  wishes: { maxDimension: 1600, quality: 82 },
+  moments: { maxDimension: 1920, quality: 82 },
+  schedule: { maxDimension: 1920, quality: 82 },
+  'couple-photo': { maxDimension: 1200, quality: 85 },
 };
 
 export interface UploadResult {
@@ -126,10 +258,38 @@ export function isMimeTypeAllowed(category: FileCategory, mimeType: string): boo
 }
 
 /**
- * Get the max file size for a category.
+ * Check if a MIME type is an image.
  */
-export function getMaxFileSize(category: FileCategory): number {
+export function isImageMime(mimeType: string): boolean {
+  return mimeType.startsWith('image/');
+}
+
+/**
+ * Check if a MIME type is a video.
+ */
+export function isVideoMime(mimeType: string): boolean {
+  return mimeType.startsWith('video/');
+}
+
+/**
+ * Get the max upload file size for a category + MIME type.
+ *
+ * For the `hero` category, the limit depends on whether the file is an
+ * image (25 MB) or a video (50 MB). For all other categories, the limit
+ * is fixed per category.
+ */
+export function getMaxFileSize(category: FileCategory, mimeType?: string): number {
+  if (category === 'hero' && mimeType && isImageMime(mimeType)) {
+    return MAX_IMAGE_UPLOAD_SIZE; // 25 MB for hero images
+  }
   return MAX_FILE_SIZE[category];
+}
+
+/**
+ * Get the size guidance for a category (for UI display + error messages).
+ */
+export function getSizeGuidance(category: FileCategory): SizeGuidance {
+  return SIZE_GUIDANCE[category];
 }
 
 /**

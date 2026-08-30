@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 
 import { useCoupleCMSStore } from '@/store/useCoupleCMSStore';
 import { invalidateWeddingCache } from '@/hooks/usePublicWedding';
+import { getSizeGuidance, isImageMime, isVideoMime } from '@/lib/file-storage-client';
 
 const WEDDING_API = '/api/cms/wedding?XTransformPort=3000';
 const UPLOAD_API = '/api/cms/upload?XTransformPort=3000';
@@ -24,23 +25,40 @@ export function HeroVisualSection({ weddingData }: { weddingData: Record<string,
 
   // Upload a file (image or video) via the file storage backend.
   // Stores the file on disk and saves the returned URL to WeddingAccount.
+  // Images are server-side optimised (resized to 1920px, JPEG 85%).
   const handleFile = async (file: File) => {
-    const isVideo = file.type.startsWith('video/');
-    if (!isVideo && !file.type.startsWith('image/')) {
+    const isVideo = isVideoMime(file.type);
+    const isImage = isImageMime(file.type);
+    if (!isVideo && !isImage) {
       toast({ title: 'Error', description: 'Please select an image or video file', variant: 'destructive' });
       return;
     }
 
-    const maxSize = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+    // Client-side pre-check with clear guidance (server enforces too)
+    // Images: 25 MB limit — the server auto-optimises via sharp (resize + JPEG)
+    // so large photos are accepted and compressed automatically.
+    const guidance = getSizeGuidance('hero');
+    const maxImageSize = 25 * 1024 * 1024;   // 25 MB for hero images (auto-optimised)
+    const maxVideoSize = 50 * 1024 * 1024;   // 50 MB for hero videos
+    const maxSize = isVideo ? maxVideoSize : maxImageSize;
     if (file.size > maxSize) {
-      toast({ title: 'Error', description: `File too large. Max ${isVideo ? '50 MB' : '10 MB'}.`, variant: 'destructive' });
+      const fileMB = (file.size / 1024 / 1024).toFixed(1);
+      const maxMB = isVideo ? '50 MB' : '25 MB';
+      const rec = isVideo
+        ? 'Recommended: 1080p H.264, under 30 seconds, under 30 MB.'
+        : `Recommended: ${guidance.recommendedPixels} px. Server will auto-resize and compress.`;
+      toast({
+        title: 'File too large',
+        description: `Your file is ${fileMB} MB — max is ${maxMB}. ${rec}`,
+        variant: 'destructive',
+      });
       return;
     }
 
     setUploading(true);
     setUploadType(isVideo ? 'video' : 'image');
     try {
-      // Step 1: Upload file to the storage backend
+      // Step 1: Upload file to the storage backend (server optimises images)
       const formData = new FormData();
       formData.append('file', file);
       formData.append('category', 'hero');
@@ -69,7 +87,11 @@ export function HeroVisualSection({ weddingData }: { weddingData: Record<string,
         useCoupleCMSStore.getState().setWeddingData(data.wedding ?? data);
       }
       invalidateWeddingCache();
-      toast({ title: 'Success', description: `${isVideo ? 'Video' : 'Image'} updated` });
+      // Show optimisation info if the server compressed the image
+      const note = uploadResult.optimised && uploadResult.originalSize
+        ? ` (optimised from ${(uploadResult.originalSize / 1024).toFixed(0)} KB to ${(uploadResult.fileSize / 1024).toFixed(0)} KB)`
+        : '';
+      toast({ title: 'Success', description: `${isVideo ? 'Video' : 'Image'} updated${note}` });
     } catch (err) {
       toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to upload', variant: 'destructive' });
     } finally {
@@ -191,7 +213,7 @@ export function HeroVisualSection({ weddingData }: { weddingData: Record<string,
             </button>
           </div>
           <p className="text-[10px] text-charcoal-ink/30 text-center">
-            Image: max 10 MB · Video: max 50 MB (MP4, WebM, OGG) · Silent autoplay loop on guest page
+            Image: max 25 MB · 1920×1080 recommended · auto-optimised · Video: max 50 MB (MP4, WebM, OGG) · 1080p H.264, under 30s recommended · Silent autoplay loop on guest page
           </p>
 
           <input
@@ -219,18 +241,28 @@ export function BannerSection({ weddingData }: { weddingData: Record<string, unk
   const bannerUrl = (weddingData as Record<string, string>)?.bannerUrl || '';
 
   const handleFile = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
+    if (!isImageMime(file.type)) {
       toast({ title: 'Error', description: 'Please select an image file', variant: 'destructive' });
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      toast({ title: 'Error', description: 'File too large. Max 10 MB.', variant: 'destructive' });
+    // Client-side pre-check with clear guidance (server enforces too)
+    // 25 MB limit — the server auto-optimises via sharp (resize + JPEG)
+    // so large photos are accepted and compressed automatically.
+    const guidance = getSizeGuidance('banner');
+    const maxSize = 25 * 1024 * 1024; // 25 MB (auto-optimised)
+    if (file.size > maxSize) {
+      const fileMB = (file.size / 1024 / 1024).toFixed(1);
+      toast({
+        title: 'File too large',
+        description: `Your file is ${fileMB} MB — max is 25 MB. Recommended: ${guidance.recommendedPixels} px. Server will auto-resize and compress.`,
+        variant: 'destructive',
+      });
       return;
     }
 
     setUploading(true);
     try {
-      // Step 1: Upload file to the storage backend
+      // Step 1: Upload file to the storage backend (server optimises images)
       const formData = new FormData();
       formData.append('file', file);
       formData.append('category', 'banner');
@@ -256,7 +288,11 @@ export function BannerSection({ weddingData }: { weddingData: Record<string, unk
         useCoupleCMSStore.getState().setWeddingData(data.wedding ?? data);
       }
       invalidateWeddingCache();
-      toast({ title: 'Success', description: 'Banner updated' });
+      // Show optimisation info if the server compressed the image
+      const note = uploadResult.optimised && uploadResult.originalSize
+        ? ` (optimised from ${(uploadResult.originalSize / 1024).toFixed(0)} KB to ${(uploadResult.fileSize / 1024).toFixed(0)} KB)`
+        : '';
+      toast({ title: 'Success', description: `Banner updated${note}` });
     } catch (err) {
       toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to upload', variant: 'destructive' });
     } finally {
@@ -328,7 +364,7 @@ export function BannerSection({ weddingData }: { weddingData: Record<string, unk
                 <>
                   <Upload className="size-6 text-charcoal-ink/25" />
                   <p className="text-xs text-charcoal-ink/40 font-medium">Upload banner image</p>
-                  <p className="text-[10px] text-charcoal-ink/25">Max 10 MB · Wide aspect ratio recommended</p>
+                  <p className="text-[10px] text-charcoal-ink/25">Max 25 MB · 1920×420 recommended</p>
                 </>
               )}
             </div>
@@ -361,7 +397,7 @@ export function BannerSection({ weddingData }: { weddingData: Record<string, unk
             )}
           </div>
           <p className="text-[10px] text-charcoal-ink/30 text-center">
-            Max 10 MB · Wide aspect ratio recommended · Drag & drop to replace
+            Max 25 MB · 1920×420 recommended (21:9 wide) · Server auto-optimises · Drag & drop to replace
           </p>
 
           <input

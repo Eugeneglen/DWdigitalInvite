@@ -388,6 +388,7 @@ export default function CoupleSchedule() {
                   )}
                 </div>
                 <MirrorImageUpload
+                  category="schedule"
                   value={venueFields["venueImage"] ?? ""}
                   onChange={(dataUrl) => handleVenueChange("venueImage", dataUrl)}
                   onRemove={() => handleVenueChange("venueImage", "")}
