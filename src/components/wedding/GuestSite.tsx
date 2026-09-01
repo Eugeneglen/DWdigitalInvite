@@ -172,7 +172,13 @@ export default function GuestSite({ slug, topOffset, showEditorButton = false }:
 
   // Generate dynamic <style> to override Tailwind's hardcoded colour values.
   // Tailwind 4 resolves @theme colours at build time, so CSS variable
-   // overrides alone don't affect utility classes like text-charcoal-ink.
+  // overrides alone don't affect utility classes like text-charcoal-ink.
+  //
+  // NOTE on fonts: the couple's selected font intentionally applies ONLY to
+  // banner headline titles (homepage top banner + SectionBanner on every
+  // page — resolved via getFont() in those components). All other text keeps
+  // the platform's Playfair Display, per the original template design plan
+  // (TemplateEditor → Design → Typography).
   const themeOverrideCSS = generateThemeOverrideStyle(textColor, borderColor, headerTextColor, headerBg);
 
   return (

@@ -12,11 +12,17 @@ interface SectionBannerProps {
 }
 
 export default function SectionBanner({ title, subtitle, bannerUrl: bannerUrlProp }: SectionBannerProps) {
-  const { data, getField } = usePublicWedding(useWeddingSlug());
+  const { data, getFont } = usePublicWedding(useWeddingSlug());
   const rawBannerUrl = bannerUrlProp ?? data?.wedding.bannerUrl ?? '';
 
-  // Read the admin-chosen banner headline font (stored as global.fontFamily)
-  const bannerFont = getField('global', 'fontFamily', 'Playfair Display');
+  // Couple's selected "Banner Headline Font" — hero section first (what the
+  // CMS font picker writes), falling back to global (template applies) then
+  // the default. Per the design plan, ONLY the banner headline title uses
+  // this font; the subtitle and all other site text stay in Playfair
+  // Display. Previously this read ONLY global.fontFamily while the CMS font
+  // picker wrote only hero.fontFamily, so the banners on every page except
+  // the homepage never reflected the couple's font choice.
+  const bannerFont = getFont();
 
   // Hooks must always be called (React rules of hooks)
   const { textColor: bannerTextColor, subtitleColor: bannerSubtitleColor, textShadow: bannerTextShadow } = useImageAutoContrast(rawBannerUrl);

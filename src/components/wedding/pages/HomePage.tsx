@@ -55,7 +55,7 @@ function parseWeddingTimestamp(dateStr: string | null | undefined): number {
 }
 
 export default function HomePage() {
-  const { data, getField } = usePublicWedding(useWeddingSlug());
+  const { data, getField, getFont } = usePublicWedding(useWeddingSlug());
 
   const bannerUrl = data?.wedding.bannerUrl || '';
   const heroImgUrl = data?.wedding.heroImageUrl || '';
@@ -104,8 +104,12 @@ export default function HomePage() {
           </section>
   ) : null;
 
-  // CMS font — applied ONLY to the master head copy (couple name)
-  const heroFont = getField('hero', 'fontFamily', '');
+  // CMS "Banner Headline Font" — resolves the couple's selection
+  // (hero section → global section → default) and applies ONLY to the top
+  // banner headline (couple name), exactly as the design plan specifies.
+  // Section banners on every sub-page resolve the same font via getFont()
+  // in SectionBanner.tsx. All other text keeps Playfair Display.
+  const heroFont = getFont();
 
   // Narrative section
   const narrativeLabel = getField('hero', 'narrativeLabel', '');

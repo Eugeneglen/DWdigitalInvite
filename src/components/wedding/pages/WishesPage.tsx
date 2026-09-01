@@ -17,6 +17,7 @@ export default function WishesPage() {
 
 function WishesPageInner() {
   const { data, getField } = usePublicWedding(useWeddingSlug());
+
   const weddingId = data?.wedding?.id;
   const { liveWishes, addWish } = useLiveWeddingData({ weddingId });
 

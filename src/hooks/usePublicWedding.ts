@@ -137,7 +137,24 @@ export function usePublicWedding(slug?: string) {
     return data.content[section]?.[fieldKey] ?? fallback;
   };
 
-  return { data, loading, getField };
+  /**
+   * Resolves the couple's selected "Banner Headline Font".
+   *
+   * Precedence: hero.fontFamily → global.fontFamily → 'Playfair Display'.
+   *
+   * Per the original template design plan (TemplateEditor → Design →
+   * Typography), the selected font applies ONLY to banner headline titles
+   * — the homepage top banner H1 and the SectionBanner H1 on every sub-page.
+   * All other site text keeps the platform's Playfair Display. The Couple
+   * CMS font picker (and template apply) writes the selection to BOTH the
+   * hero and global sections; hero-first resolution also covers weddings
+   * whose data only ever recorded a hero font (legacy rows), while
+   * global-only rows (older template applies) fall through correctly too.
+   */
+  const getFont = (): string =>
+    data?.content?.hero?.fontFamily || data?.content?.global?.fontFamily || 'Playfair Display';
+
+  return { data, loading, getField, getFont };
 }
 
 /**

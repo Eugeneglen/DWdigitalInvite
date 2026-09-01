@@ -31,8 +31,19 @@ export default function FontPicker({ section }: FontPickerProps) {
         const fontItem = (data.content ?? []).find(
           (item: { fieldKey: string; fieldValue: string }) => item.fieldKey === 'fontFamily'
         );
+        // Fall back to the site-wide font (global section) if this section
+        // has no font of its own yet.
         if (fontItem?.fieldValue) {
           setSelectedFont(fontItem.fieldValue);
+        } else {
+          const globalRes = await fetch(`${CONTENT_API}&section=global`);
+          if (globalRes.ok) {
+            const globalData = await globalRes.json();
+            const globalFont = (globalData.content ?? []).find(
+              (item: { fieldKey: string; fieldValue: string }) => item.fieldKey === 'fontFamily'
+            );
+            if (globalFont?.fieldValue) setSelectedFont(globalFont.fieldValue);
+          }
         }
       } catch {
         toast({
@@ -60,19 +71,32 @@ export default function FontPicker({ section }: FontPickerProps) {
     setSelectedFont(value);
     setSaving(true);
     try {
+      // Persist to BOTH the hero section (what the homepage banner headline
+      // reads) and the global section (what section banners on the sub-pages
+      // read, and what the admin template apply writes). Writing both keeps
+      // every banner headline in sync with the couple's choice.
+      // Per the design plan, ONLY banner headline titles use this font —
+      // all other site text stays in Playfair Display.
+      const items: Array<{ section: string; fieldKey: string; fieldValue: string; fieldType: string }> = [
+        {
+          section,
+          fieldKey: 'fontFamily',
+          fieldValue: value,
+          fieldType: 'TEXT',
+        },
+      ];
+      if (section !== 'global') {
+        items.push({
+          section: 'global',
+          fieldKey: 'fontFamily',
+          fieldValue: value,
+          fieldType: 'TEXT',
+        });
+      }
       const res = await fetch(CONTENT_API, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: [
-            {
-              section,
-              fieldKey: 'fontFamily',
-              fieldValue: value,
-              fieldType: 'TEXT',
-            },
-          ],
-        }),
+        body: JSON.stringify({ items }),
       });
       if (!res.ok) throw new Error('Failed to save font');
       invalidateWeddingCache();
@@ -93,23 +117,27 @@ export default function FontPicker({ section }: FontPickerProps) {
         <div className="flex items-center gap-2">
           <Type className="size-4 text-cinematic-gold" />
           <Label className="text-xs font-medium text-charcoal-ink/50 uppercase tracking-wider">
-            Font
+            Banner Headline Font
           </Label>
           {saving && <Loader2 className="size-3.5 animate-spin text-cinematic-gold ml-auto" />}
         </div>
+        <p className="text-[11px] text-charcoal-ink/40 -mt-1">
+          Applies to the banner headline title on every page. All other text stays in Playfair Display.
+        </p>
 
-        {/* Preview */}
+        {/* Preview — headline line in the selected font, sub-line in Playfair
+            (mirrors how the selection renders on the guest site) */}
         {!loading && (
           <div className="min-w-0">
             <p
               className="text-lg text-charcoal-ink leading-snug truncate"
               style={{ fontFamily: `'${selectedFont}', serif` }}
             >
-              Eleanor & James
+              Eleanor &amp; James
             </p>
             <p
               className="text-[11px] text-charcoal-ink/40 mt-0.5 italic truncate"
-              style={{ fontFamily: `'${selectedFont}', serif` }}
+              style={{ fontFamily: "'Playfair Display', serif" }}
             >
               Together with their families
             </p>
