@@ -10,9 +10,21 @@ import { IS_VOLUME_STORAGE } from '@/lib/file-storage';
 // Prevents repeated filesystem checks on every GET request.
 const healedWeddings = new Set<string>();
 
-/** Check whether a filesystem-based URL actually has a file behind it. */
+/**
+ * Check whether a URL is expected to render.
+ *
+ * - External absolute URLs (http/https/…) are hosted off-platform (e.g. the
+ *   template's aida-public banner/hero images) and cannot be filesystem-
+ *   verified — treat them as valid. Returning false for them (previous
+ *   behaviour) made the self-heal wipe template-seeded banner/hero URLs
+ *   from the DB on the couple's first CMS load.
+ * - Local filesystem URLs (/api/uploads/weddings/…, /uploads/weddings/…)
+ *   are verified against disk (volume first, then public/uploads).
+ */
 async function fileExistsForUrl(url: string): Promise<boolean> {
-  if (!url || !url.startsWith('/')) return false;
+  if (!url) return false;
+  // Not a site-relative path → external/non-filesystem resource; assume valid.
+  if (!url.startsWith('/')) return true;
 
   let relativePath = '';
   if (url.startsWith('/api/uploads/weddings/')) {
@@ -20,7 +32,8 @@ async function fileExistsForUrl(url: string): Promise<boolean> {
   } else if (url.startsWith('/uploads/weddings/')) {
     relativePath = url.substring('/uploads/weddings/'.length);
   } else {
-    return false; // Not a filesystem URL (might be data: URL, etc.)
+    // Unknown path shape — not a managed filesystem asset; assume valid.
+    return true;
   }
 
   // Try volume path first (Railway), then local public/uploads

@@ -8,19 +8,33 @@ import { IS_VOLUME_STORAGE } from '@/lib/file-storage';
 
 // In-memory set of wedding IDs whose filesystem URLs have been checked.
 const checkedWeddings = new Set<string>();
-// Cache of wedding ID → set of fields with broken URLs (avoid re-checking).
-const brokenUrlCache = new Map<string, Set<string>>();
 
-/** Check whether a filesystem-based URL has a backing file. */
+/**
+ * Check whether a URL is expected to render.
+ *
+ * - External absolute URLs (http/https/…) are hosted off-platform (e.g. the
+ *   template's aida-public banner/hero images). They cannot and should not
+ *   be filesystem-verified — treat them as valid. Previously they returned
+ *   false, so the self-heal NULLED every template-seeded banner/hero URL on
+ *   the first preview of a newly created couple ("banner missing on all
+ *   pages").
+ * - Local filesystem URLs (/api/uploads/weddings/…, /uploads/weddings/…)
+ *   are verified against disk (volume first, then public/uploads).
+ */
 async function fileExistsForUrl(url: string): Promise<boolean> {
-  if (!url || !url.startsWith('/')) return false;
+  if (!url) return false;
+  // Not a site-relative path → an external (or otherwise non-filesystem)
+  // resource. Assume it resolves; only local uploads can be verified here.
+  if (!url.startsWith('/')) return true;
   let relativePath = '';
   if (url.startsWith('/api/uploads/weddings/')) {
     relativePath = url.substring('/api/uploads/weddings/'.length);
   } else if (url.startsWith('/uploads/weddings/')) {
     relativePath = url.substring('/uploads/weddings/'.length);
   } else {
-    return false;
+    // Unknown path shape (not an uploads URL) — not a managed filesystem
+    // asset; assume valid rather than wiping it.
+    return true;
   }
   const candidates: string[] = [];
   if (IS_VOLUME_STORAGE) {
@@ -112,6 +126,16 @@ export async function GET(req: Request) {
     // On Railway (ephemeral filesystem), files are lost after deploys but DB URLs remain.
     // One-time check per wedding per server instance. Returns null so the guest site
     // falls back to its built-in placeholder images.
+    //
+    // External URLs (template-seeded banner/hero images) are NOT filesystem
+    // assets and are never nulled (see fileExistsForUrl).
+    //
+    // The DB update below IS the heal — the response always reflects the
+    // CURRENT DB row. There is deliberately no "broken" cache masking the
+    // response: a couple can upload a new banner right after a heal and the
+    // API must serve it immediately, without a server restart. (The old
+    // brokenUrlCache kept nulling the field for the whole process lifetime
+    // — that is why a freshly added banner image never showed.)
     let heroImageUrl: string | null = wedding.heroImageUrl;
     let bannerUrl: string | null = wedding.bannerUrl;
     let heroVideoUrl: string | null = wedding.heroVideoUrl;
@@ -139,17 +163,14 @@ export async function GET(req: Request) {
       }
 
       if (Object.keys(updates).length > 0) {
-        brokenUrlCache.set(wedding.id, new Set(Object.keys(updates)));
         console.log(`[self-heal:public] Clearing broken URLs for wedding ${wedding.id}:`, Object.keys(updates));
-        db.weddingAccount.update({ where: { id: wedding.id }, data: updates }).catch(() => {});
-      }
-    } else {
-      // Already checked — use cached result
-      if (brokenUrlCache.has(wedding.id)) {
-        const broken = brokenUrlCache.get(wedding.id)!;
-        if (broken.has('heroImageUrl')) heroImageUrl = null;
-        if (broken.has('bannerUrl')) bannerUrl = null;
-        if (broken.has('heroVideoUrl')) heroVideoUrl = null;
+        try {
+          await db.weddingAccount.update({ where: { id: wedding.id }, data: updates });
+        } catch (err) {
+          // Non-fatal: the response already omits the broken URLs; the DB
+          // will be re-healed on the next server instance.
+          console.error('[self-heal:public] DB update failed:', err);
+        }
       }
     }
 
