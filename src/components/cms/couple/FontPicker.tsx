@@ -125,13 +125,15 @@ export default function FontPicker({ section }: FontPickerProps) {
           Applies to the banner headline title on every page. All other text stays in Playfair Display.
         </p>
 
-        {/* Preview — headline line in the selected font, sub-line in Playfair
-            (mirrors how the selection renders on the guest site) */}
+        {/* Preview — headline line rendered exactly as the guest-site banner
+            headline will render it (weight 700 where the family has a true
+            bold face; natural weight for single-weight families — no
+            synthetic bolding), sub-line in Playfair Display. */}
         {!loading && (
           <div className="min-w-0">
             <p
-              className="text-lg text-charcoal-ink leading-snug truncate"
-              style={{ fontFamily: `'${selectedFont}', serif` }}
+              className="text-lg text-charcoal-ink leading-snug truncate font-bold"
+              style={{ fontFamily: `'${selectedFont}', serif`, fontSynthesis: 'none' }}
             >
               Eleanor &amp; James
             </p>

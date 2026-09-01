@@ -44,6 +44,10 @@ export default function SectionBanner({ title, subtitle, bannerUrl: bannerUrlPro
               fontFamily: `'${bannerFont}', serif`,
               color: bannerTextColor,
               textShadow: bannerTextShadow,
+              // See HomePage.tsx: single-weight fonts (most scripts) must not
+              // be faux-bolded — render their natural weight so the banner
+              // matches the CMS font picker showcase. Real bolds still apply.
+              fontSynthesis: 'none',
             }}
           >
             {title}

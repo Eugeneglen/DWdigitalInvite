@@ -148,6 +148,12 @@ export default function HomePage() {
               fontFamily: `'${heroFont}', serif`,
               color: bannerTextColor,
               textShadow: bannerTextShadow,
+              // Fonts without a true 700 face (most script/display fonts load
+              // weight 400 only from Google Fonts) must NOT be faux-bolded by
+              // the browser — that made thin showcase fonts render as thick
+              // blobs. font-synthesis: none renders their natural weight;
+              // fonts with a real bold still use it. Matches the CMS picker.
+              fontSynthesis: 'none',
             }}
           >
             {coupleName}

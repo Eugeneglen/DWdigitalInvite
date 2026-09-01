@@ -2609,7 +2609,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
           {title && (
             <h1
               className="text-[44px] md:text-[72px] leading-[1.05] tracking-tight font-bold drop-shadow-sm"
-              style={{ fontFamily: bannerFont, color: bannerTextColor, textShadow: bannerTextShadow }}
+              style={{ fontFamily: bannerFont, color: bannerTextColor, textShadow: bannerTextShadow, fontSynthesis: 'none' }}
             >
               {title}
             </h1>
@@ -2641,7 +2641,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
               {heroTitle && (
                 <h1
                   className="text-[44px] md:text-[72px] leading-[1.05] tracking-tight font-bold drop-shadow-sm"
-                  style={{ fontFamily: bannerFont, color: bannerTextColor, textShadow: bannerTextShadow }}
+                  style={{ fontFamily: bannerFont, color: bannerTextColor, textShadow: bannerTextShadow, fontSynthesis: 'none' }}
                 >
                   {heroTitle}
                 </h1>
@@ -2662,7 +2662,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
           <div className="text-center py-16 px-6">
             <h1
               className="text-[44px] md:text-[72px] leading-[1.05] tracking-tight font-bold"
-              style={{ fontFamily: bannerFont, color: autoTextColor }}
+              style={{ fontFamily: bannerFont, color: autoTextColor, fontSynthesis: 'none' }}
             >
               {heroTitle}
             </h1>
