@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { getAutoTextColorFromRGB } from '@/lib/contrast';
+import { useState, useEffect, useRef } from 'react';
+import { getAutoTextColor, getAutoTextColorFromRGB } from '@/lib/contrast';
 
 interface ImageAutoContrast {
   /** Primary text colour for headline */
@@ -14,31 +14,64 @@ interface ImageAutoContrast {
   textShadow: string;
 }
 
+/** Result used before/outside image analysis */
+function solidResult(textColor: string): Pick<ImageAutoContrast, 'textColor' | 'subtitleColor' | 'textShadow'> {
+  const isLight = textColor === '#1A1A1A';
+  return {
+    textColor,
+    subtitleColor: isLight ? 'rgba(26, 26, 26, 0.7)' : 'rgba(232, 224, 208, 0.7)',
+    textShadow: isLight ? '0 1px 3px rgba(0,0,0,0.1)' : '0 1px 4px rgba(0,0,0,0.5)',
+  };
+}
+
 /**
  * Analyses the centre region of a background image to determine whether
  * it is predominantly light or dark, then returns the appropriate text
  * colour using the same WCAG luminance logic as the page-level contrast
  * system — but independently, based on the actual image content.
  *
- * Uses an off-screen <canvas> to sample pixel data.  Falls back to dark
- * text (#1A1A1A) if the image cannot be loaded (CORS, network error, etc.).
+ * Uses an off-screen <canvas> to sample pixel data.
+ *
+ * @param imageUrl background image to analyse
+ * @param pageBackgroundColor optional page background colour. When the image
+ *   cannot be loaded (CORS, 404 — e.g. Railway's ephemeral filesystem wiping
+ *   uploads after a deploy) the banner renders directly on the PAGE
+ *   background, so the fallback must contrast with the PAGE, not assume a
+ *   light background. Omitted → legacy behaviour (dark text), used by the
+ *   master CMS template editor where the preview pane is always light.
  */
-export function useImageAutoContrast(imageUrl: string): ImageAutoContrast {
+export function useImageAutoContrast(
+  imageUrl: string,
+  pageBackgroundColor?: string,
+): ImageAutoContrast {
+  // Fallback colour when analysis is impossible — matches the page background
+  // polarity when known, else the historical dark-text default.
+  const fallback = pageBackgroundColor
+    ? solidResult(getAutoTextColor(pageBackgroundColor))
+    : solidResult('#1A1A1A');
+
   const [result, setResult] = useState<ImageAutoContrast>({
-    textColor: '#1A1A1A',
-    subtitleColor: 'rgba(26, 26, 26, 0.7)',
+    ...fallback,
     analysing: true,
-    textShadow: '0 1px 3px rgba(0,0,0,0.1)',
   });
 
+  // True once an image has been SUCCESSFULLY analysed — page-background
+  // patches must not overwrite real image-derived colours.
+  const analysedOkRef = useRef(false);
+
+  // Patch the fallback as the page background becomes known (the wedding
+  // data fetch resolves after first paint). Only applies while no image
+  // analysis has succeeded, and never flips the analysing flag.
   useEffect(() => {
+    if (analysedOkRef.current) return;
+    setResult((prev) => ({ ...fallback, analysing: prev.analysing }));
+  }, [pageBackgroundColor]);
+
+  useEffect(() => {
+    analysedOkRef.current = false;
+
     if (!imageUrl) {
-      setResult({
-        textColor: '#1A1A1A',
-        subtitleColor: 'rgba(26, 26, 26, 0.7)',
-        analysing: false,
-        textShadow: '0 1px 3px rgba(0,0,0,0.1)',
-      });
+      setResult({ ...fallback, analysing: false });
       return;
     }
 
@@ -87,6 +120,7 @@ export function useImageAutoContrast(imageUrl: string): ImageAutoContrast {
           const textColor = getAutoTextColorFromRGB(avgR, avgG, avgB);
           const isLight = textColor === '#1A1A1A';
 
+          analysedOkRef.current = true;
           setResult({
             textColor,
             subtitleColor: isLight
@@ -98,25 +132,17 @@ export function useImageAutoContrast(imageUrl: string): ImageAutoContrast {
               : '0 1px 4px rgba(0,0,0,0.5)',
           });
         } catch {
-          // CORS tainted canvas, missing context, etc. — safe fallback to dark text
-          setResult({
-            textColor: '#1A1A1A',
-            subtitleColor: 'rgba(26, 26, 26, 0.7)',
-            analysing: false,
-            textShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          });
+          // CORS tainted canvas, missing context, etc. — fall back to
+          // page-background-aware colours (symmetric with the hero hook)
+          if (!cancelled) setResult({ ...fallback, analysing: false });
         }
       };
 
       img.onerror = () => {
-        if (!cancelled) {
-          setResult({
-            textColor: '#1A1A1A',
-            subtitleColor: 'rgba(26, 26, 26, 0.7)',
-            analysing: false,
-            textShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          });
-        }
+        // Image unreachable (404/CORS/network) — the banner then renders on
+        // the PAGE background, so contrast against that instead of assuming
+        // light (fixes invisible banner headlines after Railway deploys).
+        if (!cancelled) setResult({ ...fallback, analysing: false });
       };
 
       img.src = imageUrl;

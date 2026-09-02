@@ -12,8 +12,11 @@ interface SectionBannerProps {
 }
 
 export default function SectionBanner({ title, subtitle, bannerUrl: bannerUrlProp }: SectionBannerProps) {
-  const { data, getFont } = usePublicWedding(useWeddingSlug());
+  const { data, getFont, getField } = usePublicWedding(useWeddingSlug());
   const rawBannerUrl = bannerUrlProp ?? data?.wedding.bannerUrl ?? '';
+  // Page background — drives the fallback text colour when the banner image
+  // cannot be analysed/loaded (the banner then renders on the page bg).
+  const pageBackgroundColor = getField('global', 'backgroundColor', '#FCF9F2');
 
   // Couple's selected "Banner Headline Font" — hero section first (what the
   // CMS font picker writes), falling back to global (template applies) then
@@ -25,7 +28,7 @@ export default function SectionBanner({ title, subtitle, bannerUrl: bannerUrlPro
   const bannerFont = getFont();
 
   // Hooks must always be called (React rules of hooks)
-  const { textColor: bannerTextColor, subtitleColor: bannerSubtitleColor, textShadow: bannerTextShadow } = useImageAutoContrast(rawBannerUrl);
+  const { textColor: bannerTextColor, subtitleColor: bannerSubtitleColor, textShadow: bannerTextShadow } = useImageAutoContrast(rawBannerUrl, pageBackgroundColor);
 
   // Don't render the banner at all if there's no image
   if (!rawBannerUrl) return null;

@@ -62,7 +62,12 @@ export default function HomePage() {
 
   // Independent auto-contrast for the banner headline — samples the actual
   // banner IMAGE pixels (not the page background) to pick text colour.
-  const { textColor: bannerTextColor, subtitleColor: bannerSubtitleColor, textShadow: bannerTextShadow } = useImageAutoContrast(bannerUrl);
+  // The page background is passed so the fallback colour contrasts with the
+  // page when the banner image cannot be loaded/analysed.
+  const { textColor: bannerTextColor, subtitleColor: bannerSubtitleColor, textShadow: bannerTextShadow } = useImageAutoContrast(
+    bannerUrl,
+    getField('global', 'backgroundColor', '#FCF9F2'),
+  );
   const heroVideoUrl = data?.wedding.heroVideoUrl || null;
 
   // Hero section auto-contrast — samples the BOTTOM of the image where text sits

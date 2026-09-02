@@ -8,7 +8,7 @@ import { useAuthModalStore } from '@/store/useAuthModalStore';
 import { usePublicWedding } from '@/hooks/usePublicWedding';
 import { WeddingSlugProvider } from '@/hooks/useWeddingSlug';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
-import { getAutoTextColor, getAutoBorderColor, generateThemeOverrideStyle } from '@/lib/contrast';
+import { getAutoTextColor, getAutoBorderColor, generateThemeOverrideStyle, isReadableOn } from '@/lib/contrast';
 import { filterTabsByFeatures } from '@/store/useNavigationStore';
 import { normalizePlatformRole, hasPlatformPermissionSync as hasPlatformPermission } from '@/lib/permissions';
 import Header from '@/components/wedding/Header';
@@ -138,10 +138,24 @@ export default function GuestSite({ slug, topOffset, showEditorButton = false }:
 
   // Text & border colours for the BODY — auto-detect from page bg unless
   // manually overridden. These do NOT apply to the header/footer.
+  //
+  // ── Render-time contrast guard (Railway fix) ──
+  // A stored override (template-seeded or manually set) is honoured ONLY when
+  // it still reads against the CURRENT background. Couples can change the
+  // background independently via the BackgroundColourPicker, which historically
+  // left a stale template textColor in place — the override then beat
+  // auto-contrast and rendered invisible text (dark-on-dark / light-on-light).
+  // Paired dark templates (e.g. bg #0F172A + text #F8FAFC) pass the guard and
+  // keep their explicit colours; clashing data falls back to auto-contrast.
+  // This is a render-only repair — no data is rewritten from this path.
   const textColorOverride = getField('global', 'textColor', '');
   const borderColorOverride = getField('global', 'borderColor', '');
-  const textColor = textColorOverride || getAutoTextColor(backgroundColor);
-  const borderColor = borderColorOverride || getAutoBorderColor(backgroundColor);
+  const textColor = textColorOverride && isReadableOn(textColorOverride, backgroundColor)
+    ? textColorOverride
+    : getAutoTextColor(backgroundColor);
+  const borderColor = borderColorOverride && isReadableOn(borderColorOverride, backgroundColor, 1.5)
+    ? borderColorOverride
+    : getAutoBorderColor(backgroundColor);
 
   // Header text auto-contrasts with the header bg (from Master CMS), so it
   // stays readable whether the Master CMS sets a light or dark header colour.
