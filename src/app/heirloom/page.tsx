@@ -57,9 +57,11 @@ export default function HeirloomPage() {
         .h-brown { color: #401020; }
         .h-brown-70 { color: rgba(64,16,32,0.7); }
         .h-brown-75 { color: rgba(64,16,32,0.75); }
+        .h-brown-85 { color: rgba(64,16,32,0.85); }
         .h-brown-55 { color: rgba(64,16,32,0.55); }
         .h-brown-30 { color: rgba(64,16,32,0.3); }
         .h-brown-bd-5 { border-color: rgba(64,16,32,0.05); }
+        .h-border-brown-85 { border-color: rgba(64,16,32,0.85); }
         .h-gold-80 { color: rgba(212,175,55,0.8); }
         .h-gold-bright { color: #E9CD73; }
         .h-ink-soft { color: #3a3632; }
@@ -74,11 +76,19 @@ export default function HeirloomPage() {
         .h-grad-scroll { background: linear-gradient(180deg, transparent, rgba(64,16,32,0.4)); }
         .h-shadow-ink-15 { box-shadow: 0 20px 40px rgba(64,16,32,0.15); }
         .h-shadow-ink-20 { box-shadow: 0 20px 40px rgba(26,26,26,0.20); }
+        /* Tailwind shadow-color helpers — set --tw-shadow-color so that
+           shadow-xl / shadow-2xl (which ARE in tailwind-output.css) use brown. */
+        .h-shadow-color-brown-15 { --tw-shadow-color: rgba(64,16,32,0.15); }
+        .h-shadow-color-brown-20 { --tw-shadow-color: rgba(64,16,32,0.2); }
         .h-cream-70 { color: rgba(252,249,242,0.7); }
         .h-champagne-70 { color: rgba(232,213,181,0.7); }
         .h-champagne-90 { color: rgba(232,213,181,0.9); }
         .h-playfair { font-family: var(--font-playfair), serif; }
         .h-inter { font-family: var(--font-inter), sans-serif; }
+        /* Section padding (py-24 sm:py-32 md:py-40 not in tailwind-output.css) */
+        .h-sec-pad { padding-top: 96px; padding-bottom: 96px; }
+        @media (min-width: 640px) { .h-sec-pad { padding-top: 128px; padding-bottom: 128px; } }
+        @media (min-width: 768px) { .h-sec-pad { padding-top: 160px; padding-bottom: 160px; } }
         /* Structural classes (Tailwind arbitrary values not in tailwind-output.css) */
         .h-aspect-45 { aspect-ratio: 4 / 5; }
         .h-h-21-6 { height: 21.6px; }
@@ -93,12 +103,74 @@ export default function HeirloomPage() {
         .h-tracking-02 { letter-spacing: 0.2em; }
         .h-tracking-032 { letter-spacing: 0.32em; }
         .h-tracking-03 { letter-spacing: 0.3em; }
+
+        /* === Standard Tailwind utilities MISSING from precompiled tailwind-output.css ===
+           Generated on-demand by Tailwind 4 JIT in the local sandbox, but the Railway
+           precompiled CSS does not include them because the SaaS app never used them.
+           Adding them here as plain CSS rules (with media queries for responsive
+           variants) so the Heirloom page renders identically to the local sandbox. */
+
+        /* -- Padding / margin / gap / max-width / position -- */
+        .py-24 { padding-block: 6rem; }            /* 96px - section padding base */
+        .px-9 { padding-inline: 2.25rem; }          /* 36px - Enquire Now button */
+        .my-7 { margin-block: 1.75rem; }            /* 28px - Flourish divider */
+        .mt-7 { margin-top: 1.75rem; }              /* 28px - section 3 lists + section 4 span */
+        .mt-14 { margin-top: 3.5rem; }              /* 56px */
+        .mt-16 { margin-top: 4rem; }                /* 64px - section 2 pullquote, section 3 duo grid */
+        .gap-3\\.5 { gap: 0.875rem; }              /* 14px - Flourish gap */
+        .max-w-6xl { max-width: 72rem; }            /* 1152px - section 3 outer container */
+        .bottom-8 { bottom: 2rem; }                 /* 32px - scroll indicator */
+        .left-5 { left: 1.25rem; }                  /* 20px - phone status bar */
+        .right-5 { right: 1.25rem; }                /* 20px - phone status bar */
+        .rounded-b-2xl { border-bottom-left-radius: 1rem; border-bottom-right-radius: 1rem; }
+
+        /* -- Text sizes (font-size + line-height, matching Tailwind v4 defaults) -- */
+        .text-6xl { font-size: 3.75rem; line-height: 1; }   /* 60px */
+        .text-7xl { font-size: 4.5rem; line-height: 1; }    /* 72px */
+
+        /* -- sm: (>=640px) responsive variants -- */
+        @media (min-width: 640px) {
+          .sm\\:px-12 { padding-inline: 3rem; }       /* 48px - hero white box */
+          .sm\\:py-14 { padding-block: 3.5rem; }      /* 56px - hero white box */
+          .sm\\:py-32 { padding-block: 8rem; }        /* 128px - section padding */
+          .sm\\:mt-14 { margin-top: 3.5rem; }         /* 56px - section 4 button container */
+          .sm\\:mt-20 { margin-top: 5rem; }           /* 80px - section 3 duo grid */
+          .sm\\:text-xs { font-size: 0.75rem; line-height: 1rem; }     /* 12px */
+          .sm\\:text-xl { font-size: 1.25rem; line-height: 1.75rem; }  /* 20px - hero subtitle */
+          .sm\\:text-4xl { font-size: 2.25rem; line-height: 2.5rem; }  /* 36px - section 4 h2 */
+          .sm\\:text-5xl { font-size: 3rem; line-height: 1; }          /* 48px - h1 */
+          .sm\\:text-base { font-size: 1rem; line-height: 1.5rem; }    /* 16px - section 3 lists */
+          .sm\\:text-lg { font-size: 1.125rem; line-height: 1.75rem; } /* 18px - section 2 body */
+          .sm\\:h-h-23-4 { height: 23.4px; }         /* logo height on sm+ */
+        }
+
+        /* -- md: (>=768px) responsive variants -- */
+        @media (min-width: 768px) {
+          .md\\:py-40 { padding-block: 10rem; }      /* 160px - section padding */
+          .md\\:text-2xl { font-size: 1.5rem; line-height: 2rem; }    /* 24px - hero subtitle */
+          .md\\:h-text-25rem { font-size: 2.5rem; }  /* 40px - section 4 h2 */
+        }
+
+        /* -- lg: (>=1024px) responsive variants -- */
+        @media (min-width: 1024px) {
+          .lg\\:text-7xl { font-size: 4.5rem; line-height: 1; }  /* 72px - h1 */
+          .lg\\:gap-16 { gap: 4rem; }                /* 64px - section 3 duo grid */
+        }
+
+        /* -- Line-height overrides (MUST come after text-* rules so they win the cascade) --
+           The text-* rules above set line-height: 1 (Tailwind v4 default for large sizes).
+           The h1/h2 elements use explicit h-leading-* classes to override this.
+           These rules are placed LAST in the style block so they take precedence. */
+        .h-leading-108 { line-height: 1.08; }
+        .h-leading-125 { line-height: 1.25; }
+        .h-leading-135 { line-height: 1.35; }
+        .h-leading-13 { line-height: 1.3; }
       `}</style>
 
       {/* ═══════════════════════════════════════════════════════════════════════
           SECTION 1 — HERO
           ═══════════════════════════════════════════════════════════════════════ */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden py-20 sm:py-24 md:py-28">
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
         <Image
           src="/heirloom/coexist/heirloom-main.avif"
           alt="A Dreamweavers Heirloom invitation suite — the keepsake you hold"
@@ -123,7 +195,7 @@ export default function HeirloomPage() {
 
           <Flourish />
 
-          <p className="h-cormorant italic text-lg sm:text-xl md:text-2xl h-brown-75 max-w-2xl mx-auto leading-relaxed">
+          <p className="h-cormorant italic text-lg sm:text-xl md:text-2xl h-brown-85 max-w-2xl mx-auto leading-relaxed">
             A wedding invitation is more than information.
             <br className="hidden sm:block" />
             It is the first chapter of your celebration.
@@ -142,7 +214,7 @@ export default function HeirloomPage() {
       {/* ═══════════════════════════════════════════════════════════════════════
           SECTION 2 — THE THESIS
           ═══════════════════════════════════════════════════════════════════════ */}
-      <section className="py-24 sm:py-32 md:py-40 bg-paper-cream">
+      <section className="h-sec-pad bg-paper-cream">
         <div className="max-w-3xl mx-auto px-6">
           <RevealSection>
             <p className={`${inter} h-text-11 h-tracking-03 uppercase font-semibold text-cinematic-gold text-center`}>
@@ -198,7 +270,7 @@ export default function HeirloomPage() {
       {/* ═══════════════════════════════════════════════════════════════════════
           SECTION 3 — COEXIST: THE TWO HALVES
           ═══════════════════════════════════════════════════════════════════════ */}
-      <section className="py-24 sm:py-32 md:py-40 h-bg-cream-dim">
+      <section className="h-sec-pad h-bg-cream-dim">
         <div className="max-w-6xl mx-auto px-6">
           <RevealSection>
             <p className={`${inter} h-text-11 h-tracking-03 uppercase font-semibold text-cinematic-gold text-center`}>
@@ -217,7 +289,7 @@ export default function HeirloomPage() {
             {/* ── LEFT: THE BEAUTIFULLY CRAFTED INVITATION ── */}
             <RevealSection>
               <div>
-                <div className="relative h-aspect-45 overflow-hidden mb-8 h-shadow-ink-15 bg-paper-cream">
+                <div className="relative h-aspect-45 overflow-hidden mb-8 shadow-xl h-shadow-color-brown-15 bg-paper-cream">
                   <Image
                     src="/heirloom/coexist/poppy-flatlay.png"
                     alt="The physical Heirloom invitation — a cherished keepsake"
@@ -234,7 +306,7 @@ export default function HeirloomPage() {
                   A cherished keepsake that endures beyond the wedding day.
                 </h3>
 
-                <ul className="mt-6 space-y-4">
+                <ul className="mt-7 space-y-4">
                   {[
                     'A tangible expression of your celebration and gratitude',
                     'A meaningful gesture for parents, relatives, and honoured guests',
@@ -264,7 +336,7 @@ export default function HeirloomPage() {
                   Where your invitation extends into an immersive experience.
                 </h3>
 
-                <ul className="mt-6 space-y-4">
+                <ul className="mt-7 space-y-4">
                   {[
                     'Seamlessly connected to your printed invitation',
                     'Share your story through music, video, photography, and animation',
@@ -288,7 +360,7 @@ export default function HeirloomPage() {
       {/* ═══════════════════════════════════════════════════════════════════════
           SECTION 4 — CLOSING / ENQUIRY
           ═══════════════════════════════════════════════════════════════════════ */}
-      <section className="py-24 sm:py-32 md:py-40 bg-paper-cream">
+      <section className="h-sec-pad bg-paper-cream">
         <div className="max-w-3xl mx-auto px-6 text-center">
           <RevealSection>
             <a href="https://www.dreamweavers.com.sg/" target="_blank" rel="noopener noreferrer">
@@ -300,7 +372,7 @@ export default function HeirloomPage() {
                 className="h-h-21-6 sm:h-h-23-4 w-auto mx-auto object-contain"
               />
             </a>
-            <span className={`${inter} block text-xs h-tracking-03 uppercase h-gold-80 font-medium mt-6`}>
+            <span className={`${inter} block text-xs h-tracking-03 uppercase h-gold-80 font-medium mt-7`}>
               Begin Your Journey
             </span>
           </RevealSection>
@@ -321,7 +393,7 @@ export default function HeirloomPage() {
                 href="https://www.dreamweavers.com.sg/contact"
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`${inter} inline-block bg-cinematic-gold h-brown px-9 py-4 text-xs font-medium h-tracking-02 uppercase h-bg-gold-90 transition-colors duration-300`}
+                className={`${inter} inline-block bg-cinematic-gold h-brown px-9 py-4 text-xs font-medium h-tracking-02 uppercase hover:bg-cinematic-gold/90 transition-colors duration-300`}
               >
                 Enquire Now
               </a>
@@ -333,7 +405,7 @@ export default function HeirloomPage() {
       {/* ═══════════════════════════════════════════════════════════════════════
           FOOTER
           ═══════════════════════════════════════════════════════════════════════ */}
-      <footer className="py-12 bg-paper-cream border-t h-brown-bd-5">
+      <footer className="py-8 bg-paper-cream border-t h-brown-bd-5">
         <p className={`${inter} text-xs h-brown-30 text-center tracking-wide`}>
           © 2026 DREAMWEAVERS DIGITAL HEIRLOOMS. All rights reserved.
         </p>
