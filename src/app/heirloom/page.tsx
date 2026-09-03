@@ -84,7 +84,7 @@ export default function HeirloomPage() {
       {/* ═══════════════════════════════════════════════════════════════════════
           SECTION 1 — HERO
           ═══════════════════════════════════════════════════════════════════════ */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden py-20 sm:py-24 md:py-28">
         <Image
           src="/heirloom/coexist/heirloom-main.avif"
           alt="A Dreamweavers Heirloom invitation suite — the keepsake you hold"
@@ -319,7 +319,7 @@ export default function HeirloomPage() {
       {/* ═══════════════════════════════════════════════════════════════════════
           FOOTER
           ═══════════════════════════════════════════════════════════════════════ */}
-      <footer className="py-8 bg-paper-cream border-t h-brown-bd-5">
+      <footer className="py-12 bg-paper-cream border-t h-brown-bd-5">
         <p className={`${inter} text-xs h-brown-30 text-center tracking-wide`}>
           © 2026 DREAMWEAVERS DIGITAL HEIRLOOMS. All rights reserved.
         </p>
