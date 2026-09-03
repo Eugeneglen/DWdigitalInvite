@@ -52,7 +52,16 @@ export default function HeirloomPage() {
   const script = 'font-[family-name:"Great_Vibes",cursive]'
 
   return (
-    <main className={`${inter} antialiased`}>
+    <main className={`${inter} antialiased`} style={{ color: '#401020' }}>
+        <style>{`
+          /* Override the SaaS layout's text-charcoal-ink (#1A1A1A) with the Heirloom brown (#401020) */
+          main { color: #401020 !important; }
+          main h1, main h2, main h3, main h4, main p, main li, main span, main a { color: inherit; }
+          main .text-\[\#D4AF37\], main [class*="text-[#D4AF37]"] { color: #D4AF37 !important; }
+          /* Font family overrides — ensure Great Vibes + Cormorant Garamond load correctly */
+          main [class*="Great_Vibes"] { font-family: "Great Vibes", cursive !important; }
+          main [class*="Cormorant_Garamond"] { font-family: "Cormorant Garamond", serif !important; }
+        `}</style>
       {/* ═══════════════════════════════════════════════════════════════════════
           SECTION 1 — HERO: "A Keepsake to Hold. A Story to Experience."
           ═══════════════════════════════════════════════════════════════════════ */}
@@ -74,7 +83,7 @@ export default function HeirloomPage() {
           <h1 className={`${playfair} mt-6 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-semibold text-[#401020] leading-[1.08] tracking-tight`}>
             A Keepsake to Hold.
             <br />
-            <span className={`${script} text-[#D4AF37] font-normal`} style={{ fontSize: '1.15em' }}>
+            <span style={{ fontFamily: '"Great Vibes", cursive', color: '#D4AF37', fontSize: '1.15em' }}>
               A Story to Experience.
             </span>
           </h1>
