@@ -79,6 +79,20 @@ export default function HeirloomPage() {
         .h-champagne-90 { color: rgba(232,213,181,0.9); }
         .h-playfair { font-family: var(--font-playfair), serif; }
         .h-inter { font-family: var(--font-inter), sans-serif; }
+        /* Structural classes (Tailwind arbitrary values not in tailwind-output.css) */
+        .h-aspect-45 { aspect-ratio: 4 / 5; }
+        .h-h-21-6 { height: 21.6px; }
+        .h-h-23-4 { height: 23.4px; }
+        .h-leading-108 { line-height: 1.08; }
+        .h-leading-125 { line-height: 1.25; }
+        .h-leading-135 { line-height: 1.35; }
+        .h-leading-13 { line-height: 1.3; }
+        .h-text-10 { font-size: 10px; }
+        .h-text-11 { font-size: 11px; }
+        .h-text-25rem { font-size: 2.5rem; }
+        .h-tracking-02 { letter-spacing: 0.2em; }
+        .h-tracking-032 { letter-spacing: 0.32em; }
+        .h-tracking-03 { letter-spacing: 0.3em; }
       `}</style>
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -95,11 +109,11 @@ export default function HeirloomPage() {
         />
 
         <div className="relative z-10 max-w-4xl mx-auto px-8 sm:px-12 py-12 sm:py-14 text-center bg-white/60">
-          <p className={`${inter} text-[11px] sm:text-xs tracking-[0.32em] uppercase font-semibold text-cinematic-gold`}>
+          <p className={`${inter} h-text-11 sm:text-xs h-tracking-032 uppercase font-semibold text-cinematic-gold`}>
             Heirloom by Dreamweavers
           </p>
 
-          <h1 className={`${playfair} mt-6 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-semibold h-brown leading-[1.08] tracking-tight`}>
+          <h1 className={`${playfair} mt-6 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-semibold h-brown h-leading-108 tracking-tight`}>
             A Keepsake to Hold.
             <br />
             <span className="h-script text-cinematic-gold font-normal" style={{ fontSize: '1.15em' }}>
@@ -115,7 +129,7 @@ export default function HeirloomPage() {
             It is the first chapter of your celebration.
           </p>
 
-          <p className={`${inter} mt-8 text-[10px] sm:text-xs tracking-[0.3em] uppercase h-brown-55`}>
+          <p className={`${inter} mt-8 h-text-10 sm:text-xs h-tracking-03 uppercase h-brown-55`}>
             Since 1998 · Singapore
           </p>
         </div>
@@ -131,13 +145,13 @@ export default function HeirloomPage() {
       <section className="py-24 sm:py-32 md:py-40 bg-paper-cream">
         <div className="max-w-3xl mx-auto px-6">
           <RevealSection>
-            <p className={`${inter} text-[11px] tracking-[0.3em] uppercase font-semibold text-cinematic-gold text-center`}>
+            <p className={`${inter} h-text-11 h-tracking-03 uppercase font-semibold text-cinematic-gold text-center`}>
               The Philosophy
             </p>
           </RevealSection>
 
           <RevealSection>
-            <h2 className={`${playfair} mt-5 text-2xl sm:text-3xl md:text-4xl font-semibold h-brown text-center leading-[1.25]`}>
+            <h2 className={`${playfair} mt-5 text-2xl sm:text-3xl md:text-4xl font-semibold h-brown text-center h-leading-125`}>
               In a world where everything is shared in a moment
               <br className="hidden md:block" /> and forgotten just as quickly,
               <br className="hidden md:block" />
@@ -163,7 +177,7 @@ export default function HeirloomPage() {
           <RevealSection>
             <div className="mt-16 text-center">
               <Flourish />
-              <p className={`${playfair} italic text-2xl sm:text-3xl md:text-4xl h-brown leading-[1.3] max-w-2xl mx-auto`}>
+              <p className={`${playfair} italic text-2xl sm:text-3xl md:text-4xl h-brown h-leading-13 max-w-2xl mx-auto`}>
                 The invitation becomes the keepsake.
                 <br />
                 The digital experience brings the story to life.
@@ -187,7 +201,7 @@ export default function HeirloomPage() {
       <section className="py-24 sm:py-32 md:py-40 h-bg-cream-dim">
         <div className="max-w-6xl mx-auto px-6">
           <RevealSection>
-            <p className={`${inter} text-[11px] tracking-[0.3em] uppercase font-semibold text-cinematic-gold text-center`}>
+            <p className={`${inter} h-text-11 h-tracking-03 uppercase font-semibold text-cinematic-gold text-center`}>
               Two Halves of One Celebration
             </p>
           </RevealSection>
@@ -203,7 +217,7 @@ export default function HeirloomPage() {
             {/* ── LEFT: THE BEAUTIFULLY CRAFTED INVITATION ── */}
             <RevealSection>
               <div>
-                <div className="relative aspect-[4/5] overflow-hidden mb-8 h-shadow-ink-15 bg-paper-cream">
+                <div className="relative h-aspect-45 overflow-hidden mb-8 h-shadow-ink-15 bg-paper-cream">
                   <Image
                     src="/heirloom/coexist/poppy-flatlay.png"
                     alt="The physical Heirloom invitation — a cherished keepsake"
@@ -213,7 +227,7 @@ export default function HeirloomPage() {
                   />
                 </div>
 
-                <p className={`${inter} text-[11px] tracking-[0.3em] uppercase font-semibold text-cinematic-gold`}>
+                <p className={`${inter} h-text-11 h-tracking-03 uppercase font-semibold text-cinematic-gold`}>
                   The Beautifully Crafted Invitation
                 </p>
                 <h3 className={`${playfair} text-2xl sm:text-3xl font-semibold h-brown mt-3 leading-tight`}>
@@ -243,7 +257,7 @@ export default function HeirloomPage() {
               <div>
                 <HeirloomGuestPreview className="" />
 
-                <p className={`${inter} text-[11px] tracking-[0.3em] uppercase font-semibold text-cinematic-gold mt-10`}>
+                <p className={`${inter} h-text-11 h-tracking-03 uppercase font-semibold text-cinematic-gold mt-10`}>
                   The Heirloom Digital Suite
                 </p>
                 <h3 className={`${playfair} text-2xl sm:text-3xl font-semibold h-brown mt-3 leading-tight`}>
@@ -283,17 +297,17 @@ export default function HeirloomPage() {
                 alt="Dreamweavers"
                 width={198}
                 height={20}
-                className="h-[21.6px] sm:h-[23.4px] w-auto mx-auto object-contain"
+                className="h-h-21-6 sm:h-h-23-4 w-auto mx-auto object-contain"
               />
             </a>
-            <span className={`${inter} block text-xs tracking-[0.3em] uppercase h-gold-80 font-medium mt-6`}>
+            <span className={`${inter} block text-xs h-tracking-03 uppercase h-gold-80 font-medium mt-6`}>
               Begin Your Journey
             </span>
           </RevealSection>
 
           <RevealSection>
             <Flourish />
-            <h2 className={`${playfair} italic text-2xl sm:text-3xl md:text-[2.5rem] font-medium h-brown leading-[1.35]`}>
+            <h2 className={`${playfair} italic text-2xl sm:text-3xl md:h-text-25rem font-medium h-brown h-leading-135`}>
               Trends may evolve, but meaningful gestures remain timeless.
               <br className="hidden sm:block" />
               <span className="text-cinematic-gold not-italic font-semibold"> Honour your story</span> with a keepsake
@@ -307,7 +321,7 @@ export default function HeirloomPage() {
                 href="https://www.dreamweavers.com.sg/contact"
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`${inter} inline-block bg-cinematic-gold h-brown px-9 py-4 text-xs font-medium tracking-[0.2em] uppercase h-bg-gold-90 transition-colors duration-300`}
+                className={`${inter} inline-block bg-cinematic-gold h-brown px-9 py-4 text-xs font-medium h-tracking-02 uppercase h-bg-gold-90 transition-colors duration-300`}
               >
                 Enquire Now
               </a>
