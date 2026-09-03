@@ -1,5 +1,6 @@
 node_modules
 .next
+.git
 *.log
 server.log
 db

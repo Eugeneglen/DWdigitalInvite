@@ -10,9 +10,6 @@ RUN bun install --frozen-lockfile
 
 COPY . .
 
-# Install Git LFS and pull the actual video files (tracked via LFS in the repo)
-RUN apt-get update && apt-get install -y git git-lfs && git lfs install && git lfs pull
-
 # Patch Prisma provider for Railway Postgres (local dev uses sqlite)
 RUN sed -i 's/provider = "sqlite"/provider = "postgresql"/' prisma/schema.prisma
 
