@@ -27,8 +27,12 @@ import { db } from '@/lib/db';
 // ROLE PERMISSION CACHING
 // ============================================================
 
-/** Cache: roleKey → set of permission strings (including '*' if wildcard) */
-let roleCache: Map<string, Set<string>> | null = null;
+/** Cache: roleKey → role info (permission set incl. '*' wildcard + tier for domain gating) */
+interface RoleCacheEntry {
+  perms: Set<string>;
+  tier: string;
+}
+let roleCache: Map<string, RoleCacheEntry> | null = null;
 let roleCacheTime = 0;
 const ROLE_CACHE_TTL = 60_000; // 1 minute — roles change rarely
 
@@ -51,6 +55,15 @@ async function seedDefaultRoles(): Promise<void> {
     'wedding:guests:write', 'wedding:rsvps:read', 'wedding:rsvps:manage',
     'wedding:schedule:write', 'wedding:settings:write', 'wedding:analytics:read',
   ];
+  // R-01: COUPLE gets the FULL wedding-domain permission list, explicitly
+  // enumerated — NO '*' wildcard. The wildcard on an account-tier role was
+  // honored by hasPlatformPermission() as a platform grant (F-01).
+  const COUPLE_PERMS = [
+    ...WEDDING_PERMS,
+    'wedding:wishes:moderate',
+    'wedding:members:invite',
+    'wedding:members:remove',
+  ];
   const ALL_PERMS = [...PLATFORM_PERMS, ...WEDDING_PERMS, '*'];
   const READ_ONLY_PLATFORM = ['platform:weddings:read', 'platform:weddings:read-all', 'platform:analytics:read', 'platform:audit:read'];
 
@@ -62,7 +75,7 @@ async function seedDefaultRoles(): Promise<void> {
     { key: 'COORDINATOR_1', label: 'Coordinator 1', tier: 'wedding_staff', isSystem: false, permissions: WEDDING_PERMS, sortOrder: 5 },
     { key: 'SUPPORT_1', label: 'Support 1', tier: 'platform', isSystem: false, permissions: READ_ONLY_PLATFORM, sortOrder: 6 },
     { key: 'SUPPORT_2', label: 'Support 2', tier: 'platform', isSystem: false, permissions: ['platform:weddings:read'], sortOrder: 7 },
-    { key: 'COUPLE', label: 'Couple', tier: 'account', isSystem: true, permissions: [...WEDDING_PERMS, '*'], sortOrder: 8 },
+    { key: 'COUPLE', label: 'Couple', tier: 'account', isSystem: true, permissions: COUPLE_PERMS, sortOrder: 8 },
     { key: 'EDITOR', label: 'Editor', tier: 'account', isSystem: true, permissions: ['wedding:read', 'wedding:content:write', 'wedding:media:write', 'wedding:schedule:write'], sortOrder: 9 },
     { key: 'VIEWER', label: 'Viewer', tier: 'account', isSystem: true, permissions: ['wedding:read'], sortOrder: 10 },
   ];
@@ -104,22 +117,31 @@ async function loadRoleCache(): Promise<void> {
   for (const r of roles) {
     try {
       const perms = JSON.parse(r.permissions) as string[];
-      roleCache.set(r.key, new Set(perms));
+      roleCache.set(r.key, { perms: new Set(perms), tier: r.tier });
     } catch {
-      roleCache.set(r.key, new Set());
+      roleCache.set(r.key, { perms: new Set(), tier: r.tier });
     }
   }
   roleCacheTime = Date.now();
 }
 
 /**
- * Get the set of permissions for a role key (from cache or DB).
+ * Get a role's cached info (permission set + tier). Returns null for
+ * unknown roles (no Role row) — callers must treat that as NO access.
  */
-async function getRolePermissions(roleKey: string): Promise<Set<string>> {
+async function getRoleInfo(roleKey: string): Promise<RoleCacheEntry | null> {
   if (!roleCache || Date.now() - roleCacheTime > ROLE_CACHE_TTL) {
     await loadRoleCache();
   }
-  return roleCache?.get(roleKey) ?? new Set();
+  return roleCache?.get(roleKey) ?? null;
+}
+
+/**
+ * Get the set of permissions for a role key (from cache or DB).
+ */
+async function getRolePermissions(roleKey: string): Promise<Set<string>> {
+  const info = await getRoleInfo(roleKey);
+  return info?.perms ?? new Set();
 }
 
 /**
@@ -185,6 +207,7 @@ export type PlatformAction =
   | 'platform:users:manage'
   | 'platform:weddings:read'
   | 'platform:weddings:write'
+  | 'platform:weddings:delete'
   | 'platform:settings:read'
   | 'platform:settings:write'
   | 'platform:analytics:read'
@@ -222,16 +245,28 @@ export async function hasPlatformPermission(
       .catch(() => { /* non-blocking — will retry on next request */ });
   }
 
-  // Get role permissions from cache/DB
-  const rolePerms = await getRolePermissions(normalizedRole);
+  // ── SECURITY DOMAIN GATE (R-01 / F-01) ────────────────────────────────
+  // Platform permissions belong EXCLUSIVELY to platform-side roles
+  // (tier 'platform' | 'wedding_staff'). Account-tier roles (COUPLE, EDITOR,
+  // VIEWER, custom account roles) can NEVER hold platform permissions —
+  // not via role permissions, not via the '*' wildcard, not via user
+  // overrides, not via a manipulated/custom role. Unknown roles (no Role
+  // row) fail closed as well.
+  const roleInfo = await getRoleInfo(normalizedRole);
+  if (!roleInfo || roleInfo.tier === 'account') {
+    return false;
+  }
+  const rolePerms = roleInfo.perms;
 
-  // Check overrides first (highest priority)
+  // Check overrides first (highest priority) — only reachable for
+  // platform-side tiers.
   const overrides = await getUserOverrides(userId);
   if (overrides.has(action)) {
     return overrides.get(action)!; // true = grant, false = revoke
   }
 
   // Check role permissions — wildcard '*' grants everything
+  // (only platform-side roles can reach this branch)
   if (rolePerms.has('*')) return true;
   return rolePerms.has(action);
 }
@@ -308,8 +343,12 @@ export async function hasWeddingPermission(
 
   // Check if ANY of the user's wedding roles grants the action
   for (const wr of weddingRoles) {
-    const rolePerms = await getRolePermissions(wr.role);
-    if (rolePerms.has('*')) return true; // COUPLE wildcard
+    const info = await getRoleInfo(wr.role);
+    const rolePerms = info?.perms ?? new Set<string>();
+    // R-01: the wildcard is only honored for NON-platform per-wedding roles.
+    // Platform-side roles already received full access via the step-1
+    // platform bypass above, so this restriction removes nothing legitimate.
+    if (rolePerms.has('*') && info?.tier !== 'platform') return true;
     if (rolePerms.has(action)) return true;
   }
 
@@ -505,6 +544,7 @@ export const ALL_PLATFORM_PERMISSIONS: PlatformAction[] = [
   'platform:users:manage',
   'platform:weddings:read',
   'platform:weddings:write',
+  'platform:weddings:delete',
   'platform:weddings:read-all',
   'platform:settings:read',
   'platform:settings:write',

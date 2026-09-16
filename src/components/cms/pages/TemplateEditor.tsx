@@ -10,6 +10,8 @@ import {
 import MirrorImageUpload from '@/components/cms/couple/MirrorImageUpload';
 import { isDarkBackground, getAutoTextColor } from '@/lib/contrast';
 import { ANIMATION_STYLES } from '@/lib/animation-registry';
+import { FONT_OPTIONS, FONT_CATEGORIES } from '@/lib/fonts';
+import { getSizeGuidance, isImageMime, type FileCategory } from '@/lib/file-storage-client';
 import { useImageAutoContrast } from '@/hooks/useImageAutoContrast';
 import { toast } from '@/hooks/use-toast';
 import { useCMSStore } from '@/store/useCMSStore';
@@ -220,54 +222,6 @@ const COLOR_PRESETS: { value: string; label: string }[] = [
   { value: '#1A1A1A', label: 'Deep Black' },
 ];
 
-const FONT_OPTIONS: { value: string; category: string }[] = [
-  // ── Elegant Serif ────────────────────────────────────────
-  { value: 'Playfair Display', category: 'Elegant Serif' },
-  { value: 'Cormorant Garamond', category: 'Elegant Serif' },
-  { value: 'EB Garamond', category: 'Elegant Serif' },
-  { value: 'Lora', category: 'Elegant Serif' },
-  { value: 'Spectral', category: 'Elegant Serif' },
-  { value: 'Libre Baskerville', category: 'Elegant Serif' },
-  { value: 'Merriweather', category: 'Elegant Serif' },
-  { value: 'DM Serif Display', category: 'Elegant Serif' },
-  { value: 'Bodoni Moda', category: 'Elegant Serif' },
-  { value: 'Philosopher', category: 'Elegant Serif' },
-  // ── Display Serif ────────────────────────────────────────
-  { value: 'Cinzel', category: 'Display Serif' },
-  { value: 'Cinzel Decorative', category: 'Display Serif' },
-  { value: 'Prata', category: 'Display Serif' },
-  { value: 'Italiana', category: 'Display Serif' },
-  { value: 'Arizonia', category: 'Display Serif' },
-  // ── Modern Sans ─────────────────────────────────────────
-  { value: 'Montserrat', category: 'Modern Sans' },
-  { value: 'Raleway', category: 'Modern Sans' },
-  { value: 'Poppins', category: 'Modern Sans' },
-  { value: 'Lato', category: 'Modern Sans' },
-  { value: 'Quicksand', category: 'Modern Sans' },
-  { value: 'Nunito', category: 'Modern Sans' },
-  { value: 'Work Sans', category: 'Modern Sans' },
-  { value: 'Josefin Sans', category: 'Modern Sans' },
-  // ── Script & Calligraphy ─────────────────────────────────
-  { value: 'Great Vibes', category: 'Script & Calligraphy' },
-  { value: 'Alex Brush', category: 'Script & Calligraphy' },
-  { value: 'Allura', category: 'Script & Calligraphy' },
-  { value: 'Parisienne', category: 'Script & Calligraphy' },
-  { value: 'Tangerine', category: 'Script & Calligraphy' },
-  { value: 'Sacramento', category: 'Script & Calligraphy' },
-  { value: 'Petit Formal Script', category: 'Script & Calligraphy' },
-  { value: 'Cookie', category: 'Script & Calligraphy' },
-  // ── Handwritten ─────────────────────────────────────────
-  { value: 'Dancing Script', category: 'Handwritten' },
-  { value: 'Kaushan Script', category: 'Handwritten' },
-  { value: 'Caveat', category: 'Handwritten' },
-  { value: 'Amatic SC', category: 'Handwritten' },
-  { value: 'Satisfy', category: 'Handwritten' },
-  { value: 'Pacifico', category: 'Handwritten' },
-  { value: 'Lobster', category: 'Handwritten' },
-  { value: 'Yellowtail', category: 'Handwritten' },
-];
-const FONT_CATEGORIES = [...new Set(FONT_OPTIONS.map((f) => f.category))];
-
 // ── SimpleImageGallery component ───────────────────────────────────────────
 // A gallery that stores images as data URLs in the template's media JSON array.
 // Visual parity with the couple CMS MirrorImageGallery (click-to-preview Dialog,
@@ -283,9 +237,10 @@ interface SimpleImageGalleryProps {
   aspectClass: string;
   label: string;
   helperText?: string;
+  category: FileCategory;
 }
 
-function SimpleImageGallery({ media, onAdd, onRemove, maxImages, aspectClass, label, helperText }: SimpleImageGalleryProps) {
+function SimpleImageGallery({ media, onAdd, onRemove, maxImages, aspectClass, label, helperText, category }: SimpleImageGalleryProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -294,22 +249,49 @@ function SimpleImageGallery({ media, onAdd, onRemove, maxImages, aspectClass, la
   const { confirm: galleryConfirm, ConfirmDialog: GalleryConfirmDialog } = useConfirmDialog();
 
   const canAddMore = media.length < maxImages;
+  const guidance = getSizeGuidance(category);
+  const UPLOAD_API = '/api/cms/upload?XTransformPort=3000';
 
-  function handleFiles(files: FileList | null) {
+  async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
     const remaining = maxImages - media.length;
     if (remaining <= 0) return;
-    const toRead = Array.from(files).filter((f) => f.type.startsWith('image/')).slice(0, remaining);
-    if (toRead.length === 0) return;
+    const toUpload = Array.from(files).filter((f) => isImageMime(f.type)).slice(0, remaining);
+    if (toUpload.length === 0) return;
+
+    const maxSize = 25 * 1024 * 1024; // 25 MB (auto-optimised)
     setUploading(true);
-    let done = 0;
-    const finish = () => { done++; if (done === toRead.length) setUploading(false); };
-    toRead.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = () => { onAdd(reader.result as string); finish(); };
-      reader.onerror = finish;
-      reader.readAsDataURL(file);
-    });
+    for (const file of toUpload) {
+      // Client-side size pre-check
+      if (file.size > maxSize) {
+        const fileMB = (file.size / 1024 / 1024).toFixed(1);
+        toast({
+          title: 'File too large',
+          description: `"${file.name}" is ${fileMB} MB — max is 25 MB. Recommended: ${guidance.recommendedPixels} px. Server will auto-resize and compress.`,
+          variant: 'destructive',
+        });
+        continue;
+      }
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('category', category);
+        const res = await fetch(UPLOAD_API, { method: 'POST', body: formData });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error((err as { error?: string }).error || 'Failed to upload');
+        }
+        const result = await res.json();
+        onAdd(result.url);
+      } catch (err) {
+        toast({
+          title: 'Upload failed',
+          description: err instanceof Error ? err.message : `Failed to upload ${file.name}`,
+          variant: 'destructive',
+        });
+      }
+    }
+    setUploading(false);
   }
 
   async function handleRemove(idx: number) {
@@ -1309,6 +1291,7 @@ export default function TemplateEditor() {
               {HERO_VISUAL_FIELDS.map((field) => (
                 <MirrorImageUpload
                   key={field.key}
+                  category="hero"
                   value={getContentField('hero', field.key) || ''}
                   onChange={(v) => setContentField('hero', field.key, v, 'IMAGE_URL')}
                   onRemove={() => setContentField('hero', field.key, '', 'IMAGE_URL')}
@@ -1415,6 +1398,7 @@ export default function TemplateEditor() {
                   field.type === 'image' ? (
                     <MirrorImageUpload
                       key={field.key}
+                      category="story"
                       value={getContentField('hero', field.key) || ''}
                       onChange={(v) => setContentField('hero', field.key, v, 'IMAGE_URL')}
                       onRemove={() => setContentField('hero', field.key, '', 'IMAGE_URL')}
@@ -1737,6 +1721,7 @@ export default function TemplateEditor() {
                 aspectClass="aspect-[4/3]"
                 label="Schedule Images"
                 helperText="4:3 crop mirrors the guest-site schedule images. Up to 3 images."
+                category="schedule"
               />
             </CardContent>
           </Card>
@@ -1768,6 +1753,7 @@ export default function TemplateEditor() {
                   />
                 </div>
                 <MirrorImageUpload
+                  category="schedule"
                   value={getContentField('getting-there', 'venueImage') || ''}
                   onChange={(v) => setContentField('getting-there', 'venueImage', v, 'IMAGE_URL')}
                   onRemove={() => setContentField('getting-there', 'venueImage', '', 'IMAGE_URL')}
@@ -1876,6 +1862,7 @@ export default function TemplateEditor() {
                       </div>
                       <div className="flex flex-col md:flex-row gap-4 items-start">
                         <MirrorImageUpload
+                          category="story"
                           value={item.imageUrl || ''}
                           onChange={(v) => setStoryImage(idx, v)}
                           onRemove={() => setStoryImage(idx, null)}
@@ -1906,6 +1893,7 @@ export default function TemplateEditor() {
                 aspectClass="aspect-[16/9]"
                 label="Story Hero Images"
                 helperText="16:9 banner images at the top of the guest story page. Up to 3 images."
+                category="story"
               />
             </CardContent>
           </Card>
@@ -2240,6 +2228,7 @@ export default function TemplateEditor() {
                 aspectClass="aspect-[3/4]"
                 label="Gallery Images"
                 helperText="3:4 portrait · mirrors guest-site framing"
+                category="moments"
               />
             </CardContent>
           </Card>
@@ -2620,7 +2609,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
           {title && (
             <h1
               className="text-[44px] md:text-[72px] leading-[1.05] tracking-tight font-bold drop-shadow-sm"
-              style={{ fontFamily: bannerFont, color: bannerTextColor, textShadow: bannerTextShadow }}
+              style={{ fontFamily: bannerFont, color: bannerTextColor, textShadow: bannerTextShadow, fontSynthesis: 'none' }}
             >
               {title}
             </h1>
@@ -2652,7 +2641,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
               {heroTitle && (
                 <h1
                   className="text-[44px] md:text-[72px] leading-[1.05] tracking-tight font-bold drop-shadow-sm"
-                  style={{ fontFamily: bannerFont, color: bannerTextColor, textShadow: bannerTextShadow }}
+                  style={{ fontFamily: bannerFont, color: bannerTextColor, textShadow: bannerTextShadow, fontSynthesis: 'none' }}
                 >
                   {heroTitle}
                 </h1>
@@ -2673,7 +2662,7 @@ function PreviewPanel({ data }: { data: TemplateData }) {
           <div className="text-center py-16 px-6">
             <h1
               className="text-[44px] md:text-[72px] leading-[1.05] tracking-tight font-bold"
-              style={{ fontFamily: bannerFont, color: autoTextColor }}
+              style={{ fontFamily: bannerFont, color: autoTextColor, fontSynthesis: 'none' }}
             >
               {heroTitle}
             </h1>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { generateInvitationCode } from '@/lib/invitation-code';
 
 async function getWeddingId(userId: string): Promise<string | null> {
   const w = await db.weddingAccount.findFirst({ where: { ownerId: userId }, select: { id: true } });
@@ -136,6 +137,16 @@ export async function POST(req: NextRequest) {
 
     // Create a new guest from the RSVP data
     const guestName = `${rsvp.firstName} ${rsvp.lastName}`.trim();
+    // R-06 (F-06): secure generated code (was the predictable
+    // `RSVP-<cuid prefix>` pattern which was trivially guessable).
+    let invitationCode = generateInvitationCode();
+    let codeTaken = await db.guest.findUnique({ where: { invitationCode } });
+    let codeAttempts = 0;
+    while (codeTaken && codeAttempts < 10) {
+      invitationCode = generateInvitationCode();
+      codeTaken = await db.guest.findUnique({ where: { invitationCode } });
+      codeAttempts++;
+    }
     const newGuest = await db.guest.create({
       data: {
         weddingId,
@@ -143,7 +154,7 @@ export async function POST(req: NextRequest) {
         rsvpStatus,
         plusOne: rsvp.partySize > 1,
         dietaryNotes,
-        invitationCode: `RSVP-${rsvp.id.substring(0, 8)}`,
+        invitationCode,
       },
     });
 

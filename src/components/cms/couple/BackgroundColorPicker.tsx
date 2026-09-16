@@ -6,7 +6,7 @@ import { toast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { invalidateWeddingCache } from '@/hooks/usePublicWedding';
-import { getAutoTextColor, isDarkBackground } from '@/lib/contrast';
+import { getAutoTextColor, getAutoBorderColor, isDarkBackground, isReadableOn } from '@/lib/contrast';
 
 const CONTENT_API = '/api/cms/content?XTransformPort=3000';
 
@@ -33,6 +33,12 @@ export default function BackgroundColorPicker() {
   const [color, setColor] = useState(DEFAULT_BG);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Stored overrides — needed so save() can reconcile clashing colours
+  // (a stale template textColor on a newly dark background renders
+  // invisible text otherwise; the render-time guard in GuestSite covers
+  // display, this keeps the stored data consistent too).
+  const [storedText, setStoredText] = useState('');
+  const [storedBorder, setStoredBorder] = useState('');
 
   // ── Fetch ──────────────────────────────────────────────
   const fetchColor = useCallback(async () => {
@@ -41,12 +47,16 @@ export default function BackgroundColorPicker() {
       const res = await fetch(`${CONTENT_API}&section=global`);
       if (!res.ok) throw new Error('Failed to load');
       const data = await res.json();
-      const bgItem = (data.content ?? []).find(
-        (item: { fieldKey: string; fieldValue: string }) => item.fieldKey === 'backgroundColor'
-      );
-      if (bgItem?.fieldValue) {
-        setColor(bgItem.fieldValue);
+      const find = (key: string) =>
+        (data.content ?? []).find(
+          (item: { fieldKey: string; fieldValue: string }) => item.fieldKey === key,
+        )?.fieldValue ?? '';
+      const bgItem = find('backgroundColor');
+      if (bgItem) {
+        setColor(bgItem);
       }
+      setStoredText(find('textColor'));
+      setStoredBorder(find('borderColor'));
     } catch {
       // Silently fall back to default
     } finally {
@@ -63,19 +73,49 @@ export default function BackgroundColorPicker() {
     setColor(newColor);
     setSaving(true);
     try {
+      // Saves the new background AND reconciles any stored text/border
+      // override that would clash with it (readable explicit overrides —
+      // e.g. paired dark templates — are kept intact; stale ones are
+      // repaired. No row = "auto", which already adapts at render time).
+      const items: Array<{
+        section: string;
+        fieldKey: string;
+        fieldValue: string;
+        fieldType: string;
+      }> = [
+        {
+          section: 'global',
+          fieldKey: 'backgroundColor',
+          fieldValue: newColor,
+          fieldType: 'TEXT',
+        },
+      ];
+
+      if (storedText && !isReadableOn(storedText, newColor)) {
+        const reconciledText = getAutoTextColor(newColor);
+        items.push({
+          section: 'global',
+          fieldKey: 'textColor',
+          fieldValue: reconciledText,
+          fieldType: 'TEXT',
+        });
+        setStoredText(reconciledText);
+      }
+      if (storedBorder && !isReadableOn(storedBorder, newColor, 1.5)) {
+        const reconciledBorder = getAutoBorderColor(newColor);
+        items.push({
+          section: 'global',
+          fieldKey: 'borderColor',
+          fieldValue: reconciledBorder,
+          fieldType: 'TEXT',
+        });
+        setStoredBorder(reconciledBorder);
+      }
+
       const res = await fetch(CONTENT_API, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: [
-            {
-              section: 'global',
-              fieldKey: 'backgroundColor',
-              fieldValue: newColor,
-              fieldType: 'TEXT',
-            },
-          ],
-        }),
+        body: JSON.stringify({ items }),
       });
       if (!res.ok) throw new Error('Failed to save');
       invalidateWeddingCache();

@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
-import { authenticateRequest } from '@/lib/auth-middleware';
-import { hasWeddingPermission } from '@/lib/permissions';
+import { authenticateRequest, authorizeTenantAccess } from '@/lib/auth-middleware';
 
 // ============================================
 // GET — Full analytics data for a wedding
@@ -18,9 +17,10 @@ export async function GET(
     }
 
     const { id: weddingId } = await params;
-    const canAccess = await hasWeddingPermission(user.userId, user.role, weddingId, 'wedding:read');
-    if (!canAccess) {
-      return Response.json({ success: false, error: 'Access denied. You do not have access to this wedding.' }, { status: 403 });
+    // R-03 (F-03) tenant guard: authenticate → resolve wedding → platform/owner/member → permission
+    const guard = await authorizeTenantAccess(user, weddingId, { platformPerm: 'platform:weddings:read', weddingAction: 'wedding:read' });
+    if (!guard.ok) {
+      return Response.json({ success: false, error: guard.error }, { status: guard.status });
     }
 
     const { searchParams } = new URL(request.url);

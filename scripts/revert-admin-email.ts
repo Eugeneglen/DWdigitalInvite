@@ -24,7 +24,7 @@ async function main() {
   console.log(`✓ Admin email reverted.`);
   console.log(`  Before: ${OLD_EMAIL}`);
   console.log(`  After:  ${updated.email}`);
-  console.log(`  (Login: ${NEW_EMAIL} / Admin@2024)`);
+  console.log(`  (Login: ${NEW_EMAIL} / (your current admin password))`);
   process.exit(0);
 }
 

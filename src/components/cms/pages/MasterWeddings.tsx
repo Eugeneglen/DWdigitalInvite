@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import {
   Search,
   Plus,
@@ -17,6 +18,7 @@ import {
   Copy,
   Check,
   KeyRound,
+  Trash2,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -60,7 +62,7 @@ import {
 } from '@/components/ui/select';
 // useCMSStore import removed — selectWedding was dead code
 import WeddingCreationWizard from './WeddingCreationWizard';
-import { normalizePlatformRole } from '@/lib/permissions';
+import { normalizePlatformRole, hasPlatformPermissionSync } from '@/lib/permissions';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -229,6 +231,9 @@ function EmptyState({ hasSearch }: { hasSearch: boolean }) {
 // ── Main Component ─────────────────────────────────────────────────────────
 
 export default function MasterWeddings() {
+  const { data: session } = useSession();
+  const canDeleteWedding = hasPlatformPermissionSync(session?.user?.role || '', 'platform:weddings:delete');
+
   // selectWedding removed — was dead code (set selectedWeddingId but nothing read it)
   // View button now uses window.open(`/${w.slug}`, '_blank') instead
 
@@ -280,11 +285,46 @@ export default function MasterWeddings() {
     fetchStaff();
   }, [fetchStaff]);
 
+  // Permanent delete confirmation dialog
+  const [deleteTarget, setDeleteTarget] = useState<Wedding | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  // ── Permanent delete handler ─────────────────────────────────────────
+  async function deletePermanentlyWedding(w: Wedding) {
+    setDeleteTarget(w);
+    setDeleteConfirmName('');
+  }
+
+  async function confirmPermanentDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/master/weddings?hard=true&XTransformPort=3000', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: deleteTarget.id, confirmName: deleteConfirmName }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: 'Delete Failed', description: err.error || 'Could not delete wedding.', variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Permanently Deleted', description: `${deleteTarget.coupleName} and all related data have been removed.` });
+      setDeleteTarget(null);
+      fetchWeddings();
+    } catch {
+      toast({ title: 'Delete Failed', description: 'Network error.', variant: 'destructive' });
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   // Credentials dialog state — lets admin retrieve registration details
   // (couple CMS URL, guest URL, login ID, password, job number) for any
   // wedding, even after the creation wizard has closed.
   const [credWedding, setCredWedding] = useState<Wedding | null>(null);
-  const [defaultPassword, setDefaultPassword] = useState('Couple@123');
+  const [defaultPassword, setDefaultPassword] = useState('');
   const [copied, setCopied] = useState<string | null>(null);
 
   // Fetch the platform default couple password from system settings
@@ -307,6 +347,16 @@ export default function MasterWeddings() {
 
   // ── Fetch weddings ─────────────────────────────────────────────────────
 
+  // pageRef keeps fetchWeddings stable across page changes (page is NOT a
+  // dependency), which breaks the circular dependency that made Prev/Next
+  // buttons non-functional.
+  const pageRef = useRef(page);
+  pageRef.current = page;
+
+  // Track whether the next page change is from a filter reset (debounce
+  // timer will handle the fetch) vs. a Prev/Next button click (fetch now).
+  const filterResetRef = useRef(false);
+
   const fetchWeddings = useCallback(async () => {
     try {
       setLoading(true);
@@ -314,7 +364,7 @@ export default function MasterWeddings() {
       if (search) params.set('search', search);
       if (statusFilter) params.set('status', statusFilter);
       if (planFilter) params.set('plan', planFilter);
-      params.set('page', String(page));
+      params.set('page', String(pageRef.current));
       params.set('limit', String(limit));
       const res = await fetch(
         `/api/master/weddings?${params.toString()}&XTransformPort=3000`
@@ -328,16 +378,26 @@ export default function MasterWeddings() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, planFilter, page]);
+  }, [search, statusFilter, planFilter]); // page removed — read from pageRef instead
 
-  // ── Search/filter debounce ─────────────────────────────────────────────
+  // ── Search/filter debounce (mount + filter changes) ───────────────
+  // Resets to page 1 and debounces the fetch by 300ms.
   useEffect(() => {
-    setPage(1); // reset to page 1 when filters change
-    const timer = setTimeout(() => {
-      fetchWeddings();
-    }, 300);
+    pageRef.current = 1;  // update ref immediately so fetch uses page 1
+    filterResetRef.current = true;  // signal the page effect to skip
+    setPage(1);  // update pagination UI
+    const timer = setTimeout(fetchWeddings, 300);
     return () => clearTimeout(timer);
-  }, [search, statusFilter, planFilter, fetchWeddings]);
+  }, [fetchWeddings]); // stable across page changes, only changes on filter change
+
+  // ── Page change (Prev/Next buttons) → immediate fetch ──────────────
+  useEffect(() => {
+    if (filterResetRef.current) {
+      filterResetRef.current = false;
+      return; // skip — the filter debounce timer will fetch
+    }
+    fetchWeddings();
+  }, [page]);
 
   // ── Dialog handlers ────────────────────────────────────────────────────
 
@@ -736,6 +796,19 @@ export default function MasterWeddings() {
                             <Archive className="h-4 w-4" />
                             Archive
                           </DropdownMenuItem>
+                          {canDeleteWedding && (
+                            <DropdownMenuItem
+                              variant="destructive"
+                              className="text-red-600 focus:text-red-600"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deletePermanentlyWedding(w);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Delete Permanently
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -747,8 +820,8 @@ export default function MasterWeddings() {
         </div>
       </Card>
 
-      {/* Pagination */}
-      {total > limit && (
+      {/* Pagination — always visible when there are results */}
+      {total > 0 && (
         <div className="flex flex-wrap items-center justify-between px-1 gap-2">
           <p className="text-xs text-slate-500">
             Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total}
@@ -764,9 +837,11 @@ export default function MasterWeddings() {
               <ChevronLeft className="size-3 mr-1" />
               Prev
             </Button>
-            <span className="text-xs text-slate-500">
-              Page {page} of {totalPages}
-            </span>
+            {totalPages > 1 && (
+              <span className="text-xs text-slate-500">
+                Page {page} of {totalPages}
+              </span>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -1189,11 +1264,13 @@ export default function MasterWeddings() {
                       <Label className="text-xs text-charcoal-ink/50 uppercase tracking-wider">Password</Label>
                       <div className="flex items-center gap-2 mt-1">
                         <code className="flex-1 text-sm bg-white border border-charcoal-ink/10 rounded px-2 py-1.5 truncate">
-                          {defaultPassword}
+                          {defaultPassword || 'Auto-generated at creation (not stored)'}
                         </code>
-                        <Button size="sm" variant="outline" onClick={() => copyToClipboard(defaultPassword, 'Password')}>
-                          {copied === 'Password' ? <Check className="size-3" /> : <Copy className="size-3" />}
-                        </Button>
+                        {defaultPassword ? (
+                          <Button size="sm" variant="outline" onClick={() => copyToClipboard(defaultPassword, 'Password')}>
+                            {copied === 'Password' ? <Check className="size-3" /> : <Copy className="size-3" />}
+                          </Button>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -1204,7 +1281,9 @@ export default function MasterWeddings() {
                 </div>
                 <div className="bg-cinematic-gold/5 border border-cinematic-gold/20 rounded-lg p-3 flex items-center gap-2">
                   <p className="text-xs text-charcoal-ink/60">
-                    Password shown is the platform default. If the couple has changed it, this field won't reflect their current password.
+                    {defaultPassword
+                      ? 'Password shown is the platform default. If the couple has changed it, this field won\'t reflect their current password.'
+                      : 'New couple accounts now receive a unique auto-generated secure password (shown once in the creation wizard). Reset it via Team → Reset Password if the couple loses it.'}
                   </p>
                 </div>
                 <div className="flex justify-end gap-2">
@@ -1223,6 +1302,86 @@ export default function MasterWeddings() {
               </div>
             );
           })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Permanent Delete Confirmation Dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="size-5" />
+              Delete Permanently
+            </DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. The wedding account and all related data will be permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteTarget && (
+            <div className="space-y-4 py-2">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-2">
+                <div>
+                  <Label className="text-xs text-slate-500">Couple Name</Label>
+                  <p className="text-sm font-semibold text-slate-900">{deleteTarget.coupleName}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-500">Job Number</Label>
+                  <p className="text-sm text-slate-600 font-mono">{deleteTarget.jobNumber ?? '—'}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-500">Guest URL</Label>
+                  <p className="text-sm text-slate-600 font-mono">/{deleteTarget.slug}</p>
+                </div>
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  This will permanently delete: the wedding account, all guests & RSVPs,
+                  wishes, stories, media uploads, schedule, FAQs, seating arrangements,
+                  notifications, and audit logs. Uploaded files will be removed from disk.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="delete-confirm">
+                  Type <span className="font-bold">{deleteTarget.coupleName}</span> to confirm
+                </Label>
+                <Input
+                  id="delete-confirm"
+                  placeholder={deleteTarget.coupleName}
+                  value={deleteConfirmName}
+                  onChange={(e) => setDeleteConfirmName(e.target.value)}
+                  className="border-red-200 focus-visible:ring-red-400"
+                />
+              </div>
+              <DialogFooter className="pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDeleteTarget(null)}
+                  disabled={deleting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={deleting || deleteConfirmName.trim() !== deleteTarget.coupleName}
+                  onClick={confirmPermanentDelete}
+                >
+                  {deleting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4" />
+                      Delete Permanently
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

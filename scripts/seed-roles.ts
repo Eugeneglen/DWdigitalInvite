@@ -45,8 +45,15 @@ const WEDDING_PERMISSIONS = [
 
 const ALL_PERMISSIONS = [...PLATFORM_PERMISSIONS, ...WEDDING_PERMISSIONS];
 
-// Helper: wildcard '*' means all permissions
+// Helper: wildcard '*' means all permissions — RESERVED for SUPER_ADMIN_1/2
+// (platform tier only). Account-tier roles must NEVER carry it (F-01).
 const WILDCARD = ['*'];
+
+// Full explicit wedding-domain permission list for the COUPLE system role.
+// Replaces the old '*' wildcard while preserving every capability a couple
+// legitimately has on their OWN wedding (the wedding domain is scoped by
+// hasWeddingPermission's per-wedding UserWeddingRole/ownership checks).
+const COUPLE_PERMISSIONS = [...WEDDING_PERMISSIONS];
 
 interface RoleSeed {
   key: string;
@@ -166,7 +173,9 @@ const ROLES: RoleSeed[] = [
     label: 'Couple',
     tier: 'account',
     isSystem: true,
-    permissions: WILDCARD, // full control of their own wedding (scoped by hasWeddingPermission)
+    // R-01: explicit wedding-domain permissions — NO wildcard. An account-tier
+    // role with '*' was honored by hasPlatformPermission() as a platform grant.
+    permissions: COUPLE_PERMISSIONS,
     sortOrder: 8,
   },
   {
@@ -201,24 +210,54 @@ async function main() {
   console.log('━'.repeat(60));
 
   for (const role of ROLES) {
-    await db.role.upsert({
-      where: { key: role.key },
-      update: {
-        label: role.label,
-        tier: role.tier,
-        isSystem: role.isSystem,
-        permissions: JSON.stringify(role.permissions),
-        sortOrder: role.sortOrder,
-      },
-      create: {
-        key: role.key,
-        label: role.label,
-        tier: role.tier,
-        isSystem: role.isSystem,
-        permissions: JSON.stringify(role.permissions),
-        sortOrder: role.sortOrder,
-      },
-    });
+    const existing = await db.role.findUnique({ where: { key: role.key } });
+
+    if (!existing) {
+      await db.role.create({
+        data: {
+          key: role.key,
+          label: role.label,
+          tier: role.tier,
+          isSystem: role.isSystem,
+          permissions: JSON.stringify(role.permissions),
+          sortOrder: role.sortOrder,
+        },
+      });
+    } else {
+      // ── R-01 / R-04: NON-DESTRUCTIVE update ──────────────────────────
+      // Metadata (label/tier/isSystem/sortOrder) is synced back to defaults —
+      // tier correctness is security-critical for the platform-domain gate.
+      // Permissions are LEFT UNTOUCHED unless they contain the '*' wildcard
+      // on an account-tier role, which is healed (F-01). This preserves admin
+      // customizations instead of resetting them on every deploy.
+      let permissions = existing.permissions;
+      let healed = false;
+      try {
+        const perms = JSON.parse(existing.permissions) as string[];
+        if (perms.includes('*') && (existing.tier === 'account' || role.tier === 'account')) {
+          const healedPerms = role.key === 'COUPLE'
+            ? COUPLE_PERMISSIONS
+            : perms.filter((p) => p !== '*');
+          permissions = JSON.stringify(healedPerms);
+          healed = true;
+        }
+      } catch {
+        // Malformed permissions JSON — leave untouched (fails closed at runtime)
+      }
+      await db.role.update({
+        where: { key: role.key },
+        data: {
+          label: role.label,
+          tier: role.tier,
+          isSystem: role.isSystem,
+          sortOrder: role.sortOrder,
+          ...(healed ? { permissions } : {}),
+        },
+      });
+      if (healed) {
+        console.log(`  🔒 ${role.key}: healed — removed insecure '*' wildcard from account-tier role`);
+      }
+    }
     const permCount = role.permissions.includes('*') ? 'ALL (wildcard)' : `${role.permissions.length} permissions`;
     console.log(`  ✓ ${role.key} (${role.label}) [${role.tier}] ${role.isSystem ? '🔒 system' : 'editable'} — ${permCount}`);
   }

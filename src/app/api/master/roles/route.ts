@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { z } from 'zod/v4';
-import { hasPlatformPermission, invalidateRoleCache, ALL_PERMISSIONS } from '@/lib/permissions';
+import { hasPlatformPermission, invalidateRoleCache, normalizePlatformRole, ALL_PERMISSIONS } from '@/lib/permissions';
 
 // ── GET /api/master/roles — list all roles ────────────────────────────────
 
@@ -60,8 +60,14 @@ export async function POST(req: NextRequest) {
 
     const { key, label, tier, permissions } = parsed.data;
 
+    // R-02: the '*' wildcard is reserved for the seeded SUPER_ADMIN system
+    // roles — it can never be granted through the API.
+    if (permissions.includes('*')) {
+      return NextResponse.json({ error: "Wildcard '*' is reserved for system Super Admin roles and cannot be assigned" }, { status: 400 });
+    }
+
     // Validate all permission strings are known
-    const invalidPerms = permissions.filter((p) => !ALL_PERMISSIONS.includes(p as never) && p !== '*');
+    const invalidPerms = permissions.filter((p) => !ALL_PERMISSIONS.includes(p as never));
     if (invalidPerms.length > 0) {
       return NextResponse.json({ error: `Unknown permissions: ${invalidPerms.join(', ')}` }, { status: 400 });
     }
@@ -135,9 +141,19 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Role not found' }, { status: 404 });
     }
 
+    // R-02 (F-02): system roles (SUPER_ADMIN_*, COUPLE, EDITOR, VIEWER) can
+    // only be modified by a genuine SUPER_ADMIN.
+    if (existing.isSystem && normalizePlatformRole(session.user.role) !== 'SUPER_ADMIN') {
+      return NextResponse.json({ error: 'System roles can only be modified by a Super Admin' }, { status: 403 });
+    }
+
     // Validate permissions if provided
     if (permissions) {
-      const invalidPerms = permissions.filter((p) => !ALL_PERMISSIONS.includes(p as never) && p !== '*');
+      // R-02: never allow the '*' wildcard to be (re-)introduced via PATCH.
+      if (permissions.includes('*')) {
+        return NextResponse.json({ error: "Wildcard '*' is reserved for system Super Admin roles and cannot be assigned" }, { status: 400 });
+      }
+      const invalidPerms = permissions.filter((p) => !ALL_PERMISSIONS.includes(p as never));
       if (invalidPerms.length > 0) {
         return NextResponse.json({ error: `Unknown permissions: ${invalidPerms.join(', ')}` }, { status: 400 });
       }

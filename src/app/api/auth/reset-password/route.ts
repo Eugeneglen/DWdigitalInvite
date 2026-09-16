@@ -60,7 +60,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Hash the new password and update
+    // Hash the new password and update.
+    // R-09 (F-09): bumping sessionVersion revokes every previously issued
+    // session for this user — a password reset must not leave old sessions
+    // (other browsers/devices) alive.
     const hashedPassword = await bcrypt.hash(newPassword, 12);
 
     await db.user.update({
@@ -69,6 +72,7 @@ export async function POST(req: NextRequest) {
         passwordHash: hashedPassword,
         resetToken: null,
         resetTokenExpiry: null,
+        sessionVersion: { increment: 1 },
       },
     });
 

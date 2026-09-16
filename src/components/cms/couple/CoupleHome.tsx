@@ -391,6 +391,7 @@ export default function CoupleHome() {
             <div className="flex flex-col md:flex-row gap-4 items-start">
               {/* Ceremony Section Image — constrained to 280px, 2:3 portrait */}
               <MirrorImageUpload
+                category="story"
                 value={getFieldValue('teaCeremonyImage')}
                 onChange={(dataUrl) => setFieldValue('teaCeremonyImage', dataUrl)}
                 onRemove={() => setFieldValue('teaCeremonyImage', '')}

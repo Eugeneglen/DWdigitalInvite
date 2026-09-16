@@ -19,6 +19,8 @@
  *   - POST /api/cms/tenants/[id]/members (editor/viewer invite — default password)
  */
 
+import crypto from 'crypto';
+
 export interface PasswordValidationResult {
   valid: boolean;
   errors: string[];
@@ -70,3 +72,31 @@ export const PASSWORD_RULES = [
   { key: 'number', label: 'At least one number (0-9)', test: (p: string) => /[0-9]/.test(p) },
   { key: 'special', label: 'At least one special character (!@#$...)', test: (p: string) => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(p) },
 ];
+
+/**
+ * R-05 (F-05 / F-10): generate a cryptographically secure temporary
+ * password that satisfies the policy above.
+ *
+ * Replaces every predictable hardcoded default credential
+ * (Editor@123, Couple@123, ...). Recipients must change it on first login
+ * (mustChangePassword: true is set by the calling endpoints).
+ */
+export function generateSecurePassword(length = 14): string {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghijkmnpqrstuvwxyz';
+  const digits = '23456789';
+  const special = '!@#$%^&*';
+  const all = upper + lower + digits + special;
+  const len = Math.max(12, Math.min(64, length));
+  const pick = (set: string): string => set[crypto.randomInt(set.length)];
+  // Guarantee at least one character of each class, then fill, then shuffle.
+  const chars = [pick(upper), pick(lower), pick(digits), pick(special)];
+  while (chars.length < len) {
+    chars.push(pick(all));
+  }
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join('');
+}

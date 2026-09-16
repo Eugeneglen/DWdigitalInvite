@@ -44,54 +44,71 @@ export async function POST(request: Request) {
 
     const { firstName, lastName, partySize, guests, weddingId, guestId, invitationCode } = parsed.data;
 
-    // Validate weddingId if provided
-    if (weddingId) {
-      const wedding = await db.weddingAccount.findUnique({
-        where: { id: weddingId },
-        select: { id: true, status: true },
-      });
-      if (!wedding) {
-        return NextResponse.json({ error: 'Wedding not found' }, { status: 404 });
+    // ── Guest resolution + wedding binding (R-07 / F-07) ───────────────
+    // The invitationCode → guest → wedding → RSVP chain must be consistently
+    // associated. A guest credential from one wedding must never mutate
+    // another wedding's guest record, and a guestId/invitationCode that does
+    // not belong to the target wedding is rejected outright.
+    let resolvedGuestId: string | null = null;
+    let resolvedGuest: { id: string; name: string; weddingId: string; plusOne: boolean; plusOneName: string | null } | null = null;
+
+    if (guestId || invitationCode) {
+      const g = guestId
+        ? await db.guest.findUnique({
+            where: { id: guestId },
+            select: { id: true, name: true, weddingId: true, plusOne: true, plusOneName: true },
+          })
+        : await db.guest.findUnique({
+            where: { invitationCode: (invitationCode || '').trim().toUpperCase() },
+            select: { id: true, name: true, weddingId: true, plusOne: true, plusOneName: true },
+          });
+      if (!g) {
+        return NextResponse.json(
+          { error: 'Invitation not found. Please check your code and try again.' },
+          { status: 404 }
+        );
       }
-      if (wedding.status !== 'ACTIVE') {
-        return NextResponse.json({ error: 'Wedding is not accepting RSVPs' }, { status: 400 });
+      // Cross-wedding manipulation guard: a client-supplied weddingId must
+      // match the wedding the guest record actually belongs to.
+      if (weddingId && g.weddingId !== weddingId) {
+        return NextResponse.json(
+          { error: 'This invitation does not belong to the requested wedding.' },
+          { status: 400 }
+        );
       }
+      resolvedGuestId = g.id;
+      resolvedGuest = g;
     }
 
-    // ── Guest resolution ───────────────────────────────────────────────
-    // Priority: explicit guestId > invitationCode lookup > fuzzy name match > no link
-    let resolvedGuestId: string | null = null;
-    let resolvedGuest: { id: string; name: string; plusOne: boolean; plusOneName: string | null } | null = null;
+    // Effective target wedding: client-supplied weddingId, otherwise the
+    // wedding derived server-side from the resolved guest record.
+    const effectiveWeddingId = weddingId || resolvedGuest?.weddingId || null;
+    if (!effectiveWeddingId) {
+      return NextResponse.json(
+        { error: 'Unable to determine the wedding for this RSVP.' },
+        { status: 400 }
+      );
+    }
 
-    if (guestId) {
-      // Explicit guestId provided by the form (via ?code= link)
-      const g = await db.guest.findUnique({
-        where: { id: guestId },
-        select: { id: true, name: true, weddingId: true, plusOne: true, plusOneName: true },
-      });
-      if (g && (!weddingId || g.weddingId === weddingId)) {
-        resolvedGuestId = g.id;
-        resolvedGuest = g;
-      }
-    } else if (invitationCode) {
-      // Invitation code provided — resolve via unique invitationCode field
-      const g = await db.guest.findUnique({
-        where: { invitationCode: invitationCode.trim().toUpperCase() },
-        select: { id: true, name: true, weddingId: true, plusOne: true, plusOneName: true },
-      });
-      if (g && (!weddingId || g.weddingId === weddingId)) {
-        resolvedGuestId = g.id;
-        resolvedGuest = g;
-      }
-    } else if (weddingId) {
-      // Fallback: improved fuzzy match by name (no PENDING filter — matches any guest)
-      // Try exact full name match first, then fall back to first name substring
-      const trimmedFirst = firstName.trim();
-      const trimmedLast = lastName.trim();
-      const fullName = `${trimmedFirst} ${trimmedLast}`.toLowerCase();
+    // R-07: the target wedding must exist and be ACTIVE — regardless of
+    // whether the id came from the client or from the guest record (the
+    // guest-facing site only serves ACTIVE weddings).
+    const targetWedding = await db.weddingAccount.findUnique({
+      where: { id: effectiveWeddingId },
+      select: { id: true, status: true },
+    });
+    if (!targetWedding) {
+      return NextResponse.json({ error: 'Wedding not found' }, { status: 404 });
+    }
+    if (targetWedding.status !== 'ACTIVE') {
+      return NextResponse.json({ error: 'Wedding is not accepting RSVPs' }, { status: 400 });
+    }
 
+    // Fallback: fuzzy name match, scoped strictly to the target wedding
+    // (no credential was supplied — this cannot cross weddings).
+    if (!resolvedGuestId) {
       const candidates = await db.guest.findMany({
-        where: { weddingId },
+        where: { weddingId: effectiveWeddingId },
         select: { id: true, name: true, plusOne: true, plusOneName: true },
       });
 
@@ -113,7 +130,7 @@ export async function POST(request: Request) {
       const matched = exactMatch || nameContainsMatch || firstNameMatch;
       if (matched) {
         resolvedGuestId = matched.id;
-        resolvedGuest = matched;
+        resolvedGuest = { ...matched, weddingId: effectiveWeddingId };
       }
     }
 
@@ -156,7 +173,7 @@ export async function POST(request: Request) {
         firstName,
         lastName,
         partySize,
-        weddingId: weddingId || null,
+        weddingId: effectiveWeddingId,
         guestId: resolvedGuestId, // ← THE KEY FIX: link the submission to the Guest
         guests: {
           create: guests.map((g) => ({
@@ -191,11 +208,12 @@ export async function POST(request: Request) {
       });
     }
 
-    // Notify wedding owner about new RSVP
-    if (weddingId) {
+    // Notify wedding owner about new RSVP (R-07: always bound to the
+    // effective wedding — an RSVP without a wedding context is rejected above)
+    {
       const { notifyWeddingOwner } = await import('@/lib/notifications');
       await notifyWeddingOwner(
-        weddingId,
+        effectiveWeddingId,
         'RSVP_RECEIVED',
         'New RSVP Received',
         `${firstName} ${lastName} submitted an RSVP — ${attendingCount} attending, ${decliningCount} declining (party of ${partySize}).${resolvedGuestId ? '' : ' (Unmatched — no linked guest)'}`,

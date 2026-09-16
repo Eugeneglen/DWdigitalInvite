@@ -5,14 +5,27 @@ import { db } from '@/lib/db';
 import { promises as fsp } from 'fs';
 import path from 'path';
 import { IS_VOLUME_STORAGE } from '@/lib/file-storage';
+import { clampFocal, normalizeDisplayMode } from '@/lib/hero-focal';
 
 // In-memory set of wedding IDs that have been self-healed this server instance.
 // Prevents repeated filesystem checks on every GET request.
 const healedWeddings = new Set<string>();
 
-/** Check whether a filesystem-based URL actually has a file behind it. */
+/**
+ * Check whether a URL is expected to render.
+ *
+ * - External absolute URLs (http/https/…) are hosted off-platform (e.g. the
+ *   template's aida-public banner/hero images) and cannot be filesystem-
+ *   verified — treat them as valid. Returning false for them (previous
+ *   behaviour) made the self-heal wipe template-seeded banner/hero URLs
+ *   from the DB on the couple's first CMS load.
+ * - Local filesystem URLs (/api/uploads/weddings/…, /uploads/weddings/…)
+ *   are verified against disk (volume first, then public/uploads).
+ */
 async function fileExistsForUrl(url: string): Promise<boolean> {
-  if (!url || !url.startsWith('/')) return false;
+  if (!url) return false;
+  // Not a site-relative path → external/non-filesystem resource; assume valid.
+  if (!url.startsWith('/')) return true;
 
   let relativePath = '';
   if (url.startsWith('/api/uploads/weddings/')) {
@@ -20,7 +33,8 @@ async function fileExistsForUrl(url: string): Promise<boolean> {
   } else if (url.startsWith('/uploads/weddings/')) {
     relativePath = url.substring('/uploads/weddings/'.length);
   } else {
-    return false; // Not a filesystem URL (might be data: URL, etc.)
+    // Unknown path shape — not a managed filesystem asset; assume valid.
+    return true;
   }
 
   // Try volume path first (Railway), then local public/uploads
@@ -137,11 +151,42 @@ export async function PUT(req: NextRequest) {
     }
 
     const updateData: Record<string, unknown> = {};
-    const allowedFields = ['coupleName', 'brideName', 'groomName', 'weddingDate', 'weddingTime', 'venue', 'venueAddress', 'googleMapsUrl', 'heroImageUrl', 'heroVideoUrl', 'bannerUrl'];
+    const allowedFields = ['coupleName', 'brideName', 'groomName', 'weddingDate', 'weddingTime', 'venue', 'venueAddress', 'googleMapsUrl', 'heroImageUrl', 'heroVideoUrl', 'bannerUrl', 'heroFocalX', 'heroFocalY', 'heroDisplayMode'];
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
         updateData[field] = field === 'weddingDate' ? new Date(body[field]) : body[field];
       }
+    }
+
+    // ── Mobile hero framing validation (additive, zero-regression) ──────────
+    // Focal coordinates must be numbers in [0,1] (or null/'' to clear →
+    // legacy centre crop). Display mode accepts 'fill' | 'fit' (or null/'' →
+    // legacy fill). Reject anything else with 400 rather than persisting junk.
+    const framingError = validateFramingFields(body);
+    if (framingError) {
+      return NextResponse.json({ error: framingError }, { status: 400 });
+    }
+    if (updateData.heroFocalX !== undefined) {
+      updateData.heroFocalX = body.heroFocalX === '' || body.heroFocalX === null ? null : clampFocal(Number(body.heroFocalX));
+    }
+    if (updateData.heroFocalY !== undefined) {
+      updateData.heroFocalY = body.heroFocalY === '' || body.heroFocalY === null ? null : clampFocal(Number(body.heroFocalY));
+    }
+    if (updateData.heroDisplayMode !== undefined) {
+      updateData.heroDisplayMode = body.heroDisplayMode === '' || body.heroDisplayMode === null ? null : normalizeDisplayMode(body.heroDisplayMode);
+    }
+
+    // Stale-focal guard: when a NEW hero image is saved without explicit focal
+    // coordinates in the same request, clear any previously saved focal point —
+    // it belongs to the OLD photo and would mis-crop the new one. (Uploads that
+    // ran auto-detection send heroFocalX/Y in the same body and keep theirs.)
+    if (
+      body.heroImageUrl !== undefined &&
+      body.heroFocalX === undefined &&
+      body.heroFocalY === undefined
+    ) {
+      updateData.heroFocalX = null;
+      updateData.heroFocalY = null;
     }
 
     const updated = await db.weddingAccount.update({
@@ -165,4 +210,25 @@ export async function PUT(req: NextRequest) {
     console.error('Update wedding error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
+}
+
+/**
+ * Validate mobile hero framing fields when present in a PUT body.
+ * Returns an error message, or null when everything is valid/absent.
+ * Accepts: number 0..1, null, '' (clear) for focal; 'fill'|'fit'|null|'' for mode.
+ */
+function validateFramingFields(body: Record<string, unknown>): string | null {
+  for (const key of ['heroFocalX', 'heroFocalY'] as const) {
+    const v = body[key];
+    if (v === undefined || v === null || v === '') continue;
+    if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 1) {
+      return `${key} must be a number between 0 and 1, or null to reset`;
+    }
+  }
+  const mode = body.heroDisplayMode;
+  if (mode === undefined || mode === null || mode === '') return null;
+  if (typeof mode !== 'string' || !['fill', 'fit'].includes(mode.trim().toLowerCase())) {
+    return 'heroDisplayMode must be "fill" or "fit"';
+  }
+  return null;
 }

@@ -44,7 +44,9 @@ const updateUserSchema = z.object({
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:weddings:read'))) {
+    // R-02: user listing exposes staff PII — require users:manage (consistent
+    // with the rest of this route family), not the weaker weddings:read.
+    if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:users:manage'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -166,6 +168,20 @@ export async function POST(req: NextRequest) {
 
 // ── PUT ───────────────────────────────────────────────────────────────────
 
+/** R-02 lockout guard: true if this user is the LAST active Super Admin. */
+async function isLastActiveSuperAdmin(userId: string): Promise<boolean> {
+  const target = await db.user.findUnique({
+    where: { id: userId },
+    select: { role: true, isActive: true },
+  });
+  if (!target || !target.isActive) return false;
+  if (!target.role.startsWith('SUPER_ADMIN')) return false;
+  const activeSuperAdmins = await db.user.count({
+    where: { role: { startsWith: 'SUPER_ADMIN' }, isActive: true },
+  });
+  return activeSuperAdmins <= 1;
+}
+
 export async function PUT(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -173,6 +189,13 @@ export async function PUT(req: NextRequest) {
     // Previously used platform:weddings:read which let consultants reset any user's password.
     if (!session?.user || !(await hasPlatformPermission(session.user.id, session.user.role, 'platform:users:manage'))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // R-02 (F-02): modifying another user's email / password / isActive are
+    // account-takeover primitives — require a genuine SUPER_ADMIN, matching
+    // the POST/DELETE gates on this route family.
+    if (normalizePlatformRole(session.user.role) !== 'SUPER_ADMIN') {
+      return NextResponse.json({ error: 'Forbidden — only Super Admins can modify user accounts' }, { status: 403 });
     }
 
     const body = await req.json();
@@ -208,6 +231,12 @@ export async function PUT(req: NextRequest) {
     }
     if (updates.isActive !== undefined) updateData.isActive = updates.isActive;
 
+    // R-02 lockout guard: never demote or deactivate the LAST active Super Admin.
+    const demotes = updates.role !== undefined && !String(updates.role).startsWith('SUPER_ADMIN');
+    if ((demotes || updates.isActive === false) && (await isLastActiveSuperAdmin(id))) {
+      return NextResponse.json({ error: 'Cannot demote or deactivate the last active Super Admin' }, { status: 400 });
+    }
+
     const user = await db.user.update({
       where: { id },
       data: updateData,
@@ -218,20 +247,43 @@ export async function PUT(req: NextRequest) {
         role: true,
         avatarUrl: true,
         isActive: true,
+        sessionVersion: true,
         lastLoginAt: true,
         createdAt: true,
         updatedAt: true,
       },
     });
 
-    // Audit log
+    // R-09 (F-09): password/email/role/isActive changes are security-relevant
+    // account changes — bump sessionVersion so ALL of the target user's
+    // existing sessions are rejected from their next request onwards.
+    // (Deactivation is additionally caught by the per-request isActive check
+    // in the jwt callback; this bump makes it — and every other change here —
+    // revocation-immediate rather than only flag-immediate.)
+    const securityRelevant =
+      updates.password !== undefined ||
+      updates.email !== undefined ||
+      updates.role !== undefined ||
+      updates.isActive !== undefined;
+    if (securityRelevant) {
+      await db.user.update({
+        where: { id },
+        data: { sessionVersion: { increment: 1 } },
+      });
+    }
+
+    // Audit log (never persist plaintext passwords)
     await db.auditLog.create({
       data: {
         userId: session.user.id,
         action: 'UPDATE',
         entity: 'User',
         entityId: id,
-        details: JSON.stringify(updates),
+        details: JSON.stringify({
+          ...updates,
+          ...(updates.password ? { password: '[REDACTED]' } : {}),
+          ...(securityRelevant ? { sessionsRevoked: true } : {}),
+        }),
       },
     });
 
@@ -269,8 +321,15 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 });
     }
 
+    // R-02 lockout guard: never delete (hard OR soft) the last active Super Admin.
+    if (await isLastActiveSuperAdmin(id)) {
+      return NextResponse.json({ error: 'Cannot delete the last active Super Admin' }, { status: 400 });
+    }
+
     if (hard) {
-      // Hard delete — remove user and all their data in a transaction
+      // Hard delete — remove user and all their data in a transaction.
+      // R-09: the deleted user's sessions die via the jwt callback's
+      // user-missing check (fail-closed), no bump needed on a gone row.
       await db.$transaction([
         // Null out ownership of any weddings they own
         db.weddingAccount.updateMany({ where: { ownerId: id }, data: { ownerId: null } }),
@@ -285,6 +344,8 @@ export async function DELETE(req: NextRequest) {
         db.user.delete({ where: { id } }),
       ]);
     } else {
+      // Soft delete (deactivation). R-09: sessions are rejected immediately
+      // by the per-request isActive check in the jwt callback.
       await db.user.update({
         where: { id },
         data: { isActive: false },

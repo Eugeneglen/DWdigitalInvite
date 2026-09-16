@@ -24,16 +24,21 @@ RUN test -f ".next/standalone/server.js" || (echo "ERROR: .next/standalone/serve
 # ── Pre-compile seed scripts to plain JavaScript ────────────────────────────
 # The runner stage is node:22-alpine (musl). tsx/esbuild only ship a glibc-linked
 # binary (@esbuild/linux-x64) — there is NO musl variant — so `tsx` cannot run
-# on Alpine regardless of whether it is re-installed via npm. The previous fix
-# (RUN npm install tsx esbuild --no-save) re-installed the SAME glibc binary and
-# therefore still failed at runtime.
+# on Alpine regardless of whether it is re-installed via npm.
 #
 # Fix: compile each seed .ts to a self-contained ES module (.mjs) HERE in the
 # builder (where esbuild's glibc binary works), keeping @prisma/client +
-# bcryptjs as EXTERNAL imports (resolved from node_modules at runtime, so the
-# Prisma query-engine binary selection — incl. the linux-musl variant from
-# binaryTargets — is untouched). The runner then executes them with plain
-# `node` — no tsx, no esbuild, no transpiler needed at runtime.
+# bcryptjs as EXTERNAL imports (resolved from node_modules at runtime).
+#
+# R-04 (F-04): these scripts are compiled for MANUAL bootstrap only — they are
+# NO LONGER executed automatically on container start (see CMD below).
+#   - seed.mjs               → non-destructive bootstrap (super admins via
+#                              SEED_ADMIN_PASSWORD, settings create-only);
+#                              demo data only with SEED_DEMO=true, never in
+#                              production (NODE_ENV=production).
+#   - seed-roles.mjs         → non-destructive role sync + wildcard heal —
+#                              SAFE on every boot (only startup seed kept).
+#   - seed-content-templates → conditional, create-only template seeding.
 RUN ./node_modules/.bin/esbuild prisma/seed.ts \
       --bundle --platform=node --format=esm --packages=external \
       --outfile=dist/seed.mjs \
@@ -90,12 +95,23 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Run db push (create/migrate schema) → seed all data → start server.
-# All seed scripts are idempotent (use upsert), safe to run on every deploy.
-# Order matters: seed.mjs creates the wedding → seed-roles.mjs creates
-# permissions → seed-content-templates.mjs creates template from wedding.
-# Seeds are pre-compiled .mjs files executed with plain `node`, so no
-# tsx/esbuild runtime dependency is required on Alpine (musl). Each script
-# exits 0 only on success, so a real seed failure stops the chain and the
-# server does NOT start with an empty database.
-CMD ["sh", "-c", "./node_modules/.bin/prisma db push && node dist/seed.mjs && node dist/seed-roles.mjs && node dist/seed-content-templates.mjs && node .next/standalone/server.js"]
+# ── R-04 (F-04): PRODUCTION-SAFE STARTUP ────────────────────────────────────
+# Previous CMD ran `seed.mjs` on EVERY container start. That seed globally
+# deleted ALL RSVPs, guest responses and wishes, and reset every seeded
+# user's password — destroying production customer data on every deploy.
+#
+# New startup policy:
+#   1. `prisma db push` — schema sync ONLY (no --accept-data-loss: a
+#      destructive schema change FAILS the deploy loudly instead of silently
+#      dropping data).
+#   2. `seed-roles.mjs` — the ONLY startup seed. It is strictly
+#      non-destructive: creates missing default roles and heals insecure
+#      account-tier '*' wildcards; it never deletes or resets anything else.
+#   3. Start the server.
+#
+# User/content seeding is NOT part of startup anymore. For a FRESH
+# environment, bootstrap once manually (from inside the container):
+#   SEED_ADMIN_PASSWORD='<strong password>' node dist/seed.mjs
+# Demo data (dev only): SEED_DEMO=true node dist/seed.mjs — never in
+# production.
+CMD ["sh", "-c", "./node_modules/.bin/prisma db push && node dist/seed-roles.mjs && node .next/standalone/server.js"]

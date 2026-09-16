@@ -12,14 +12,23 @@ interface SectionBannerProps {
 }
 
 export default function SectionBanner({ title, subtitle, bannerUrl: bannerUrlProp }: SectionBannerProps) {
-  const { data, getField } = usePublicWedding(useWeddingSlug());
+  const { data, getFont, getField } = usePublicWedding(useWeddingSlug());
   const rawBannerUrl = bannerUrlProp ?? data?.wedding.bannerUrl ?? '';
+  // Page background — drives the fallback text colour when the banner image
+  // cannot be analysed/loaded (the banner then renders on the page bg).
+  const pageBackgroundColor = getField('global', 'backgroundColor', '#FCF9F2');
 
-  // Read the admin-chosen banner headline font (stored as global.fontFamily)
-  const bannerFont = getField('global', 'fontFamily', 'Playfair Display');
+  // Couple's selected "Banner Headline Font" — hero section first (what the
+  // CMS font picker writes), falling back to global (template applies) then
+  // the default. Per the design plan, ONLY the banner headline title uses
+  // this font; the subtitle and all other site text stay in Playfair
+  // Display. Previously this read ONLY global.fontFamily while the CMS font
+  // picker wrote only hero.fontFamily, so the banners on every page except
+  // the homepage never reflected the couple's font choice.
+  const bannerFont = getFont();
 
   // Hooks must always be called (React rules of hooks)
-  const { textColor: bannerTextColor, subtitleColor: bannerSubtitleColor, textShadow: bannerTextShadow } = useImageAutoContrast(rawBannerUrl);
+  const { textColor: bannerTextColor, subtitleColor: bannerSubtitleColor, textShadow: bannerTextShadow } = useImageAutoContrast(rawBannerUrl, pageBackgroundColor);
 
   // Don't render the banner at all if there's no image
   if (!rawBannerUrl) return null;
@@ -38,6 +47,10 @@ export default function SectionBanner({ title, subtitle, bannerUrl: bannerUrlPro
               fontFamily: `'${bannerFont}', serif`,
               color: bannerTextColor,
               textShadow: bannerTextShadow,
+              // See HomePage.tsx: single-weight fonts (most scripts) must not
+              // be faux-bolded — render their natural weight so the banner
+              // matches the CMS font picker showcase. Real bolds still apply.
+              fontSynthesis: 'none',
             }}
           >
             {title}

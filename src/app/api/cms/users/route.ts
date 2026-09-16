@@ -3,7 +3,15 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
 import { authenticateRequest, createAuditLog } from '@/lib/auth-middleware';
-import { hasPlatformPermission } from '@/lib/permissions';
+import { hasPlatformPermission, normalizePlatformRole } from '@/lib/permissions';
+
+// R-02 (F-02): server-side role-assignment whitelist for user creation via
+// the CMS. SUPER_ADMIN roles can only be created through /api/master/users
+// (which is itself SUPER_ADMIN-gated). Arbitrary role strings are rejected.
+const CMS_CREATABLE_ROLES = [
+  'CONSULTANT_1', 'CONSULTANT_2', 'COORDINATOR_1',
+  'SUPPORT_1', 'SUPPORT_2', 'COUPLE',
+] as const;
 
 // ============================================
 // GET — List all users with owned weddings
@@ -79,7 +87,7 @@ const createUserSchema = z.object({
     .regex(/[a-zA-Z]/, 'Password must contain at least one letter')
     .regex(/[0-9]/, 'Password must contain at least one number'),
   name: z.string().min(1, 'Name is required'),
-  role: z.string().optional(),
+  role: z.enum(CMS_CREATABLE_ROLES).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -91,6 +99,12 @@ export async function POST(request: NextRequest) {
 
     if (!(await hasPlatformPermission(user.userId, user.role, 'platform:users:manage'))) {
       return Response.json({ success: false, error: 'Access denied. Admin privileges required.' }, { status: 403 });
+    }
+
+    // R-02 (F-02): creating users is a SUPER_ADMIN-only operation, matching
+    // the /api/master/users POST gate.
+    if (normalizePlatformRole(user.role) !== 'SUPER_ADMIN') {
+      return Response.json({ success: false, error: 'Access denied. Only Super Admins can create users.' }, { status: 403 });
     }
 
     const body = await request.json();

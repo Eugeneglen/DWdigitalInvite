@@ -353,6 +353,7 @@ export default function CoupleDetails() {
           {/* Custom Map Upload — shown when Upload Custom Map is selected */}
           {mapType === 'custom-map' && (
             <MirrorImageUpload
+              category="schedule"
               value={customMapImage}
               onChange={setCustomMapImage}
               onRemove={() => setCustomMapImage('')}

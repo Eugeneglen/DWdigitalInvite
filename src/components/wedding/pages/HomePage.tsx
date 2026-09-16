@@ -7,6 +7,7 @@ import { useWeddingSlug } from '@/hooks/useWeddingSlug';;
 import { useLiveWeddingData } from '@/hooks/useLiveWeddingData';
 import { useImageAutoContrast } from '@/hooks/useImageAutoContrast';
 import { useHeroAutoContrast } from '@/hooks/useHeroAutoContrast';
+import { useAmbientBackdrop } from '@/hooks/useAmbientBackdrop';
 
 
 
@@ -55,15 +56,38 @@ function parseWeddingTimestamp(dateStr: string | null | undefined): number {
 }
 
 export default function HomePage() {
-  const { data, getField } = usePublicWedding(useWeddingSlug());
+  const { data, getField, getFont } = usePublicWedding(useWeddingSlug());
 
   const bannerUrl = data?.wedding.bannerUrl || '';
   const heroImgUrl = data?.wedding.heroImageUrl || '';
 
   // Independent auto-contrast for the banner headline — samples the actual
   // banner IMAGE pixels (not the page background) to pick text colour.
-  const { textColor: bannerTextColor, subtitleColor: bannerSubtitleColor, textShadow: bannerTextShadow } = useImageAutoContrast(bannerUrl);
+  // The page background is passed so the fallback colour contrasts with the
+  // page when the banner image cannot be loaded/analysed.
+  const { textColor: bannerTextColor, subtitleColor: bannerSubtitleColor, textShadow: bannerTextShadow } = useImageAutoContrast(
+    bannerUrl,
+    getField('global', 'backgroundColor', '#FCF9F2'),
+  );
   const heroVideoUrl = data?.wedding.heroVideoUrl || null;
+
+  // ── Mobile hero framing (additive; null = legacy centre-crop, byte-identical) ──
+  // heroFocalX/Y anchor `object-position` on the couple's joint centroid so the
+  // 9:16 mobile crop keeps both partners in frame. heroDisplayMode 'fit' shows
+  // the ENTIRE photo (object-contain) over an ambient backdrop sampled from the
+  // image — used when the couple prefers no cropping at all.
+  const heroFocalX = data?.wedding.heroFocalX ?? null;
+  const heroFocalY = data?.wedding.heroFocalY ?? null;
+  const heroDisplayMode = data?.wedding.heroDisplayMode === 'fit' ? 'fit' as const : 'fill' as const;
+  const heroFitMode = heroDisplayMode === 'fit' && !!heroImgUrl && !heroVideoUrl;
+  const heroObjectPosition =
+    heroFocalX != null && heroFocalY != null && !heroFitMode
+      ? `${(heroFocalX * 100).toFixed(2)}% ${(heroFocalY * 100).toFixed(2)}%`
+      : undefined;
+  const ambientBackdrop = useAmbientBackdrop(
+    heroFitMode ? heroImgUrl : '',
+    'rgb(240, 235, 226)',
+  );
 
   // Hero section auto-contrast — samples the BOTTOM of the image where text sits
   const heroContrast = useHeroAutoContrast(heroImgUrl, heroVideoUrl);
@@ -104,8 +128,12 @@ export default function HomePage() {
           </section>
   ) : null;
 
-  // CMS font — applied ONLY to the master head copy (couple name)
-  const heroFont = getField('hero', 'fontFamily', '');
+  // CMS "Banner Headline Font" — resolves the couple's selection
+  // (hero section → global section → default) and applies ONLY to the top
+  // banner headline (couple name), exactly as the design plan specifies.
+  // Section banners on every sub-page resolve the same font via getFont()
+  // in SectionBanner.tsx. All other text keeps Playfair Display.
+  const heroFont = getFont();
 
   // Narrative section
   const narrativeLabel = getField('hero', 'narrativeLabel', '');
@@ -144,6 +172,12 @@ export default function HomePage() {
               fontFamily: `'${heroFont}', serif`,
               color: bannerTextColor,
               textShadow: bannerTextShadow,
+              // Fonts without a true 700 face (most script/display fonts load
+              // weight 400 only from Google Fonts) must NOT be faux-bolded by
+              // the browser — that made thin showcase fonts render as thick
+              // blobs. font-synthesis: none renders their natural weight;
+              // fonts with a real bold still use it. Matches the CMS picker.
+              fontSynthesis: 'none',
             }}
           >
             {coupleName}
@@ -166,8 +200,17 @@ export default function HomePage() {
         {/* ===== HERO SECTION ===== */}
         {(heroVideoUrl || heroImgUrl || dateText || heroDescription) && (
         <section className="relative w-full flex flex-col justify-end overflow-hidden" style={{ minHeight: (heroVideoUrl || heroImgUrl) ? '795px' : 'auto', height: (heroVideoUrl || heroImgUrl) ? undefined : 'auto' }}>
-          {/* Background — full bleed, video or image */}
-          <div className="absolute inset-0 z-0" style={{ display: (heroVideoUrl || heroImgUrl) ? 'block' : 'none' }}>
+          {/* Background — full bleed, video or image.
+              Fill (legacy): object-cover. With a couple-set focal point the
+              crop anchors on BOTH people instead of the geometric centre.
+              Fit: object-contain over an ambient backdrop — no cropping. */}
+          <div
+            className="absolute inset-0 z-0"
+            style={{
+              display: (heroVideoUrl || heroImgUrl) ? 'block' : 'none',
+              ...(heroFitMode ? { backgroundColor: ambientBackdrop } : {}),
+            }}
+          >
             {heroVideoUrl ? (
               <video
                 autoPlay
@@ -180,7 +223,10 @@ export default function HomePage() {
             ) : heroImgUrl ? (
               <img
                 alt="Hero Wedding Portrait"
-                className="w-full h-full object-cover object-center"
+                className={heroFitMode
+                  ? 'w-full h-full object-contain object-center'
+                  : 'w-full h-full object-cover object-center'}
+                style={heroObjectPosition ? { objectPosition: heroObjectPosition } : undefined}
                 src={heroImgUrl}
               />
             ) : null}

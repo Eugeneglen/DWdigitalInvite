@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { hasPlatformPermission, invalidateOverrideCache, ALL_PERMISSIONS } from '@/lib/permissions';
+import { hasPlatformPermission, invalidateOverrideCache, normalizePlatformRole, ALL_PERMISSIONS } from '@/lib/permissions';
 import { z } from 'zod/v4';
 
 // ── GET /api/master/users/[id]/permissions — list overrides for a user ────
@@ -82,6 +82,12 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // R-02 (F-02): editing a user's permission overrides is privilege
+    // assignment — SUPER_ADMIN only.
+    if (normalizePlatformRole(session.user.role) !== 'SUPER_ADMIN') {
+      return NextResponse.json({ error: 'Forbidden — only Super Admins can modify permission overrides' }, { status: 403 });
+    }
+
     const { id: userId } = await params;
 
     const user = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
@@ -120,6 +126,14 @@ export async function PUT(
     }
 
     invalidateOverrideCache(userId);
+
+    // R-09 (F-09): permission overrides are an authorization change — bump
+    // sessionVersion so the user's existing sessions are rejected and any
+    // retained authorization is dropped (fresh login re-evaluates overrides).
+    await db.user.update({
+      where: { id: userId },
+      data: { sessionVersion: { increment: 1 } },
+    });
 
     return NextResponse.json({
       success: true,

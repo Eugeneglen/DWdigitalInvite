@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
-import crypto from 'crypto';
+import { generateInvitationCode } from '@/lib/invitation-code';
 
 // ---------------------------------------------------------------------------
 // Normalisation helper — case-insensitive, collapsed whitespace
@@ -74,9 +74,11 @@ export async function POST(req: NextRequest) {
     const existingCodeSet = new Set(existingGuests.map((g) => g.invitationCode));
 
     function generateCode(): string {
+      // R-06 (F-06): cryptographically secure 8-char code from an unambiguous
+      // alphabet (was: crypto.randomBytes(3).toString('hex') — 24 bits only).
       let code: string;
       do {
-        code = crypto.randomBytes(3).toString('hex').toUpperCase();
+        code = generateInvitationCode();
       } while (existingCodeSet.has(code));
       existingCodeSet.add(code);
       return code;

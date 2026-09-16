@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { z } from 'zod/v4';
+import { generateInvitationCode } from '@/lib/invitation-code';
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -68,10 +69,6 @@ async function getWeddingId(userId: string): Promise<string | null> {
     select: { id: true },
   });
   return w?.id ?? null;
-}
-
-function generateInvitationCode(): string {
-  return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
 async function createAuditLog(

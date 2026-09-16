@@ -52,15 +52,16 @@ prompt
 server.log
 # Skills directory
 /skills/
-
-# Local DB
+# Database files (SQLite dev DBs must never be tracked — contain hashes + PII)
 db/
-
-# Sandbox tooling
+*.db
+*.db-journal
+# ── Release hygiene: local-only artefacts (never publish) ─────────────────────
+# Captured tool outputs from development sessions
 tool-results/
-/upload/
+# Pasted screenshots / generated images from chat sessions
+upload/
+# Project worklog — internal security-remediation memory (security-sensitive prose)
 worklog.md
-ensure-server.sh
-mini-services/PUSH_PROCEDURE.md
-
-PUSH_PROCEDURE.md
+# Runtime uploads (dev wedding media — local disk only, volume in production)
+public/uploads/

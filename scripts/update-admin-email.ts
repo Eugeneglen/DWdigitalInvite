@@ -27,7 +27,7 @@ async function main() {
   console.log(`✓ Admin email updated successfully.`);
   console.log(`  Before: ${OLD_EMAIL}`);
   console.log(`  After:  ${updated.email}`);
-  console.log(`  (Password is unchanged. Login with ${NEW_EMAIL} / Admin@2024)`);
+  console.log(`  (Password is unchanged. Login with ${NEW_EMAIL} / (your current admin password))`);
 
   // 4) Print verification
   const verify = await db.user.findUnique({ where: { email: NEW_EMAIL } });

@@ -1,83 +1,137 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
 
 const db = new PrismaClient();
 
+/**
+ * R-04 / R-05 (F-04, F-05, F-10): cryptographically random password
+ * generator. No predictable default credentials are ever seeded.
+ */
+function generatePassword(length = 16): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  const bytes = crypto.randomBytes(length);
+  return Array.from(bytes).map((b) => alphabet[b % alphabet.length]).join('');
+}
+
+interface SeededUser {
+  email: string;
+  name: string;
+  role: string;
+  password: string;
+  created: boolean;
+  id: string;
+}
+
+/**
+ * R-04 (F-04): create-only user provisioning. If the user already exists,
+ * NOTHING is updated — production password changes and role changes must
+ * survive re-runs and redeploys. Previously this upsert reset passwordHash
+ * and role on every deploy, silently reverting customer password changes.
+ */
+async function ensureUser(opts: {
+  email: string;
+  name: string;
+  role: string;
+  envVar?: string;
+}): Promise<SeededUser> {
+  const existing = await db.user.findUnique({ where: { email: opts.email } });
+  if (existing) {
+    return { ...opts, password: '', created: false, id: existing.id };
+  }
+  const envPassword = opts.envVar ? process.env[opts.envVar] : undefined;
+  const password = envPassword && envPassword.length >= 8 ? envPassword : generatePassword();
+  const passwordHash = await bcrypt.hash(password, 12);
+  const user = await db.user.create({
+    data: {
+      email: opts.email,
+      passwordHash,
+      name: opts.name,
+      role: opts.role,
+      isActive: true,
+      mustChangePassword: true, // forced password change on first login
+    },
+  });
+  console.log(`✅ User created: ${user.email} (${user.role})`);
+  if (envPassword && envPassword.length >= 8) {
+    console.log(`   (password provided via ${opts.envVar})`);
+  } else {
+    console.log(`   ⚠️  Generated temporary password (shown ONCE, change on first login): ${password}`);
+  }
+  return { ...opts, password, created: true, id: user.id };
+}
+
 async function seed() {
-  console.log('🌱 Seeding database (replicating production data)...');
+  console.log('🌱 Seeding database (non-destructive)...');
+
+  const isProduction = process.env.NODE_ENV === 'production';
+  const userCountBefore = await db.user.count();
+  // R-04 (F-04): demo data is EXPLICITLY separated from production:
+  //   - SEED_DEMO=true forces demo seeding (fresh dev DB bootstrap)
+  //   - a completely empty database OUTSIDE production also seeds demo
+  //     (preserves the scripts/pre-dev-check.js dev-restore behaviour)
+  //   - production NEVER seeds demo automatically
+  const demoMode = process.env.SEED_DEMO === 'true' || (!isProduction && userCountBefore === 0);
+  console.log(`   mode: ${demoMode ? 'BOOTSTRAP + DEMO' : 'BOOTSTRAP ONLY'}${isProduction ? ' (production)' : ''}`);
 
   // ============================================================
-  // 1. PLATFORM USERS
+  // 1. PLATFORM USERS — create-only, generated credentials
   // ============================================================
-  const adminPassword = await bcrypt.hash('Admin@2024', 12);
-  const admin = await db.user.upsert({
-    where: { email: 'admin@dreamweavers.sg' },
-    update: { role: 'SUPER_ADMIN_1', passwordHash: adminPassword },
-    create: {
-      email: 'admin@dreamweavers.sg',
-      passwordHash: adminPassword,
-      name: 'Dreamweavers Admin',
-      role: 'SUPER_ADMIN_1',
-      isActive: true,
-    },
-  });
-  console.log(`✅ Admin user: ${admin.email} (${admin.role})`);
+  const admin = await ensureUser({ email: 'admin@dreamweavers.sg', name: 'Dreamweavers Admin', role: 'SUPER_ADMIN_1', envVar: 'SEED_ADMIN_PASSWORD' });
+  const admin2 = await ensureUser({ email: 'eugeneglen@gmail.com', name: 'Eugene (Backup Admin)', role: 'SUPER_ADMIN_1', envVar: 'SEED_ADMIN_PASSWORD' });
+  void admin; void admin2;
 
-  // Backup Super Admin (safety net in case primary admin has login issues)
-  const admin2Password = await bcrypt.hash('Admin@2024', 12);
-  const admin2 = await db.user.upsert({
-    where: { email: 'eugeneglen@gmail.com' },
-    update: { role: 'SUPER_ADMIN_1', passwordHash: admin2Password },
-    create: {
-      email: 'eugeneglen@gmail.com',
-      passwordHash: admin2Password,
-      name: 'Eugene (Backup Admin)',
-      role: 'SUPER_ADMIN_1',
-      isActive: true,
-    },
-  });
-  console.log(`✅ Backup admin: ${admin2.email} (${admin2.role})`);
+  let couple: SeededUser | null = null;
+  let consultant: SeededUser | null = null;
+  let coordinator: SeededUser | null = null;
+  if (demoMode) {
+    // Demo/test accounts — only in demo mode, never in a production bootstrap.
+    couple = await ensureUser({ email: 'eleanor@wedding.com', name: 'Eleanor', role: 'COUPLE' });
+    consultant = await ensureUser({ email: 'consultant@dreamweavers.sg', name: 'Sarah Chen', role: 'CONSULTANT_1' });
+    coordinator = await ensureUser({ email: 'coordinator@dreamweavers.sg', name: 'Marcus Tan', role: 'COORDINATOR_1' });
+    console.log(`✅ Staff: ${consultant.email} (CONSULTANT_1), ${coordinator.email} (COORDINATOR_1)`);
+  }
 
-  const couplePassword = await bcrypt.hash('Couple@2024', 12);
-  const couple = await db.user.upsert({
-    where: { email: 'eleanor@wedding.com' },
-    update: { role: 'COUPLE', passwordHash: couplePassword },
-    create: {
-      email: 'eleanor@wedding.com',
-      passwordHash: couplePassword,
-      name: 'Eleanor',
-      role: 'COUPLE',
-      isActive: true,
+  // ============================================================
+  // 1b. PLATFORM SETTINGS — create-only (never overwrite existing values)
+  //     R-05 (F-05/F-10): default_couple_password is NO LONGER seeded.
+  //     New couple accounts receive a generated random password instead.
+  // ============================================================
+  const platformSettings = [
+    { key: 'couple_access_expiry_days', value: '30' },
+    { key: 'expiry_notification_days', value: '7' },
+    { key: 'default_plan', value: 'GOLD' },
+    { key: 'default_wedding_status', value: 'DRAFT' },
+    // Mark Classic Elegance as the global default template (used by the
+    // Couple CMS Design page and the Admin CMS Content Templates page).
+    { key: 'default_template', value: 'classic-elegance' },
+    {
+      key: 'package_templates',
+      value: JSON.stringify([
+        { name: 'GOLD', label: 'Gold', features: ['countdown', 'schedule', 'rsvp', 'getting-there'], maxGuests: 100, maxMedia: 20, sortOrder: 1 },
+        { name: 'PLATINUM', label: 'Platinum', features: ['countdown', 'schedule', 'rsvp', 'getting-there', 'story', 'qa'], maxGuests: 200, maxMedia: 50, sortOrder: 2 },
+        { name: 'DIAMOND', label: 'Diamond', features: ['countdown', 'schedule', 'rsvp', 'getting-there', 'story', 'wishes', 'qa', 'moments'], maxGuests: 500, maxMedia: 100, sortOrder: 3 },
+      ]),
     },
-  });
-  console.log(`✅ Couple user: ${couple.email} (${couple.role})`);
+  ];
+  for (const setting of platformSettings) {
+    await db.systemSetting.upsert({
+      where: { key: setting.key },
+      update: {},
+      create: setting,
+    });
+  }
+  console.log(`✅ ${platformSettings.length} platform settings ensured (create-only)`);
 
-  // 1b. Staff users — consultant (ADMIN_1) & coordinator (ADMIN_2)
-  //     Needed so the Admin CMS consultant/coordinator dropdowns have options.
-  const staffPassword = await bcrypt.hash('Staff@2024', 12);
-  const consultant = await db.user.upsert({
-    where: { email: 'consultant@dreamweavers.sg' },
-    update: { role: 'CONSULTANT_1', passwordHash: staffPassword },
-    create: {
-      email: 'consultant@dreamweavers.sg',
-      passwordHash: staffPassword,
-      name: 'Sarah Chen',
-      role: 'CONSULTANT_1',
-      isActive: true,
-    },
-  });
-  const coordinator = await db.user.upsert({
-    where: { email: 'coordinator@dreamweavers.sg' },
-    update: { role: 'COORDINATOR_1', passwordHash: staffPassword },
-    create: {
-      email: 'coordinator@dreamweavers.sg',
-      passwordHash: staffPassword,
-      name: 'Marcus Tan',
-      role: 'COORDINATOR_1',
-      isActive: true,
-    },
-  });
-  console.log(`✅ Staff: ${consultant.name} (CONSULTANT_1), ${coordinator.name} (COORDINATOR_1)`);
+  if (!demoMode) {
+    console.log('\n🎉 Bootstrap complete. Demo data skipped (set SEED_DEMO=true to seed the demo weddings).');
+    await db.$disconnect();
+    return;
+  }
+
+  const coupleUser = couple as SeededUser;
+  void consultant; void coordinator;
+  console.log('\n🌱 DEMO MODE — seeding demo weddings (dev/test data only; NEVER run with SEED_DEMO=true against production)');
 
   // ============================================================
   // 2. WEDDING #1 — Eleanor & James (ACTIVE / FREE, owned by couple)
@@ -85,7 +139,7 @@ async function seed() {
   // ============================================================
   const wedding1 = await db.weddingAccount.upsert({
     where: { slug: 'eleanor-james-2027' },
-    update: { ownerId: couple.id, coupleEmail: 'eleanor@wedding.com', accountStatus: 'ACTIVE' },
+    update: { ownerId: coupleUser.id, coupleEmail: 'eleanor@wedding.com', accountStatus: 'ACTIVE' },
     create: {
       slug: 'eleanor-james-2027',
       coupleName: 'Eleanor & James',
@@ -102,7 +156,7 @@ async function seed() {
       coupleEmail: 'eleanor@wedding.com',
       heroImageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBeAe38AA5-0h4B5MmgQCqv54oQXyPMGznDKaw2sJI_FnTbB_yXXWOpirFlFycj_2VI02IVLouUTt86Y1J7Ls-bRsMOHPAcfSqruVoh87sfhw3vi2Z6t1C7ogCLtkvF6QbJkwuV0av8pXTrUeAAi6ymnZpvyOr8qVjTNNorAOmqRrW_fohX_xlkscmBh39K4Wtvs6TH0Nvb_X3LQQRD9W_sySN_iWbWw9O0au8u1jO-hSekE9pSGNo5zsTz3o9PWy5xbzc6lq3knkIy',
       bannerUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA-OyKfcsxXAmZDArHbDXl1cVCgGUG5liFPzyHdVvMG6_4jN9pNTrN9GCrkdnegli9UPJUSPs39KJRsRP7AiLem4xYS-q1ZYq1T3DAIqyvn3wAvbdkoMVkufft0SpQw4gDTPSnIml6k62lRYobUrNu70UGIILiMZQ0fAydTXXwVZ1oswQZ-mjPT8H9mDDqfhxsMSI5zla8GKz_ILXbmdRjtRUk682dPEDBD6I81DzEx7dITgjb6vxQoee5599jkYf_vCYP7npydvxqx',
-      ownerId: couple.id,
+      ownerId: coupleUser.id,
     },
   });
   console.log(`✅ Wedding #1: ${wedding1.coupleName} (${wedding1.slug}) — ${wedding1.status}/${wedding1.plan}`);
@@ -157,7 +211,7 @@ async function seed() {
   //     backward compatibility until Phase 3c cleanup.
   // ============================================================
   const weddingRoleAssignments = [
-    { userId: couple.id, weddingId: wedding1.id, role: 'COUPLE' as const },
+    { userId: coupleUser.id, weddingId: wedding1.id, role: 'COUPLE' as const },
     // Weddings #2 and #3 are unowned (no ownerId) — no role rows needed
   ];
 
@@ -343,120 +397,100 @@ async function seed() {
   console.log(`✅ ${mediaItems.length} media items (moments) seeded`);
 
   // ============================================================
-  // 11. RSVPs — 3 submissions (matches production exactly)
-  //     #1 Jerine Lim (party 2, both attending) → wedding #1
-  //     #2 Eugene Lim (party 2, mixed) → no wedding (orphaned, as on prod)
-  //     #3 Eugene Lim (party 1, attending) → no wedding (orphaned, as on prod)
+  // 11. RSVPs — demo submissions (R-04/F-04: create-only. Existing
+  //      submissions are NEVER deleted — the old global
+  //      guestResponse.deleteMany({}) / rSVPSubmission.deleteMany({})
+  //      wiped production RSVPs on every deploy.)
+  //      #1 Jerine Lim (party 2, both attending) → wedding #1
+  //      #2 Lim Eugene (party 2, mixed) → no wedding (orphaned, as on prod)
+  //      #3 Eugene Lim (party 1, attending) → wedding #1
   // ============================================================
-  await db.guestResponse.deleteMany({});
-  await db.rSVPSubmission.deleteMany({});
-
-  const rsvp1 = await db.rSVPSubmission.create({
-    data: {
-      firstName: 'Jerine',
-      lastName: 'Lim',
-      partySize: 2,
-      weddingId: wedding1.id,
-      createdAt: new Date('2026-07-15T03:18:21.038Z'),
-      guests: {
-        create: [
-          { name: 'Jerine Lim', attendance: 'yes' },
-          { name: 'Boon thien', attendance: 'yes' },
-        ],
+  const existingDemoRsvps = await db.rSVPSubmission.count({ where: { weddingId: wedding1.id } });
+  if (existingDemoRsvps === 0) {
+    await db.rSVPSubmission.create({
+      data: {
+        firstName: 'Jerine',
+        lastName: 'Lim',
+        partySize: 2,
+        weddingId: wedding1.id,
+        createdAt: new Date('2026-07-15T03:18:21.038Z'),
+        guests: {
+          create: [
+            { name: 'Jerine Lim', attendance: 'yes' },
+            { name: 'Boon thien', attendance: 'yes' },
+          ],
+        },
       },
-    },
-  });
-
-  const rsvp2 = await db.rSVPSubmission.create({
-    data: {
-      firstName: 'Lim',
-      lastName: 'Eugene',
-      partySize: 2,
-      weddingId: null,
-      createdAt: new Date('2026-07-12T12:00:56.864Z'),
-      guests: {
-        create: [
-          { name: 'Lim Eugene', attendance: 'yes' },
-          { name: 'Guest 2', attendance: 'yes' },
-        ],
-      },
-    },
-  });
-
-  const rsvp3 = await db.rSVPSubmission.create({
-    data: {
-      firstName: 'Eugene',
-      lastName: 'Lim',
-      partySize: 2,
-      weddingId: wedding1.id,
-      createdAt: new Date('2026-07-08T09:33:11.019Z'),
-      guests: {
-        create: [
-          { name: 'Eugene Lim', attendance: 'no' },
-          { name: 'Guest 2', attendance: 'yes' },
-        ],
-      },
-    },
-  });
-  console.log(`✅ 3 RSVPs seeded (Jerine Lim, Lim Eugene, Eugene Lim)`);
-  void rsvp1; void rsvp2; void rsvp3;
-
-  // ============================================================
-  // 12. WISHES — 1 wish (matches production exactly)
-  //     "Lim" (Friend): "Cngrats" — orphaned (no weddingId), as on prod
-  // ============================================================
-  await db.wish.deleteMany({});
-  await db.wish.create({
-    data: {
-      name: 'Lim',
-      relationship: 'Friend',
-      message: 'Cngrats',
-      weddingId: null,
-      createdAt: new Date('2026-07-12T12:01:44.933Z'),
-    },
-  });
-  console.log(`✅ 1 wish seeded (Lim — "Cngrats")`);
-
-  // ============================================================
-  // 13. PLATFORM SETTINGS — package templates + config (matches production)
-  // ============================================================
-  const platformSettings = [
-    { key: 'default_couple_password', value: 'Couple@123' },
-    { key: 'couple_access_expiry_days', value: '30' },
-    { key: 'expiry_notification_days', value: '7' },
-    { key: 'default_plan', value: 'GOLD' },
-    { key: 'default_wedding_status', value: 'DRAFT' },
-    // Mark Classic Elegance as the global default template (used by the
-    // Couple CMS Design page and the Admin CMS Content Templates page).
-    { key: 'default_template', value: 'classic-elegance' },
-    {
-      key: 'package_templates',
-      value: JSON.stringify([
-        { name: 'GOLD', label: 'Gold', features: ['countdown', 'schedule', 'rsvp', 'getting-there'], maxGuests: 100, maxMedia: 20, sortOrder: 1 },
-        { name: 'PLATINUM', label: 'Platinum', features: ['countdown', 'schedule', 'rsvp', 'getting-there', 'story', 'qa'], maxGuests: 200, maxMedia: 50, sortOrder: 2 },
-        { name: 'DIAMOND', label: 'Diamond', features: ['countdown', 'schedule', 'rsvp', 'getting-there', 'story', 'wishes', 'qa', 'moments'], maxGuests: 500, maxMedia: 100, sortOrder: 3 },
-      ]),
-    },
-  ];
-  for (const setting of platformSettings) {
-    await db.systemSetting.upsert({
-      where: { key: setting.key },
-      update: {},
-      create: setting,
     });
-  }
-  console.log(`✅ ${platformSettings.length} platform settings seeded (package templates, couple password, expiry config)`);
 
-  console.log('\n🎉 Seed complete! (replicates production data)');
+    await db.rSVPSubmission.create({
+      data: {
+        firstName: 'Lim',
+        lastName: 'Eugene',
+        partySize: 2,
+        weddingId: null,
+        createdAt: new Date('2026-07-12T12:00:56.864Z'),
+        guests: {
+          create: [
+            { name: 'Lim Eugene', attendance: 'yes' },
+            { name: 'Guest 2', attendance: 'yes' },
+          ],
+        },
+      },
+    });
+
+    await db.rSVPSubmission.create({
+      data: {
+        firstName: 'Eugene',
+        lastName: 'Lim',
+        partySize: 2,
+        weddingId: wedding1.id,
+        createdAt: new Date('2026-07-08T09:33:11.019Z'),
+        guests: {
+          create: [
+            { name: 'Eugene Lim', attendance: 'no' },
+            { name: 'Guest 2', attendance: 'yes' },
+          ],
+        },
+      },
+    });
+    console.log(`✅ 3 demo RSVPs seeded (Jerine Lim, Lim Eugene, Eugene Lim)`);
+  } else {
+    console.log(`↷ RSVPs already present (${existingDemoRsvps}) — skipped (existing submissions are never deleted)`);
+  }
+
+  // ============================================================
+  // 12. WISHES — demo wish (R-04/F-04: create-only; the old global
+  //      wish.deleteMany({}) wiped production wishes on every deploy)
+  // ============================================================
+  const demoWishExists = await db.wish.findFirst({ where: { name: 'Lim', message: 'Cngrats' } });
+  if (!demoWishExists) {
+    await db.wish.create({
+      data: {
+        name: 'Lim',
+        relationship: 'Friend',
+        message: 'Cngrats',
+        weddingId: null,
+        createdAt: new Date('2026-07-12T12:01:44.933Z'),
+      },
+    });
+    console.log(`✅ 1 demo wish seeded (Lim — "Cngrats")`);
+  } else {
+    console.log('↷ Demo wish already present — skipped (existing wishes are never deleted)');
+  }
+
+  // ============================================================
+  // 13. Platform settings were ensured during bootstrap (see 1b) —
+  //     create-only, and default_couple_password is no longer seeded.
+  // ============================================================
+
+  console.log('\n🎉 Seed complete!');
   console.log('---');
-  console.log('Admin login: admin@dreamweavers.sg / Admin@2024');
-  console.log('Backup admin: eugeneglen@gmail.com / Admin@2024');
-  console.log('Couple login: eleanor@wedding.com / Couple@2024');
+  console.log('Demo weddings: 3 (1 ACTIVE + 2 DRAFT)');
+  console.log('Demo RSVPs/wish: created only when absent — never deleted');
+  console.log('Credentials: generated per-account at creation (see logs above)');
+  console.log('             and forced to change on first login. No default passwords.');
   console.log('---');
-  console.log('Weddings: 3 (1 ACTIVE + 2 DRAFT)');
-  console.log('RSVPs: 3 (Jerine Lim, Lim Eugene, Eugene Lim)');
-  console.log('Wishes: 1 (Lim — "Cngrats")');
-  console.log('Content sections: 10/10 (including rsvp)');
 
   await db.$disconnect();
 }

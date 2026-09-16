@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
+import { encode } from 'next-auth/jwt';
 import { db } from '@/lib/db';
-import { getServerSession } from '@/lib/auth';
+import { getServerSession, resolveSecret } from '@/lib/auth';
 import { validatePassword } from '@/lib/password-policy';
 
 /**
@@ -86,15 +87,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Hash and update
+    // Hash and update.
+    // R-09 (F-09): bumping sessionVersion revokes EVERY issued session for
+    // this user (other browsers/devices included). The actor's own cookie is
+    // rotated below with the new version, so the user who changed the
+    // password keeps working while all other sessions die.
     const passwordHash = await bcrypt.hash(newPassword, 12);
-    await db.user.update({
+    const updatedUser = await db.user.update({
       where: { id: user.id },
       data: {
         passwordHash,
         mustChangePassword: false,
         resetToken: null,
         resetTokenExpiry: null,
+        sessionVersion: { increment: 1 },
       },
     });
 
@@ -106,17 +112,50 @@ export async function POST(req: NextRequest) {
           action: 'UPDATE',
           entity: 'User',
           entityId: user.id,
-          details: JSON.stringify({ action: 'PASSWORD_CHANGE', selfService: true }),
+          details: JSON.stringify({ action: 'PASSWORD_CHANGE', selfService: true, sessionsRevoked: true }),
         },
       });
     } catch {
       // Audit log is non-critical
     }
 
-    return NextResponse.json({
+    // ── R-09: rotate the actor's session cookie onto the new version ──────
+    // Mirrors the token shape minted by /api/auth/login (including `sv`),
+    // so the current browser continues seamlessly while every other
+    // session for this user is rejected from its next request onwards.
+    const response = NextResponse.json({
       success: true,
       message: 'Password changed successfully.',
     });
+    try {
+      const rotatedToken = await encode({
+        token: {
+          sub: user.id,
+          id: user.id,
+          name: session.user.name,
+          email: session.user.email,
+          role: updatedUser.role,
+          mustChangePassword: false,
+          sv: updatedUser.sessionVersion,
+          iat: Math.floor(Date.now() / 1000),
+          exp: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
+        },
+        secret: resolveSecret() || '',
+      });
+      response.cookies.set('next-auth.session-token', rotatedToken, {
+        httpOnly: true,
+        secure: false, // Must match login cookie — Railway terminates TLS before app
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 24 * 60 * 60,
+      });
+    } catch (rotationError) {
+      // Rotation is best-effort: if it fails, the version bump already
+      // revoked all sessions (fail-closed) and the user simply re-logs in.
+      console.error('Session rotation after password change failed:', rotationError);
+    }
+
+    return response;
   } catch (error) {
     console.error('Change password error:', error);
     return NextResponse.json(

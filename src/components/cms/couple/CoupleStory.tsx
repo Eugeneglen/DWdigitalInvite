@@ -589,6 +589,7 @@ export default function CoupleStory() {
                       chapter; constrained to 280px so it stays compact. */}
                   <div className="flex flex-col md:flex-row gap-4 items-start">
                     <MirrorImageUpload
+                      category="story"
                       value={item.imageUrl ?? ''}
                       onChange={(dataUrl) => handleChapterImageChange(item.id, dataUrl)}
                       onRemove={() => handleChapterImageRemove(item.id)}

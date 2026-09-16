@@ -1,8 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { authenticateRequest, createAuditLog } from '@/lib/auth-middleware';
-import { hasWeddingPermission } from '@/lib/permissions';
+import { authenticateRequest, createAuditLog, authorizeTenantAccess } from '@/lib/auth-middleware';
 
 // ============================================
 // PATCH — Update a wish (message, name, etc.)
@@ -27,9 +26,10 @@ export async function PATCH(
     }
 
     const { id: weddingId, wishId } = await params;
-    const canAccess = await hasWeddingPermission(user.userId, user.role, weddingId, 'wedding:wishes:moderate');
-    if (!canAccess) {
-      return Response.json({ success: false, error: 'Access denied. You do not have permission to moderate wishes.' }, { status: 403 });
+    // R-03 (F-03) tenant guard: authenticate → resolve wedding → platform/owner/member → permission
+    const guard = await authorizeTenantAccess(user, weddingId, { platformPerm: 'platform:weddings:read', weddingAction: 'wedding:wishes:moderate' });
+    if (!guard.ok) {
+      return Response.json({ success: false, error: guard.error }, { status: guard.status });
     }
 
     const existing = await db.wish.findFirst({
@@ -97,9 +97,10 @@ export async function DELETE(
     }
 
     const { id: weddingId, wishId } = await params;
-    const canAccess = await hasWeddingPermission(user.userId, user.role, weddingId, 'wedding:wishes:moderate');
-    if (!canAccess) {
-      return Response.json({ success: false, error: 'Access denied. You do not have permission to moderate wishes.' }, { status: 403 });
+    // R-03 (F-03) tenant guard: authenticate → resolve wedding → platform/owner/member → permission
+    const guard = await authorizeTenantAccess(user, weddingId, { platformPerm: 'platform:weddings:read', weddingAction: 'wedding:wishes:moderate' });
+    if (!guard.ok) {
+      return Response.json({ success: false, error: guard.error }, { status: guard.status });
     }
 
     const existing = await db.wish.findFirst({

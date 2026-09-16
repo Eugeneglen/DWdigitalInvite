@@ -58,6 +58,30 @@ export function getPerceivedLuminance(hex: string): number {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 }
 
+/** WCAG 2.0 contrast ratio (1–21) between two colours */
+export function getContrastRatio(hexA: string, hexB: string): number {
+  const la = getLuminance(hexA);
+  const lb = getLuminance(hexB);
+  const lighter = Math.max(la, lb);
+  const darker = Math.min(la, lb);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+/**
+ * True when `fgHex` remains readable on `bgHex` (contrast ratio ≥ minRatio).
+ * Invalid/truncated colours return false so callers fall back to auto-contrast.
+ *
+ * Default 3.0 ≈ WCAG AA for large text — the practical minimum for
+ * "visible at all"; anything below is treated as broken data, not design.
+ */
+export function isReadableOn(fgHex: string, bgHex: string, minRatio = 3): boolean {
+  if (!fgHex || !bgHex) return false;
+  const fg = fgHex.replace('#', '');
+  const bg = bgHex.replace('#', '');
+  if (fg.length < 6 || bg.length < 6) return false;
+  return getContrastRatio(fgHex, bgHex) >= minRatio;
+}
+
 /**
  * Parse "#RRGGBB" into [r, g, b] (0–255 integers).
  */
@@ -150,6 +174,24 @@ export function generateThemeOverrideStyle(
       lines.push(`${SCOPE} .bg-paper-cream\\/${ca} .text-charcoal-ink\\/${ta} { color: rgba(${DARK_R}, ${DARK_G}, ${DARK_B}, ${ta / 100}) !important; }`);
     }
   }
+  // Same-element combos (bg-white + text-charcoal-ink on ONE element — e.g.
+  // the Schedule page "Add to Calendar"/"Directions" buttons). The descendant
+  // rules above don't match these, so the theme remap used to paint their
+  // labels in the theme colour (cream-on-white on dark themes — invisible).
+  lines.push(`${SCOPE} .bg-white.text-charcoal-ink { color: rgb(${DARK_R}, ${DARK_G}, ${DARK_B}) !important; }`);
+  lines.push(`${SCOPE} .bg-paper-cream.text-charcoal-ink { color: rgb(${DARK_R}, ${DARK_G}, ${DARK_B}) !important; }`);
+  for (const ca of [5, 10, 20, 25, 30, 40, 50, 60, 70, 75, 80, 90, 95]) {
+    lines.push(`${SCOPE} .bg-white\\/${ca}.text-charcoal-ink { color: rgb(${DARK_R}, ${DARK_G}, ${DARK_B}) !important; }`);
+    lines.push(`${SCOPE} .bg-paper-cream\\/${ca}.text-charcoal-ink { color: rgb(${DARK_R}, ${DARK_G}, ${DARK_B}) !important; }`);
+  }
+  for (const ta of [20, 25, 30, 35, 40, 50, 60, 70, 75, 80]) {
+    lines.push(`${SCOPE} .bg-white.text-charcoal-ink\\/${ta} { color: rgba(${DARK_R}, ${DARK_G}, ${DARK_B}, ${ta / 100}) !important; }`);
+    lines.push(`${SCOPE} .bg-paper-cream.text-charcoal-ink\\/${ta} { color: rgba(${DARK_R}, ${DARK_G}, ${DARK_B}, ${ta / 100}) !important; }`);
+    for (const ca of [5, 10, 20, 25, 30, 40, 50, 60, 70, 75, 80, 90, 95]) {
+      lines.push(`${SCOPE} .bg-white\\/${ca}.text-charcoal-ink\\/${ta} { color: rgba(${DARK_R}, ${DARK_G}, ${DARK_B}, ${ta / 100}) !important; }`);
+      lines.push(`${SCOPE} .bg-paper-cream\\/${ca}.text-charcoal-ink\\/${ta} { color: rgba(${DARK_R}, ${DARK_G}, ${DARK_B}, ${ta / 100}) !important; }`);
+    }
+  }
 
   // ── border-charcoal-ink ──
   rule('.border-charcoal-ink', 'border-color', tr, tg, tb);
@@ -182,6 +224,64 @@ export function generateThemeOverrideStyle(
   lines.push(`${SCOPE} :where(.divide-champagne-silk > :not(:last-child)) { border-color: rgb(${br} ${bg_} ${bb}); }`);
   for (const a of [50]) {
     lines.push(`${SCOPE} :where(.divide-champagne-silk\\/${a} > :not(:last-child)) { border-color: rgb(${br} ${bg_} ${bb} / ${a / 100}); }`);
+  }
+
+  // ── Dark-theme CTA/button repair (P0) ─────────────────────────────────
+  // The bg-charcoal-ink remap above re-paints solid charcoal buttons/panels
+  // with the (light) theme text colour on dark themes, but their
+  // .text-paper-cream labels were never remapped — producing light-on-light
+  // (≈1.2:1, invisible) CTAs. Restore the inverse pairing:
+  //
+  //   1. ON / INSIDE a solid .bg-charcoal-ink surface (now light) →
+  //      .text-paper-cream flips to dark ink.
+  //   2. INSIDE light cards (.bg-white / .bg-paper-cream, solid + alpha) →
+  //      the button KEEPS its original charcoal background and cream label
+  //      (mirrors the white-card text protection above, so embedded CTAs
+  //      render exactly as they do on light themes).
+  //   3. .hover\:bg-black hover states re-paint to the light theme colour so
+  //      the swapped dark label stays readable on hover.
+  //
+  // Only emitted when the theme text colour is LIGHT (a dark theme). On light
+  // themes the bg-charcoal-ink remap is an identity transform, so no swap is
+  // needed — output stays byte-compatible with the pre-fix behaviour.
+  if (!isDarkBackground(textColor)) {
+    const INK = 'rgb(26, 26, 26)';       // original charcoal-ink
+    const CREAM = 'rgb(252, 249, 242)'; // original paper-cream
+
+    // 1) paper-cream labels on/inside remapped (now light) charcoal surfaces
+    lines.push(`${SCOPE} .bg-charcoal-ink .text-paper-cream { color: ${INK}; }`);
+    lines.push(`${SCOPE} .bg-charcoal-ink.text-paper-cream { color: ${INK}; }`);
+    for (const a of [30, 40, 50, 60, 70, 80, 90]) {
+      lines.push(`${SCOPE} .bg-charcoal-ink .text-paper-cream\\/${a} { color: rgba(26, 26, 26, ${a / 100}); }`);
+      lines.push(`${SCOPE} .bg-charcoal-ink.text-paper-cream\\/${a} { color: rgba(26, 26, 26, ${a / 100}); }`);
+    }
+
+    // 2) Light-card restore — embedded charcoal buttons keep the original
+    //    charcoal bg + cream label (identical to light-theme rendering).
+    //    !important + higher specificity beats the remaps above, exactly like
+    //    the white-card text protection.
+    const containers: string[] = ['.bg-white', '.bg-paper-cream'];
+    for (const a of [5, 10, 20, 25, 30, 40, 50, 60, 70, 75, 80, 90, 95]) {
+      containers.push(`.bg-white\\/${a}`, `.bg-paper-cream\\/${a}`);
+    }
+    for (const c of containers) {
+      // background restore (solid + alpha variants of the button/panel bg)
+      lines.push(`${SCOPE} ${c} .bg-charcoal-ink { background-color: ${INK} !important; }`);
+      for (const ba of [3, 5, 10, 20, 30, 60, 90]) {
+        lines.push(`${SCOPE} ${c} .bg-charcoal-ink\\/${ba} { background-color: rgba(26, 26, 26, ${ba / 100}) !important; }`);
+      }
+      // label restore (solid + alpha)
+      lines.push(`${SCOPE} ${c} .bg-charcoal-ink .text-paper-cream { color: ${CREAM} !important; }`);
+      lines.push(`${SCOPE} ${c} .bg-charcoal-ink.text-paper-cream { color: ${CREAM} !important; }`);
+      for (const ta of [30, 40, 50, 60, 70, 80, 90]) {
+        lines.push(`${SCOPE} ${c} .bg-charcoal-ink .text-paper-cream\\/${ta} { color: rgba(252, 249, 242, ${ta / 100}) !important; }`);
+        lines.push(`${SCOPE} ${c} .bg-charcoal-ink.text-paper-cream\\/${ta} { color: rgba(252, 249, 242, ${ta / 100}) !important; }`);
+      }
+    }
+
+    // 3) hover\:bg-black — would pair black with the swapped dark label;
+    //    re-paint to the light theme colour so the hover pairing stays readable
+    lines.push(`${SCOPE} .hover\\:bg-black:hover { background-color: rgb(${tr} ${tg} ${tb}); }`);
   }
 
   // ── Header-specific overrides ──

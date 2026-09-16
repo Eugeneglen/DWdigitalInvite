@@ -3,14 +3,24 @@
 import React, { useRef, useState } from 'react';
 import { Upload, X, Loader2, ImageIcon, Replace } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/hooks/use-toast';
+import { getSizeGuidance, isImageMime, type FileCategory } from '@/lib/file-storage-client';
+
+const UPLOAD_API = '/api/cms/upload?XTransformPort=3000';
 
 interface MirrorImageUploadProps {
-  /** Current image URL (data: or https://). Empty string = no image. */
+  /** Current image URL (file URL or https://). Empty string = no image. */
   value: string;
-  /** Called when a new image is selected (receives a base64 data URL). */
-  onChange: (dataUrl: string) => void;
+  /** Called when a new image is uploaded (receives a file URL from /api/cms/upload). */
+  onChange: (url: string) => void;
   /** Called when the image is removed. */
   onRemove: () => void;
+  /**
+   * Storage category — determines server-side optimization settings
+   * (max dimension + JPEG quality) and the size guidance shown to the user.
+   * Must match a FileCategory from file-storage-client.ts.
+   */
+  category: FileCategory;
   /** Label shown above the upload area, e.g. "Hero Visual". */
   label?: string;
   /** Helper text under the label, e.g. "Full-bleed hero image". */
@@ -42,17 +52,23 @@ interface MirrorImageUploadProps {
  * how their image will crop before saving, preventing surprises (e.g. a wide
  * logo getting awkwardly cropped to a portrait hero).
  *
+ * Images are uploaded to /api/cms/upload which server-side optimises them
+ * (resize + JPEG compress via sharp) before storing. The couple gets a
+ * file URL back — no base64 data URLs in the database.
+ *
  * Features:
  *  - Prominent "Upload Image" button (not a dashed box)
  *  - Aspect-matched thumbnail (mirrors frontend crop via object-cover)
- *  - Image metadata (file name, when provided)
- *  - Replace / Remove actions
+ *  - Server-side image optimization (auto-resize + JPEG compress)
+ *  - Client-side size pre-check with clear guidance toast
  *  - Drag-and-drop on the preview area
+ *  - Replace / Remove actions
  */
 export default function MirrorImageUpload({
   value,
   onChange,
   onRemove,
+  category,
   label = 'Upload Image',
   helperText,
   aspectClass = 'aspect-[16/9]',
@@ -65,19 +81,52 @@ export default function MirrorImageUpload({
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const guidance = getSizeGuidance(category);
+
   const handleFile = async (file: File) => {
-    if (!file.type.startsWith('image/')) return;
+    if (!isImageMime(file.type)) {
+      toast({ title: 'Error', description: 'Please select an image file', variant: 'destructive' });
+      return;
+    }
+
+    // Client-side size pre-check (server enforces too)
+    // 25 MB limit — the server auto-optimises via sharp (resize + JPEG)
+    const maxSize = 25 * 1024 * 1024; // 25 MB for all images (auto-optimised)
+    if (file.size > maxSize) {
+      const fileMB = (file.size / 1024 / 1024).toFixed(1);
+      toast({
+        title: 'File too large',
+        description: `Your file is ${fileMB} MB — max is 25 MB. Recommended: ${guidance.recommendedPixels} px. Server will auto-resize and compress.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setUploading(true);
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('category', category);
+      const res = await fetch(UPLOAD_API, { method: 'POST', body: formData });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { error?: string }).error || 'Failed to upload');
+      }
+      const result = await res.json();
+      onChange(result.url);
+      // Show optimisation info
+      if (result.optimised && result.originalSize) {
+        toast({
+          title: 'Image optimised',
+          description: `${(result.originalSize / 1024).toFixed(0)} KB → ${(result.fileSize / 1024).toFixed(0)} KB`,
+        });
+      }
+    } catch (err) {
+      toast({
+        title: 'Upload failed',
+        description: err instanceof Error ? err.message : 'Failed to upload image',
+        variant: 'destructive',
       });
-      onChange(dataUrl);
-    } catch {
-      // silently fail — user can try again
     } finally {
       setUploading(false);
     }
@@ -179,7 +228,9 @@ export default function MirrorImageUpload({
                   <Upload className="size-3.5" />
                   Upload Image
                 </Button>
-                <p className="text-[10px] text-charcoal-ink/30 mt-1">Mirrors guest-site framing</p>
+                <p className="text-[10px] text-charcoal-ink/30 mt-1">
+                  Max 25 MB · {guidance.recommendedPixels} recommended · Auto-optimised
+                </p>
               </>
             )}
           </div>

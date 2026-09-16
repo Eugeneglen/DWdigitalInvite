@@ -28,6 +28,11 @@ model User {
   mustChangePassword Boolean @default(false)  // true = forced to change password on next login
   resetToken        String?
   resetTokenExpiry  DateTime?
+  // R-09 (F-09): server-side session revocation version. Embedded in the JWT
+  // as `sv` at login; incremented on password change/reset, deactivation,
+  // deletion and privilege reduction. Any issued token whose `sv` differs from
+  // the current value is rejected on the next authenticated request.
+  sessionVersion    Int      @default(0)
   lastLoginAt       DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -124,6 +129,21 @@ model WeddingAccount {
   heroVideoUrl   String?
   bannerUrl      String?
   floorPlanUrl   String?
+
+  // ── Mobile hero framing (additive, nullable — null = exact legacy behavior) ──
+  // Couples' landscape portraits get centre-cropped on 9:16 mobile hero views,
+  // often cutting off one partner. These fields let the couple anchor the crop:
+  //   heroFocalX/Y   — 0..1 focal point (object-position anchor) for the
+  //                    full-bleed hero image. Auto-detected at upload time via
+  //                    VLM ("never split the couple" centroid), adjustable in
+  //                    the Couple CMS phone-frame preview. null → centre.
+  //   heroDisplayMode — 'fill' (default/legacy full-bleed cover crop) or
+  //                    'fit' (show the ENTIRE photo, object-contain, over an
+  //                    ambient backdrop sampled from the image). null → fill.
+  // All consumers must treat null as "not set" and render exactly as before.
+  heroFocalX     Float?
+  heroFocalY     Float?
+  heroDisplayMode String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

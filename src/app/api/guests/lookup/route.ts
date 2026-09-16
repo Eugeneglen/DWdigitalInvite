@@ -1,10 +1,32 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
 // GET /api/guests/lookup?code=XXX
-// Public endpoint — no auth required — for guests to look up their invitation
+// Public endpoint — no auth required — for guests to look up their invitation.
+//
+// R-06 (F-06) hardening:
+//   - Rate limited (10 lookups/min/IP): the invitation code functions as a
+//     guest credential, so this endpoint must not be brute-forceable.
+//   - PII minimisation: the response contains ONLY the fields the guest
+//     invitation workflow needs (name confirmation, party size, plus-one,
+//     wedding binding). Email, phone, table assignment, dietary notes and
+//     group information are no longer exposed to unauthenticated callers.
 export async function GET(req: Request) {
   try {
+    // Rate limit: 10 lookups per minute per IP
+    const ip = getClientIp(req);
+    const { success, resetAt } = rateLimit(`guest-lookup:${ip}`, 10, 60_000);
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Too many lookup attempts. Please wait a moment and try again.' },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(Math.ceil((resetAt - Date.now()) / 1000)) },
+        }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const code = searchParams.get('code');
 
@@ -18,15 +40,9 @@ export async function GET(req: Request) {
     const guest = await db.guest.findUnique({
       where: { invitationCode: code.trim().toUpperCase() },
       select: {
-        id: true,
         name: true,
-        email: true,
-        phone: true,
-        groupName: true,
-        tableNumber: true,
         plusOne: true,
         plusOneName: true,
-        dietaryNotes: true,
         rsvpStatus: true,
         weddingId: true,
       },
@@ -47,12 +63,8 @@ export async function GET(req: Request) {
         rsvpStatus: guest.rsvpStatus,
         guest: {
           name: guest.name,
-          email: guest.email,
-          groupName: guest.groupName,
-          tableNumber: guest.tableNumber,
           plusOne: guest.plusOne,
           plusOneName: guest.plusOneName,
-          dietaryNotes: guest.dietaryNotes,
           weddingId: guest.weddingId,
         },
       });
@@ -66,13 +78,9 @@ export async function GET(req: Request) {
       alreadyResponded: false,
       guest: {
         name: guest.name,
-        email: guest.email,
-        partySize,
         plusOne: guest.plusOne,
         plusOneName: guest.plusOneName,
-        dietaryNotes: guest.dietaryNotes,
-        groupName: guest.groupName,
-        tableNumber: guest.tableNumber,
+        partySize,
         weddingId: guest.weddingId,
       },
     });

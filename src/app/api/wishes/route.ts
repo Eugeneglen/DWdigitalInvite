@@ -35,7 +35,8 @@ export async function POST(request: Request) {
 
     const { name, relationship, message, weddingId, imageUrl } = parsed.data;
 
-    // Validate weddingId if provided
+    // Validate weddingId if provided — R-07 (F-07): the wedding must be
+    // ACTIVE to receive new wishes (prevents posting to DRAFT/archived weddings)
     if (weddingId) {
       const wedding = await db.weddingAccount.findUnique({
         where: { id: weddingId },
@@ -43,6 +44,9 @@ export async function POST(request: Request) {
       });
       if (!wedding) {
         return NextResponse.json({ error: 'Wedding not found' }, { status: 404 });
+      }
+      if (wedding.status !== 'ACTIVE') {
+        return NextResponse.json({ error: 'Wedding is not accepting wishes' }, { status: 400 });
       }
     }
 
@@ -100,8 +104,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'weddingId is required' }, { status: 400 });
     }
 
+    // R-07 (F-07): only ACTIVE weddings expose their guest wishes publicly.
+    // (Couple/staff CMS reads use the authenticated /api/cms/wishes routes.)
     const wishes = await db.wish.findMany({
-      where: { weddingId },
+      where: { weddingId, wedding: { status: 'ACTIVE' } },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });

@@ -1,8 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { authenticateRequest, createAuditLog } from '@/lib/auth-middleware';
-import { hasWeddingPermission } from '@/lib/permissions';
+import { authenticateRequest, createAuditLog, authorizeTenantAccess } from '@/lib/auth-middleware';
 
 // ============================================
 // GET — List feature toggles for a wedding
@@ -21,9 +20,10 @@ export async function GET(
     const { id: weddingId } = await params;
 
     // Phase 3b: Added role check (was missing — security gap fixed)
-    const canAccess = await hasWeddingPermission(user.userId, user.role, weddingId, 'wedding:read');
-    if (!canAccess) {
-      return Response.json({ success: false, error: 'Access denied. You do not have access to this wedding.' }, { status: 403 });
+    // R-03 (F-03) tenant guard: authenticate → resolve wedding → platform/owner/member → permission
+    const guard = await authorizeTenantAccess(user, weddingId, { platformPerm: 'platform:weddings:read', weddingAction: 'wedding:read' });
+    if (!guard.ok) {
+      return Response.json({ success: false, error: guard.error }, { status: guard.status });
     }
 
     // Verify wedding account exists
@@ -73,9 +73,10 @@ export async function PATCH(
 
     const { id: weddingId } = await params;
 
-    const canAccess = await hasWeddingPermission(user.userId, user.role, weddingId, 'wedding:settings:write');
-    if (!canAccess) {
-      return Response.json({ success: false, error: 'Access denied. You do not have permission to edit wedding settings.' }, { status: 403 });
+    // R-03 (F-03) tenant guard: authenticate → resolve wedding → platform/owner/member → permission
+    const guard = await authorizeTenantAccess(user, weddingId, { platformPerm: 'platform:weddings:read', weddingAction: 'wedding:settings:write' });
+    if (!guard.ok) {
+      return Response.json({ success: false, error: guard.error }, { status: guard.status });
     }
 
     const body = await request.json();
@@ -146,9 +147,10 @@ export async function PUT(
 
     const { id: weddingId } = await params;
 
-    const canAccess = await hasWeddingPermission(user.userId, user.role, weddingId, 'wedding:settings:write');
-    if (!canAccess) {
-      return Response.json({ success: false, error: 'Access denied. You do not have permission to edit wedding settings.' }, { status: 403 });
+    // R-03 (F-03) tenant guard: authenticate → resolve wedding → platform/owner/member → permission
+    const guard = await authorizeTenantAccess(user, weddingId, { platformPerm: 'platform:weddings:read', weddingAction: 'wedding:settings:write' });
+    if (!guard.ok) {
+      return Response.json({ success: false, error: guard.error }, { status: guard.status });
     }
 
     const body = await request.json();

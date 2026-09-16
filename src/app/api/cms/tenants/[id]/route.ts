@@ -1,8 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { authenticateRequest, createAuditLog } from '@/lib/auth-middleware';
-import { hasPlatformPermission } from '@/lib/permissions';
+import { authenticateRequest, createAuditLog, authorizeTenantAccess } from '@/lib/auth-middleware';
 
 // ============================================
 // GET — Single wedding account with features
@@ -18,11 +17,13 @@ export async function GET(
       return Response.json({ success: false, error: error || 'Authentication required' }, { status: 401 });
     }
 
-    if (!(await hasPlatformPermission(user.userId, user.role, 'platform:weddings:read'))) {
-      return Response.json({ success: false, error: 'Access denied. Admin privileges required.' }, { status: 403 });
-    }
-
     const { id } = await params;
+    // R-03 (F-03): account-level read exposes operational data (internalNotes,
+    // jobNumber, owner PII) — platform staff only. Couples use /api/cms/wedding.
+    const guard = await authorizeTenantAccess(user, id, { platformPerm: 'platform:weddings:read', platformOnly: true });
+    if (!guard.ok) {
+      return Response.json({ success: false, error: guard.error }, { status: guard.status });
+    }
     const account = await db.weddingAccount.findUnique({
       where: { id },
       include: {
@@ -106,11 +107,13 @@ export async function PATCH(
       return Response.json({ success: false, error: error || 'Authentication required' }, { status: 401 });
     }
 
-    if (!(await hasPlatformPermission(user.userId, user.role, 'platform:weddings:write'))) {
-      return Response.json({ success: false, error: 'Access denied. Admin privileges required.' }, { status: 403 });
-    }
-
     const { id } = await params;
+    // R-03 (F-03): editing status/plan/slug/couple identity is an account-level
+    // platform operation — owners use /api/cms/wedding PUT for their own content.
+    const guard = await authorizeTenantAccess(user, id, { platformPerm: 'platform:weddings:write', platformOnly: true });
+    if (!guard.ok) {
+      return Response.json({ success: false, error: guard.error }, { status: guard.status });
+    }
     const existing = await db.weddingAccount.findUnique({ where: { id } });
     if (!existing) {
       return Response.json({ success: false, error: 'Wedding account not found' }, { status: 404 });
@@ -190,11 +193,12 @@ export async function DELETE(
       return Response.json({ success: false, error: error || 'Authentication required' }, { status: 401 });
     }
 
-    if (!(await hasPlatformPermission(user.userId, user.role, 'platform:weddings:write'))) {
-      return Response.json({ success: false, error: 'Access denied. Admin privileges required.' }, { status: 403 });
-    }
-
     const { id } = await params;
+    // R-03 (F-03): deleting a wedding account is a platform-only operation.
+    const guard = await authorizeTenantAccess(user, id, { platformPerm: 'platform:weddings:write', platformOnly: true });
+    if (!guard.ok) {
+      return Response.json({ success: false, error: guard.error }, { status: guard.status });
+    }
     const existing = await db.weddingAccount.findUnique({ where: { id } });
     if (!existing) {
       return Response.json({ success: false, error: 'Wedding account not found' }, { status: 404 });

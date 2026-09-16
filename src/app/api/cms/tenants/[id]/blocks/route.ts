@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { authenticateRequest, createAuditLog } from '@/lib/auth-middleware';
-import { hasWeddingPermission } from '@/lib/permissions';
+import { authenticateRequest, createAuditLog, authorizeTenantAccess } from '@/lib/auth-middleware';
 
 // ============================================
 // GET — List content entries for a wedding (key-value WeddingContent model)
@@ -19,9 +18,10 @@ export async function GET(
 
     const { id: weddingId } = await params;
 
-    const canAccess = await hasWeddingPermission(user.userId, user.role, weddingId, 'wedding:read');
-    if (!canAccess) {
-      return Response.json({ success: false, error: 'Access denied. You do not have access to this wedding.' }, { status: 403 });
+    // R-03 (F-03) tenant guard: authenticate → resolve wedding → platform/owner/member → permission
+    const guard = await authorizeTenantAccess(user, weddingId, { platformPerm: 'platform:weddings:read', weddingAction: 'wedding:read' });
+    if (!guard.ok) {
+      return Response.json({ success: false, error: guard.error }, { status: guard.status });
     }
 
     // Verify wedding account exists
@@ -86,9 +86,10 @@ export async function POST(
 
     const { id: weddingId } = await params;
 
-    const canAccess = await hasWeddingPermission(user.userId, user.role, weddingId, 'wedding:content:write');
-    if (!canAccess) {
-      return Response.json({ success: false, error: 'Access denied. You do not have permission to edit content.' }, { status: 403 });
+    // R-03 (F-03) tenant guard: authenticate → resolve wedding → platform/owner/member → permission
+    const guard = await authorizeTenantAccess(user, weddingId, { platformPerm: 'platform:weddings:read', weddingAction: 'wedding:content:write' });
+    if (!guard.ok) {
+      return Response.json({ success: false, error: guard.error }, { status: guard.status });
     }
 
     // Verify wedding account exists

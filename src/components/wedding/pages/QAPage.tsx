@@ -85,7 +85,7 @@ export default function QAPage() {
 
         {/* CTA — only render if there's meaningful content */}
         {contactPrompt && contactEmail && (
-        <section className="animate-orchestral delay-400 max-w-2xl mx-auto bg-paper-cream/40 py-16 px-8 text-center">
+        <section className="animate-orchestral delay-400 max-w-2xl mx-auto wedding-surface-40 py-16 px-8 text-center">
           {ctaEyebrow && (
           <p
             className="text-cinematic-gold uppercase tracking-[0.2em] mb-3"

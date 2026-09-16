@@ -58,6 +58,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   'platform:users:manage': 'Manage Users',
   'platform:weddings:read': 'Read Weddings',
   'platform:weddings:write': 'Write Weddings',
+  'platform:weddings:delete': 'Delete Weddings',
   'platform:weddings:read-all': 'Read-Only All Weddings',
   'platform:settings:read': 'Read Settings',
   'platform:settings:write': 'Write Settings',

@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { authenticateRequest, createAuditLog } from '@/lib/auth-middleware';
-import { hasWeddingPermission } from '@/lib/permissions';
+import { authenticateRequest, createAuditLog, authorizeTenantAccess } from '@/lib/auth-middleware';
 
 // ============================================
 // PATCH — Update a media item
@@ -29,9 +28,10 @@ export async function PATCH(
 
     const { id: weddingId, itemId } = await params;
 
-    const canAccess = await hasWeddingPermission(user.userId, user.role, weddingId, 'wedding:media:write');
-    if (!canAccess) {
-      return Response.json({ success: false, error: 'Access denied. You do not have permission to manage media.' }, { status: 403 });
+    // R-03 (F-03) tenant guard: authenticate → resolve wedding → platform/owner/member → permission
+    const guard = await authorizeTenantAccess(user, weddingId, { platformPerm: 'platform:weddings:read', weddingAction: 'wedding:media:write' });
+    if (!guard.ok) {
+      return Response.json({ success: false, error: guard.error }, { status: guard.status });
     }
 
     const existing = await db.weddingMedia.findFirst({
@@ -102,9 +102,10 @@ export async function DELETE(
 
     const { id: weddingId, itemId } = await params;
 
-    const canAccess = await hasWeddingPermission(user.userId, user.role, weddingId, 'wedding:media:write');
-    if (!canAccess) {
-      return Response.json({ success: false, error: 'Access denied. You do not have permission to manage media.' }, { status: 403 });
+    // R-03 (F-03) tenant guard: authenticate → resolve wedding → platform/owner/member → permission
+    const guard = await authorizeTenantAccess(user, weddingId, { platformPerm: 'platform:weddings:read', weddingAction: 'wedding:media:write' });
+    if (!guard.ok) {
+      return Response.json({ success: false, error: guard.error }, { status: guard.status });
     }
 
     const existing = await db.weddingMedia.findFirst({

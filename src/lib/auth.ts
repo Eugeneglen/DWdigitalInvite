@@ -1,4 +1,5 @@
-import type { NextAuthOptions } from 'next-auth';
+import type { NextAuthOptions, Session } from 'next-auth';
+import type { JWT } from 'next-auth/jwt';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { getServerSession as nextAuthGetServerSession } from 'next-auth';
 import bcrypt from 'bcryptjs';
@@ -6,6 +7,15 @@ import { readFileSync } from 'fs';
 import path from 'path';
 import jwt from 'jsonwebtoken';
 import { db } from '@/lib/db';
+import {
+  checkLoginAllowed,
+  equalizeLoginTiming,
+  extractClientIp,
+  logLoginEvent,
+  normalizeLoginIdentifier,
+  recordLoginFailure,
+  recordLoginSuccess,
+} from '@/lib/login-security';
 
 // ── getServerSession wrapper ──────────────────────────────────────────────
 // Re-exports NextAuth's built-in getServerSession with authOptions pre-bound.
@@ -105,6 +115,8 @@ declare module 'next-auth' {
   interface User {
     role: string;
     mustChangePassword?: boolean;
+    /** R-09: current session revocation version, embedded as `sv` in the JWT. */
+    sessionVersion?: number;
   }
 }
 
@@ -113,6 +125,9 @@ declare module 'next-auth/jwt' {
     id: string;
     role: string;
     mustChangePassword?: boolean;
+    /** R-09: session version snapshot taken at login. Compared against
+     *  User.sessionVersion on every session read — mismatch ⇒ revoked. */
+    sv?: number;
   }
 }
 
@@ -124,23 +139,78 @@ export const authOptions: NextAuthOptions = {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
       },
-      async authorize(credentials) {
+      // NextAuth passes { query, body, headers, method } as the second
+      // argument (plain object, not a Headers instance).
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
           return null;
         }
 
-        const normalizedEmail = credentials.email.trim().toLowerCase();
+        const normalizedEmail = normalizeLoginIdentifier(credentials.email);
+        const ip = extractClientIp((req as { headers?: Record<string, unknown> } | undefined)?.headers);
+        const userAgent =
+          (req as { headers?: Record<string, string> } | undefined)?.headers?.['user-agent'] ?? null;
+
+        // ── R-08 (F-08): brute-force gate, BEFORE any credential evaluation.
+        const gate = checkLoginAllowed(normalizedEmail, ip);
+        if (!gate.allowed) {
+          await logLoginEvent({
+            event: 'LOGIN_THROTTLED',
+            userId: null,
+            attemptedEmail: normalizedEmail,
+            ip,
+            userAgent,
+          });
+          // NextAuth cannot surface a 429 from authorize(); returning null
+          // yields the same generic CredentialsSignin error as a wrong
+          // password. The attempt is still blocked and audited.
+          return null;
+        }
 
         const user = await db.user.findUnique({
           where: { email: normalizedEmail },
         });
 
-        if (!user || !user.isActive) {
+        // ── R-08: uniform failure handling. Unknown account and inactive
+        // account run a decoy bcrypt compare so response timing matches the
+        // wrong-password path (no account-enumeration via timing), and every
+        // failure feeds the account+IP throttles.
+        if (!user) {
+          await equalizeLoginTiming(credentials.password);
+          recordLoginFailure(normalizedEmail, ip, 'ACCOUNT_NOT_FOUND');
+          await logLoginEvent({
+            event: 'LOGIN_FAILED_ACCOUNT_NOT_FOUND',
+            userId: null,
+            attemptedEmail: normalizedEmail,
+            ip,
+            userAgent,
+          });
+          return null;
+        }
+
+        if (!user.isActive) {
+          await equalizeLoginTiming(credentials.password);
+          recordLoginFailure(normalizedEmail, ip, 'ACCOUNT_INACTIVE');
+          await logLoginEvent({
+            event: 'LOGIN_FAILED_ACCOUNT_INACTIVE',
+            userId: user.id,
+            attemptedEmail: normalizedEmail,
+            ip,
+            userAgent,
+          });
           return null;
         }
 
         const isValid = await bcrypt.compare(credentials.password, user.passwordHash);
         if (!isValid) {
+          recordLoginFailure(normalizedEmail, ip, 'WRONG_PASSWORD');
+          await logLoginEvent({
+            event: 'LOGIN_FAILED_WRONG_PASSWORD',
+            userId: user.id,
+            attemptedEmail: normalizedEmail,
+            ip,
+            userAgent,
+          });
           return null;
         }
 
@@ -154,12 +224,22 @@ export const authOptions: NextAuthOptions = {
           // Ignore — DB may be read-only in some environments
         }
 
+        recordLoginSuccess(normalizedEmail);
+        await logLoginEvent({
+          event: 'LOGIN_SUCCESS',
+          userId: user.id,
+          attemptedEmail: normalizedEmail,
+          ip,
+          userAgent,
+        });
+
         return {
           id: user.id,
           email: user.email,
           name: user.name,
           role: user.role,
           mustChangePassword: user.mustChangePassword,
+          sessionVersion: user.sessionVersion,
         };
       },
     }),
@@ -192,25 +272,60 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id!;
         token.role = user.role;
         token.mustChangePassword = user.mustChangePassword;
+        // R-09: snapshot the current session version into the token.
+        token.sv = user.sessionVersion ?? 0;
       } else if (token.id) {
-        // On session refresh — re-read mustChangePassword from DB
-        // This ensures the flag is always current, even if the JWT is stale
+        // On session refresh — re-read the security-relevant user state from
+        // the database. This callback runs on EVERY getServerSession() call,
+        // which is what makes revocation immediate rather than token-lifetime.
+        //
+        // R-09 (F-09) fail-closed revocation check:
+        //   - user deleted                  → dead token
+        //   - user deactivated (isActive)   → dead token
+        //   - sessionVersion mismatch       → dead token (password change /
+        //     reset, deactivation or privilege reduction since issuance)
+        // A dead token is `{}`; the session callback then yields an empty
+        // body, which getServerSession() surfaces as `null` (no session).
         try {
           const dbUser = await db.user.findUnique({
             where: { id: token.id },
-            select: { mustChangePassword: true, role: true },
+            select: {
+              mustChangePassword: true,
+              role: true,
+              isActive: true,
+              sessionVersion: true,
+            },
           });
-          if (dbUser) {
-            token.mustChangePassword = dbUser.mustChangePassword;
-            token.role = dbUser.role;
+          if (
+            !dbUser ||
+            !dbUser.isActive ||
+            token.sv !== dbUser.sessionVersion
+          ) {
+            // Dead token: a JWT with no subject. The cast is required only
+            // because NextAuth's callback types don't model revocation —
+            // runtime-wise an empty object is a valid (subject-less) JWT,
+            // and the session callback below turns it into "no session".
+            return {} as JWT;
           }
+          token.mustChangePassword = dbUser.mustChangePassword;
+          token.role = dbUser.role;
+          token.sv = dbUser.sessionVersion;
         } catch {
-          // DB read failed — keep the existing token values
+          // DB read failed — fail closed: a session we cannot verify is a
+          // session we must not honour.
+          return {} as JWT;
         }
       }
       return token;
     },
     async session({ session, token }) {
+      // R-09: dead/empty tokens produce an empty session body. NextAuth's
+      // getServerSession() returns `null` for an empty body, so every
+      // consumer sees "not authenticated" and fails closed. (The cast is
+      // needed only because NextAuth's types don't model an empty session.)
+      if (!token?.id) {
+        return {} as Session;
+      }
       if (session.user) {
         session.user.id = token.id;
         session.user.role = token.role;
